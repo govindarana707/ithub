@@ -2,6 +2,9 @@
 require_once dirname(__DIR__) . '/config/config.php';
 require_once dirname(__DIR__) . '/includes/auth.php';
 require_once dirname(__DIR__) . '/models/Course.php';
+require_once dirname(__DIR__) . '/models/Quiz.php';
+require_once dirname(__DIR__) . '/models/Discussion.php';
+require_once dirname(__DIR__) . '/models/Database.php';
 
 if (!isLoggedIn()) {
     redirect('../login.php');
@@ -16,26 +19,220 @@ require_once dirname(__DIR__) . '/includes/universal_header.php';
 
 $studentId = $_SESSION['user_id'];
 $course = new Course();
+$quiz = new Quiz();
+$discussion = new Discussion();
 
-// Get enrolled courses
+// Get enrolled courses with enhanced data
 $enrolledCourses = $course->getEnrolledCourses($studentId);
+
+// Enhanced course data
+foreach ($enrolledCourses as &$enrolledCourse) {
+    // Get detailed progress
+    $enrolledCourse['progress_details'] = $course->getCourseStatistics($enrolledCourse['id']);
+    
+    // Get quiz statistics
+    $enrolledCourse['quiz_stats'] = $quiz->getCourseQuizStats($studentId, $enrolledCourse['id']);
+    
+    // Get discussion count
+    $enrolledCourse['discussion_count'] = $discussion->getCourseDiscussionCount($enrolledCourse['id']);
+    
+    // Get next lesson
+    $enrolledCourse['next_lesson'] = $course->getNextLesson($studentId, $enrolledCourse['id']);
+    
+    // Calculate learning streak
+    $enrolledCourse['learning_streak'] = calculateLearningStreak($studentId, $enrolledCourse['id']);
+    
+    // Get completion prediction
+    $enrolledCourse['completion_prediction'] = predictCompletionTime($enrolledCourse);
+}
 
 // Handle course selection
 $selectedCourseId = $_GET['course_id'] ?? null;
 $selectedCourse = null;
 $lessons = [];
+$courseQuizzes = [];
+$courseDiscussions = [];
+$courseAnalytics = [];
 
 if ($selectedCourseId && isset($enrolledCourses)) {
     foreach ($enrolledCourses as $enrolled) {
         if ($enrolled['id'] == $selectedCourseId) {
             $selectedCourse = $enrolled;
-            $lessons = $course->getCourseLessons($selectedCourseId);
+            $lessons = $course->getCourseLessons($selectedCourseId, $studentId);
+            $courseQuizzes = $quiz->getCourseQuizzes($selectedCourseId);
+            $courseDiscussions = $discussion->getCourseDiscussions($selectedCourseId);
+            $courseAnalytics = getCourseAnalytics($studentId, $selectedCourseId);
             break;
         }
     }
 }
 
+// Handle filters and sorting
+$filter = $_GET['filter'] ?? 'all';
+$sort = $_GET['sort'] ?? 'recent';
+$search = $_GET['search'] ?? '';
+
+// Filter courses
+$filteredCourses = filterCourses($enrolledCourses, $filter, $search);
+
+// Sort courses
+$filteredCourses = sortCourses($filteredCourses, $sort);
+
 $pageTitle = $selectedCourse ? htmlspecialchars($selectedCourse['title']) : 'My Courses';
+
+// Advanced functions
+function calculateLearningStreak($studentId, $courseId) {
+    $database = new Database();
+    $conn = $database->getConnection();
+    
+    $stmt = $conn->prepare("
+        SELECT COUNT(DISTINCT DATE(completed_at)) as streak_days
+        FROM lesson_progress lp
+        JOIN lessons l ON lp.lesson_id = l.id
+        WHERE lp.student_id = ? AND l.course_id = ? AND lp.completed = 1
+        AND completed_at >= DATE_SUB(CURRENT_DATE, INTERVAL 30 DAY)
+        ORDER BY completed_at DESC
+    ");
+    
+    if ($stmt) {
+        $stmt->bind_param("ii", $studentId, $courseId);
+        $stmt->execute();
+        $result = $stmt->get_result()->fetch_assoc();
+        return $result['streak_days'] ?? 0;
+    }
+    return 0;
+}
+
+function predictCompletionTime($course) {
+    $progress = $course['enrollment_status'] ?? 'active';
+    $progressPercentage = $course['progress_percentage'] ?? 0;
+    
+    if ($progressPercentage >= 100) {
+        return ['status' => 'completed', 'days' => 0];
+    }
+    
+    // Simple prediction based on current progress
+    $daysSinceEnrollment = $course['enrolled_at'] ? 
+        (time() - strtotime($course['enrolled_at'])) / 86400 : 1;
+    
+    if ($progressPercentage > 0) {
+        $totalDays = $daysSinceEnrollment / ($progressPercentage / 100);
+        $remainingDays = $totalDays - $daysSinceEnrollment;
+        return [
+            'status' => 'in_progress', 
+            'days' => max(1, round($remainingDays))
+        ];
+    }
+    
+    return ['status' => 'not_started', 'days' => 30]; // Default estimate
+}
+
+function filterCourses($courses, $filter, $search) {
+    $filtered = $courses;
+    
+    // Apply search filter
+    if (!empty($search)) {
+        $search = strtolower($search);
+        $filtered = array_filter($filtered, function($course) use ($search) {
+            return strpos(strtolower($course['title']), $search) !== false ||
+                   strpos(strtolower($course['description'] ?? ''), $search) !== false ||
+                   strpos(strtolower($course['category_name'] ?? ''), $search) !== false;
+        });
+    }
+    
+    // Apply status filter
+    switch ($filter) {
+        case 'active':
+            $filtered = array_filter($filtered, function($course) {
+                return ($course['progress_percentage'] ?? 0) < 100;
+            });
+            break;
+        case 'completed':
+            $filtered = array_filter($filtered, function($course) {
+                return ($course['progress_percentage'] ?? 0) >= 100;
+            });
+            break;
+        case 'in_progress':
+            $filtered = array_filter($filtered, function($course) {
+                $progress = $course['progress_percentage'] ?? 0;
+                return $progress > 0 && $progress < 100;
+            });
+            break;
+    }
+    
+    return array_values($filtered);
+}
+
+function sortCourses($courses, $sort) {
+    switch ($sort) {
+        case 'recent':
+            usort($courses, function($a, $b) {
+                return strtotime($b['enrolled_at'] ?? '1970-01-01') - strtotime($a['enrolled_at'] ?? '1970-01-01');
+            });
+            break;
+        case 'progress':
+            usort($courses, function($a, $b) {
+                return ($b['progress_percentage'] ?? 0) - ($a['progress_percentage'] ?? 0);
+            });
+            break;
+        case 'title':
+            usort($courses, function($a, $b) {
+                return strcmp($a['title'] ?? '', $b['title'] ?? '');
+            });
+            break;
+        case 'streak':
+            usort($courses, function($a, $b) {
+                return ($b['learning_streak'] ?? 0) - ($a['learning_streak'] ?? 0);
+            });
+            break;
+    }
+    
+    return $courses;
+}
+
+function getCourseAnalytics($studentId, $courseId) {
+    $database = new Database();
+    $conn = $database->getConnection();
+    
+    $analytics = [];
+    
+    // Learning activity over time
+    $stmt = $conn->prepare("
+        SELECT DATE(completed_at) as date, COUNT(*) as lessons_completed
+        FROM lesson_progress lp
+        JOIN lessons l ON lp.lesson_id = l.id
+        WHERE lp.student_id = ? AND l.course_id = ? AND lp.completed = 1
+        AND completed_at >= DATE_SUB(CURRENT_DATE, INTERVAL 30 DAY)
+        GROUP BY DATE(completed_at)
+        ORDER BY date DESC
+    ");
+    
+    if ($stmt) {
+        $stmt->bind_param("ii", $studentId, $courseId);
+        $stmt->execute();
+        $analytics['activity_timeline'] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+    
+    // Best performing categories
+    $stmt = $conn->prepare("
+        SELECT c.name as category, AVG(lp.completion_time) as avg_time
+        FROM lesson_progress lp
+        JOIN lessons l ON lp.lesson_id = l.id
+        JOIN courses_new c ON l.course_id = c.id
+        WHERE lp.student_id = ? AND l.course_id = ? AND lp.completed = 1
+        GROUP BY c.name
+        ORDER BY avg_time ASC
+        LIMIT 5
+    ");
+    
+    if ($stmt) {
+        $stmt->bind_param("ii", $studentId, $courseId);
+        $stmt->execute();
+        $analytics['category_performance'] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+    
+    return $analytics;
+}
 ?>
 
     <div class="container-fluid py-4">

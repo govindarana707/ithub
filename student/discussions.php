@@ -23,22 +23,39 @@ $studentId = $_SESSION['user_id'];
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
+    $isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest';
     
     switch ($action) {
         case 'create_discussion':
+            // Debug: Log the request
+            error_log("Discussion creation request - User ID: " . $studentId);
+            error_log("POST data: " . json_encode($_POST));
+            
             $data = [
                 'course_id' => intval($_POST['course_id']),
                 'student_id' => $studentId,
                 'title' => sanitize($_POST['title']),
                 'content' => sanitize($_POST['content']),
-                'parent_id' => null
+                'lesson_id' => null,
+                'pinned' => 0,
+                'locked' => 0
             ];
             
+            error_log("Processed data: " . json_encode($data));
+            
             $result = $discussion->createDiscussion($data);
-            if ($result['success']) {
-                $_SESSION['success_message'] = 'Discussion posted successfully!';
+            error_log("Discussion result: " . json_encode($result));
+            
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode($result);
+                exit;
             } else {
-                $_SESSION['error_message'] = 'Failed to post discussion: ' . $result['error'];
+                if ($result['success']) {
+                    $_SESSION['success_message'] = 'Discussion posted successfully!';
+                } else {
+                    $_SESSION['error_message'] = 'Failed to post discussion: ' . $result['error'];
+                }
             }
             break;
             
@@ -100,6 +117,28 @@ $stats = $discussion->getDiscussionStats();
 ?>
 
     <div class="container-fluid py-4">
+        <?php if (isset($_SESSION['success_message'])): ?>
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fas fa-check-circle me-2"></i>
+                <?php 
+                    echo htmlspecialchars($_SESSION['success_message']);
+                    unset($_SESSION['success_message']);
+                ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['error_message'])): ?>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                <?php 
+                    echo htmlspecialchars($_SESSION['error_message']);
+                    unset($_SESSION['error_message']);
+                ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+        
         <div class="row">
             <div class="col-md-3">
                 <div class="list-group">
@@ -193,7 +232,7 @@ $stats = $discussion->getDiscussionStats();
                     <?php else: ?>
                         <div class="discussions-list">
                             <?php foreach ($discussions as $discussion): ?>
-                                <div class="card mb-3 <?php echo $discussion['is_pinned'] ? 'border-warning' : ''; ?>">
+                                <div class="card mb-3 <?php echo ($discussion['pinned'] ?? 0) ? 'border-warning' : ''; ?>">
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-start mb-2">
                                             <div class="d-flex align-items-center">
@@ -207,11 +246,11 @@ $stats = $discussion->getDiscussionStats();
                                                 <div>
                                                     <h6 class="mb-0">
                                                         <?php echo htmlspecialchars($discussion['title']); ?>
-                                                        <?php if ($discussion['is_pinned']): ?>
+                                                        <?php if ($discussion['pinned'] ?? 0): ?>
                                                             <i class="fas fa-thumbtack text-warning ms-2"></i>
                                                         <?php endif; ?>
-                                                        <?php if ($discussion['is_resolved']): ?>
-                                                            <span class="badge bg-success ms-2">Resolved</span>
+                                                        <?php if ($discussion['locked'] ?? 0): ?>
+                                                            <span class="badge bg-success ms-2">Locked</span>
                                                         <?php endif; ?>
                                                     </h6>
                                                     <small class="text-muted">
@@ -222,7 +261,7 @@ $stats = $discussion->getDiscussionStats();
                                             </div>
                                             <div class="text-end">
                                                 <small class="text-muted">
-                                                    <i class="fas fa-comment me-1"></i><?php echo $discussion['reply_count']; ?> replies
+                                                    <i class="fas fa-eye me-1"></i><?php echo $discussion['views_count'] ?? 0; ?> views
                                                 </small>
                                             </div>
                                         </div>
@@ -317,6 +356,58 @@ $stats = $discussion->getDiscussionStats();
     <script src="../assets/js/main.js"></script>
     <script>
         $(document).ready(function() {
+            // Handle AJAX form submissions
+            $('.ajax-form').on('submit', function(e) {
+                e.preventDefault();
+                var form = $(this);
+                var submitBtn = form.find('button[type="submit"]');
+                var originalText = submitBtn.html();
+                
+                console.log('Form submission started');
+                console.log('Form data:', form.serialize());
+                
+                // Show loading state
+                submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Posting...');
+                
+                $.ajax({
+                    url: form.attr('action') || window.location.href,
+                    type: 'POST',
+                    data: form.serialize(),
+                    dataType: 'json',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    beforeSend: function(xhr) {
+                        console.log('Sending AJAX request...');
+                    },
+                    success: function(response) {
+                        console.log('AJAX response:', response);
+                        if (response.success) {
+                            // Close modal and refresh page
+                            $('#createDiscussionModal').modal('hide');
+                            location.reload();
+                        } else {
+                            // Show error message
+                            alert('Error: ' + (response.message || response.error || 'Failed to post discussion. Please try again.'));
+                            submitBtn.prop('disabled', false).html(originalText);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.log('AJAX error:', status, error);
+                        console.log('Response text:', xhr.responseText);
+                        
+                        // Try to parse error response
+                        try {
+                            var response = JSON.parse(xhr.responseText);
+                            alert('Error: ' + (response.message || response.error || 'Failed to post discussion. Please try again.'));
+                        } catch(e) {
+                            alert('Error posting discussion. Please try again.\n\nDetails: ' + xhr.responseText);
+                        }
+                        submitBtn.prop('disabled', false).html(originalText);
+                    }
+                });
+            });
+            
             window.viewDiscussion = function(discussionId) {
                 $('#discussionDetailsContent').html(`
                     <div class="text-center">

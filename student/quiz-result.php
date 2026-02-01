@@ -249,24 +249,31 @@ $results = $quiz->getQuizAttemptResults($attemptId);
                                 
                                 <?php if ($question['question_type'] === 'multiple_choice'): ?>
                                     <div class="options-review">
-                                        <?php foreach ($question['options'] as $option): ?>
-                                            <div class="option-review <?php 
-                                                echo $option['is_correct'] ? 'correct' : ''; 
-                                                echo ($option['selected'] && !$option['is_correct']) ? ' incorrect' : ''; 
-                                                echo $option['selected'] ? ' selected' : ''; 
-                                            ?>">
-                                                <div class="d-flex align-items-center">
-                                                    <?php if ($option['is_correct']): ?>
-                                                        <i class="fas fa-check-circle text-success me-2"></i>
-                                                    <?php elseif ($option['selected']): ?>
-                                                        <i class="fas fa-times-circle text-danger me-2"></i>
-                                                    <?php else: ?>
-                                                        <i class="fas fa-circle text-muted me-2"></i>
-                                                    <?php endif; ?>
-                                                    <?php echo htmlspecialchars($option['option_text']); ?>
+                                        <?php if (!empty($question['options'])): ?>
+                                            <?php foreach ($question['options'] as $option): ?>
+                                                <div class="option-review <?php 
+                                                    echo $option['is_correct'] ? 'correct' : ''; 
+                                                    echo (isset($option['selected']) && $option['selected'] && !$option['is_correct']) ? ' incorrect' : ''; 
+                                                    echo (isset($option['selected']) && $option['selected']) ? ' selected' : ''; 
+                                                ?>">
+                                                    <div class="d-flex align-items-center">
+                                                        <?php if ($option['is_correct']): ?>
+                                                            <i class="fas fa-check-circle text-success me-2"></i>
+                                                        <?php elseif (isset($option['selected']) && $option['selected']): ?>
+                                                            <i class="fas fa-times-circle text-danger me-2"></i>
+                                                        <?php else: ?>
+                                                            <i class="fas fa-circle text-muted me-2"></i>
+                                                        <?php endif; ?>
+                                                        <?php echo htmlspecialchars($option['option_text']); ?>
+                                                    </div>
                                                 </div>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <div class="alert alert-warning">
+                                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                                No options available for this question.
                                             </div>
-                                        <?php endforeach; ?>
+                                        <?php endif; ?>
                                     </div>
                                     
                                 <?php elseif ($question['question_type'] === 'true_false'): ?>

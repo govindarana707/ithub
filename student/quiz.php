@@ -217,24 +217,15 @@ $conn->close();
                             <p class="lead"><?php echo htmlspecialchars($question['question_text']); ?></p>
                             
                             <?php if ($question['question_type'] === 'multiple_choice'): ?>
-                                <?php
-                                $conn = connectDB();
-                                $stmt = $conn->prepare("SELECT * FROM quiz_options WHERE question_id = ? ORDER BY option_order");
-                                $stmt->bind_param("i", $question['id']);
-                                $stmt->execute();
-                                $options = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-                                $conn->close();
-                                ?>
-                                
                                 <div class="options-container">
-                                    <?php foreach ($options as $option): ?>
+                                    <?php foreach ($question['options'] as $option): ?>
                                         <div class="option-card" onclick="selectOption(this, <?php echo $question['id']; ?>, <?php echo $option['id']; ?>)">
                                             <div class="d-flex align-items-center">
                                                 <div class="form-check me-3">
                                                     <input class="form-check-input" type="radio" name="answers[<?php echo $question['id']; ?>]" value="<?php echo $option['id']; ?>" id="option_<?php echo $option['id']; ?>">
                                                 </div>
                                                 <label class="form-check-label flex-grow-1" for="option_<?php echo $option['id']; ?>">
-                                                    <?php echo htmlspecialchars($option['option_text']); ?>
+                                                    <?php echo htmlspecialchars($option['text']); ?>
                                                 </label>
                                             </div>
                                         </div>
@@ -397,6 +388,37 @@ $conn->close();
             if (!confirm('Are you sure you want to submit your quiz? You cannot change your answers after submission.')) {
                 return;
             }
+            
+            // Ensure all radio button answers are included in form data
+            const formData = new FormData(this);
+            const answers = {};
+            
+            // Collect all radio button answers
+            document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
+                const name = radio.name;
+                const value = radio.value;
+                const questionId = name.match(/\d+/)[0];
+                answers[questionId] = value;
+            });
+            
+            // Collect all textarea answers
+            document.querySelectorAll('textarea').forEach(textarea => {
+                const name = textarea.name;
+                const value = textarea.value.trim();
+                if (value) {
+                    const questionId = name.match(/\d+/)[0];
+                    answers[questionId] = value;
+                }
+            });
+            
+            // Create hidden inputs for all answers to ensure they're submitted
+            Object.keys(answers).forEach(questionId => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'answers[' + questionId + ']';
+                input.value = answers[questionId];
+                this.appendChild(input);
+            });
             
             clearInterval(timerInterval);
             this.submit();

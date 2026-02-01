@@ -4,29 +4,21 @@ require_once '../includes/auth.php';
 
 requireStudent();
 
+require_once '../models/Database.php';
 require_once '../models/User.php';
 require_once '../models/Course.php';
 require_once '../models/Quiz.php';
 require_once '../models/Discussion.php';
-
-$user = new User();
-$course = new Course();
-$quiz = new Quiz();
-$discussion = new Discussion();
-
-$userId = $_SESSION['user_id'];
-
-// Get dashboard data
-$dashboardData = getStudentDashboardData($userId);
-
-// Include header after all PHP logic
-require_once '../includes/universal_header.php';
+require_once '../models/ProgressTracking.php';
+require_once '../models/RecommendationSystem.php';
 
 /**
  * Get comprehensive student dashboard data
  */
 function getStudentDashboardData($userId) {
-    $conn = connectDB();
+    // Use Database class instead of connectDB()
+    $database = new Database();
+    $conn = $database->getConnection();
     
     // Get enrolled courses with progress
     $enrolledCourses = getEnrolledCoursesWithProgress($conn, $userId);
@@ -46,7 +38,7 @@ function getStudentDashboardData($userId) {
     // Get recommended courses
     $recommendedCourses = getRecommendedCourses($conn, $userId, 4);
     
-    $conn->close();
+    $database->close();
     
     return [
         'enrolledCourses' => $enrolledCourses,
@@ -70,8 +62,8 @@ function getEnrolledCoursesWithProgress($conn, $userId) {
                 JOIN lessons l ON lp.lesson_id = l.id 
                 WHERE l.course_id = c.id AND lp.student_id = ? AND lp.completed = 1) as completed_lessons
         FROM enrollments e
-        JOIN courses c ON e.course_id = c.id
-        LEFT JOIN categories cat ON c.category_id = cat.id
+        JOIN courses_new c ON e.course_id = c.id
+        LEFT JOIN categories_new cat ON c.category_id = cat.id
         WHERE e.student_id = ?
         ORDER BY e.enrolled_at DESC
     ";
@@ -85,7 +77,7 @@ function getEnrolledCoursesWithProgress($conn, $userId) {
                    0 as total_lessons,
                    0 as completed_lessons
             FROM enrollments e
-            JOIN courses c ON e.course_id = c.id
+            JOIN courses_new c ON e.course_id = c.id
             WHERE e.student_id = ?
             ORDER BY e.enrolled_at DESC
         ");
@@ -135,7 +127,7 @@ function getQuizStatistics($conn, $userId) {
         SELECT qa.*, q.title as quiz_title, c.title as course_title
         FROM quiz_attempts qa
         JOIN quizzes q ON qa.quiz_id = q.id
-        JOIN courses c ON q.course_id = c.id
+        JOIN courses_new c ON q.course_id = c.id
         WHERE qa.student_id = ? AND qa.status = 'completed'
         ORDER BY qa.completed_at DESC
         LIMIT 5
@@ -169,7 +161,7 @@ function getRecentActivity($conn, $userId) {
             e.enrolled_at as created_at,
             c.id as related_id
         FROM enrollments e
-        JOIN courses c ON e.course_id = c.id
+        JOIN courses_new c ON e.course_id = c.id
         WHERE e.student_id = ?
         UNION ALL
         SELECT 
@@ -188,7 +180,7 @@ function getRecentActivity($conn, $userId) {
             l.id as related_id
         FROM lesson_progress lp
         JOIN lessons l ON lp.lesson_id = l.id
-        JOIN courses c ON l.course_id = c.id
+        JOIN courses_new c ON l.course_id = c.id
         WHERE lp.student_id = ? AND lp.completed = 1
         ORDER BY created_at DESC
         LIMIT 8
@@ -256,28 +248,65 @@ function getStudentAchievements($conn, $userId) {
 }
 
 /**
- * Get recommended courses
+ * Get recommended courses using the new recommendation system
  */
 function getRecommendedCourses($conn, $userId, $limit = 4) {
-    $stmt = $conn->prepare("
-        SELECT c.*, u.name as instructor_name,
-               (SELECT AVG(rating) FROM course_ratings WHERE course_id = c.id) as avg_rating,
-               (SELECT COUNT(*) FROM course_ratings WHERE course_id = c.id) as rating_count
-        FROM courses c
-        JOIN users u ON c.instructor_id = u.id
-        WHERE c.id NOT IN (SELECT course_id FROM enrollments WHERE student_id = ?)
-        AND c.status = 'published'
-        ORDER BY c.enrollment_count DESC, avg_rating DESC
-        LIMIT ?
-    ");
-    if ($stmt === false) {
-        return [];
+    // Use the new recommendation system
+    $recommendationSystem = new RecommendationSystem();
+    
+    // Get KNN recommendations
+    $recommendations = $recommendationSystem->getKNNRecommendations($userId, $limit);
+    
+    // If no recommendations available, fallback to basic method
+    if (empty($recommendations)) {
+        $stmt = $conn->prepare("
+            SELECT c.*, u.full_name as instructor_name,
+                   (SELECT AVG(rating) FROM course_ratings WHERE course_id = c.id) as avg_rating,
+                   (SELECT COUNT(*) FROM course_ratings WHERE course_id = c.id) as rating_count
+            FROM courses_new c
+            JOIN users_new u ON c.instructor_id = u.id
+            WHERE c.id NOT IN (SELECT course_id FROM enrollments WHERE student_id = ?)
+            AND c.status = 'published'
+            ORDER BY c.enrollment_count DESC, avg_rating DESC
+            LIMIT ?
+        ");
+        
+        if ($stmt === false) {
+            return [];
+        }
+        $stmt->bind_param("ii", $userId, $limit);
+        $stmt->execute();
+        $recommendations = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     }
-    $stmt->bind_param("ii", $userId, $limit);
-    $stmt->execute();
-    return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    
+    return $recommendations;
 }
 
+// Initialize objects after function definitions
+$user = new User();
+$course = new Course();
+$quiz = new Quiz();
+$discussion = new Discussion();
+$progressTracking = new ProgressTracking();
+$recommendationSystem = new RecommendationSystem();
+
+$userId = $_SESSION['user_id'];
+
+// Get dashboard data
+$dashboardData = getStudentDashboardData($userId);
+
+// Include header after all PHP logic
+require_once '../includes/universal_header.php';
+?>
+
+<!-- Add enhanced dashboard styles and scripts -->
+<link rel="stylesheet" href="../assets/css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Add user ID meta tag for JavaScript -->
+<meta name="user-id" content="<?php echo $userId; ?>">
+
+<?php
 // Extract data for easier access with safe defaults
 $enrolledCourses = $dashboardData['enrolledCourses'] ?? [];
 $quizStats = $dashboardData['quizStats'] ?? ['total_attempts' => 0, 'avg_score' => 0, 'best_score' => 0, 'passed_quizzes' => 0, 'failed_quizzes' => 0, 'recent_quizzes' => []];
@@ -291,7 +320,25 @@ $totalEnrolled = count($enrolledCourses);
 
 // Calculate additional metrics
 $completedCourses = count(array_filter($enrolledCourses, fn($c) => $c['status'] === 'completed'));
-$inProgressCourses = $totalEnrolled - $completedCourses;?>
+$inProgressCourses = $totalEnrolled - $completedCourses;
+
+// Get enhanced progress data for enrolled courses
+$enhancedProgress = [];
+foreach (array_slice($enrolledCourses, 0, 3) as $course) {
+    try {
+        $progressData = $progressTracking->getProgressReport($userId, $course['id']);
+        $enhancedProgress[$course['id']] = $progressData;
+    } catch (Exception $e) {
+        // Fallback if progress tracking fails
+        $enhancedProgress[$course['id']] = [
+            'completion_percentage' => $course['progress_percentage'] ?? 0,
+            'completion_probability' => 0.7,
+            'estimated_completion_time' => -1,
+            'alerts' => []
+        ];
+    }
+}
+?>
 
 <!-- Main Content -->
 <div class="container-fluid py-4">
@@ -338,105 +385,75 @@ $inProgressCourses = $totalEnrolled - $completedCourses;?>
                 </div>
 
                 <!-- Learning Overview -->
-                <div class="dashboard-card mb-4">
-                    <h3>Learning Overview</h3>
-                    <div class="row">
-                        <div class="col-md-3">
-                            <div class="stat-card primary">
-                                <h3><?php echo $totalEnrolled; ?></h3>
-                                <p>Enrolled Courses</p>
-                                <small><i class="fas fa-book-open"></i> Active Learning</small>
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-chart-line me-2"></i>Learning Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4><?php echo $totalEnrolled; ?></h4>
+                                    <p class="text-muted">Courses Enrolled</p>
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stat-card success">
-                                <h3><?php echo $completedCourses; ?></h3>
-                                <p>Completed</p>
-                                <small><i class="fas fa-check-circle"></i> Achievements</small>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4><?php echo $completedCourses; ?></h4>
+                                    <p class="text-muted">Completed</p>
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stat-card info">
-                                <h3><?php echo $quizStats['total_attempts']; ?></h3>
-                                <p>Quiz Attempts</p>
-                                <small><i class="fas fa-brain"></i> Knowledge Tests</small>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4><?php echo $quizStats['total_attempts']; ?></h4>
+                                    <p class="text-muted">Quiz Attempts</p>
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stat-card warning">
-                                <h3><?php echo $learningStreak; ?></h3>
-                                <p>Day Streak</p>
-                                <small><i class="fas fa-fire"></i> Consistency</small>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4><?php echo $learningStreak; ?></h4>
+                                    <p class="text-muted">Day Streak</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                    <!-- Enhanced Quiz Performance Section -->
-                    <div class="dashboard-card mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h3><i class="fas fa-brain me-2"></i>Quiz Performance</h3>
-                            <div>
-                                <a href="quizzes.php" class="btn btn-primary btn-sm me-2">
-                                    <i class="fas fa-play me-1"></i>Take Quiz
-                                </a>
-                                <a href="quiz-results.php" class="btn btn-outline-primary btn-sm">View All Results</a>
+                    <!-- Quiz Performance -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-brain me-2"></i>Quiz Performance</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="text-center">
+                                    <h4><?php echo $quizStats['avg_score']; ?>%</h4>
+                                    <p class="text-muted">Average Score</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-center">
+                                    <h4><?php echo $quizStats['best_score']; ?>%</h4>
+                                    <p class="text-muted">Best Score</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-center">
+                                    <h4><?php echo $quizStats['passed_quizzes']; ?>/<?php echo $quizStats['total_attempts']; ?></h4>
+                                    <p class="text-muted">Passed/Total</p>
+                                </div>
                             </div>
                         </div>
-                        
-                        <!-- Recent Quiz Activity -->
-                        <div class="mt-4">
-                            <h5><i class="fas fa-clock-rotate-left me-2"></i>Recent Quiz Activity</h5>
-                            <?php if (empty($quizStats['recent_quizzes'])): ?>
-                                <div class="text-center py-4">
-                                    <i class="fas fa-brain fa-3x text-muted mb-3"></i>
-                                    <h5>No quiz attempts yet</h5>
-                                    <p class="text-muted">Start taking quizzes to see your performance!</p>
-                                    <a href="quizzes.php" class="btn btn-primary">Take Your First Quiz</a>
-                                </div>
-                            <?php else: ?>
-                                <div>
-                                    <?php foreach ($quizStats['recent_quizzes'] as $quiz): ?>
-                                        <div class="quiz-item">
-                                            <div class="d-flex justify-content-between align-items-start">
-                                                <div class="flex-grow-1">
-                                                    <h6 class="mb-1"><?php echo htmlspecialchars($quiz['quiz_title']); ?></h6>
-                                                    <p class="mb-1 text-muted small">
-                                                        <i class="fas fa-book me-1"></i><?php echo htmlspecialchars($quiz['course_title']); ?>
-                                                    </p>
-                                                    <div class="d-flex align-items-center flex-wrap">
-                                                        <span class="badge bg-<?php echo $quiz['passed'] ? 'success' : 'danger'; ?> me-2">
-                                                            <i class="fas fa-<?php echo $quiz['passed'] ? 'check' : 'times'; ?> me-1"></i>
-                                                            <?php echo $quiz['passed'] ? 'Passed' : 'Failed'; ?>
-                                                        </span>
-                                                        <span class="badge bg-info me-2">
-                                                            <?php echo round($quiz['percentage']); ?>%
-                                                        </span>
-                                                        <small class="text-muted">
-                                                            <i class="fas fa-clock me-1"></i><?php echo date('M j, Y H:i', strtotime($quiz['completed_at'])); ?>
-                                                        </small>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <a href="quiz-result.php?attempt_id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-outline-primary">
-                                                        <i class="fas fa-eye me-1"></i>View Details
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            <?php endif; ?>
-                        </div>
                     </div>
+                </div>
 
-                    <!-- Enhanced Enrolled Courses Section -->
-                    <div class="dashboard-card mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h3><i class="fas fa-graduation-cap me-2"></i>My Enrolled Courses</h3>
-                            <a href="my-courses.php" class="btn btn-primary btn-sm">View All</a>
-                        </div>
-                        
+                    <!-- Enrolled Courses -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-graduation-cap me-2"></i>My Enrolled Courses</h5>
+                    </div>
+                    <div class="card-body">
                         <?php if (empty($enrolledCourses)): ?>
                             <div class="text-center py-4">
                                 <i class="fas fa-book fa-3x text-muted mb-3"></i>
@@ -448,32 +465,19 @@ $inProgressCourses = $totalEnrolled - $completedCourses;?>
                             <div class="row">
                                 <?php foreach (array_slice($enrolledCourses, 0, 3) as $course): ?>
                                     <div class="col-md-4 mb-3">
-                                        <div class="card course-card h-100">
+                                        <div class="card">
                                             <div class="card-body">
-                                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                                    <h6 class="card-title"><?php echo htmlspecialchars($course['title']); ?></h6>
-                                                    <span class="badge bg-<?php echo $course['status'] === 'completed' ? 'success' : 'primary'; ?>">
-                                                        <?php echo ucfirst($course['status']); ?>
-                                                    </span>
+                                                <h6 class="card-title"><?php echo htmlspecialchars($course['title']); ?></h6>
+                                                <p class="card-text small text-muted"><?php echo htmlspecialchars($course['category_name'] ?? 'General'); ?></p>
+                                                <div class="progress mb-2">
+                                                    <div class="progress-bar" style="width: <?php echo $course['progress_percentage']; ?>%"></div>
                                                 </div>
-                                                <p class="card-text small text-muted mb-2"><?php echo htmlspecialchars($course['category_name'] ?? 'General'); ?></p>
-                                                
-                                                <div class="mb-3">
-                                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                                        <small class="text-muted">Progress</small>
-                                                        <small class="text-muted"><?php echo round($course['progress_percentage']); ?>%</small>
-                                                    </div>
-                                                    <div class="progress">
-                                                        <div class="progress-bar" style="width: <?php echo $course['progress_percentage']; ?>%"></div>
-                                                    </div>
-                                                    <small class="text-muted">
-                                                        <?php echo $course['completed_lessons'] ?? 0; ?>/<?php echo $course['total_lessons'] ?? 0; ?> lessons
-                                                    </small>
-                                                </div>
-                                                
+                                                <small class="text-muted">
+                                                    <?php echo round($course['progress_percentage']); ?>% complete
+                                                </small>
                                                 <div class="mt-2">
-                                                    <a href="view-course.php?id=<?php echo $course['id']; ?>" class="btn btn-primary btn-sm w-100">
-                                                        <i class="fas fa-play me-1"></i><?php echo $course['status'] === 'completed' ? 'Review' : 'Continue'; ?>
+                                                    <a href="view-course.php?id=<?php echo $course['id']; ?>" class="btn btn-primary btn-sm">
+                                                        <?php echo $course['status'] === 'completed' ? 'Review' : 'Continue'; ?>
                                                     </a>
                                                 </div>
                                             </div>
@@ -481,158 +485,88 @@ $inProgressCourses = $totalEnrolled - $completedCourses;?>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
+                            <div class="text-center mt-3">
+                                <a href="my-courses.php" class="btn btn-outline-primary">View All Courses</a>
+                            </div>
                         <?php endif; ?>
                     </div>
+                </div>
 
-                    <!-- Recent Courses -->
-                    <div class="dashboard-card mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h3>Recent Courses</h3>
-                            <a href="my-courses.php" class="btn btn-primary btn-sm">View All</a>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Course Title</th>
-                                        <th>Progress</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php if (empty($enrolledCourses)): ?>
-                                        <tr>
-                                            <td colspan="4" class="text-center text-muted">
-                                                <i class="fas fa-graduation-cap fa-3x mb-3"></i>
-                                                <p>No courses enrolled yet</p>
-                                                <a href="../courses.php" class="btn btn-primary">Browse Courses</a>
-                                            </td>
-                                        </tr>
-                                    <?php else: ?>
-                                        <?php foreach (array_slice($enrolledCourses, 0, 5) as $course): ?>
-                                            <tr>
-                                                <td>
-                                                    <strong><?php echo htmlspecialchars($course['title']); ?></strong>
-                                                    <br>
-                                                    <small class="text-muted">Category: <?php echo htmlspecialchars($course['category_name'] ?? 'General'); ?></small>
-                                                </td>
-                                                <td>
-                                                    <div class="progress" style="height: 20px;">
-                                                        <div class="progress-bar" role="progressbar" 
-                                                             style="width: <?php echo $course['progress_percentage'] ?? 0; ?>%">
-                                                            <?php echo round($course['progress_percentage'] ?? 0); ?>%
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <span class="badge bg-<?php echo $course['status'] === 'completed' ? 'success' : ($course['status'] === 'in_progress' ? 'warning' : 'secondary'); ?>">
-                                                        <?php echo ucfirst($course['status'] ?? 'unknown'); ?>
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <div class="btn-group btn-group-sm">
-                                                        <a href="course-view.php?id=<?php echo $course['id']; ?>" class="btn btn-outline-primary">
-                                                            <i class="fas fa-eye"></i>
-                                                        </a>
-                                                        <a href="course-lessons.php?id=<?php echo $course['id']; ?>" class="btn btn-outline-success">
-                                                            <i class="fas fa-play"></i>
-                                                        </a>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
+                    <!-- Recommended Courses -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-star me-2"></i>Recommended Courses</h5>
                     </div>
-
-                    <!-- Enhanced Recommended Courses Section -->
-                    <div class="dashboard-card mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h3><i class="fas fa-star me-2"></i>Recommended Courses</h3>
-                            <a href="../courses.php" class="btn btn-outline-primary btn-sm">Browse All</a>
-                        </div>
-                        
-                        <div class="row">
-                            <?php foreach ($recommendedCourses as $course): ?>
-                                <div class="col-md-6 mb-3">
-                                    <div class="card course-card h-100">
-                                        <div class="card-body">
-                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="card-body">
+                        <?php if (empty($recommendedCourses)): ?>
+                            <div class="text-center py-4">
+                                <i class="fas fa-star fa-3x text-muted mb-3"></i>
+                                <h5>No recommendations yet</h5>
+                                <p class="text-muted">Start learning to get personalized recommendations.</p>
+                            </div>
+                        <?php else: ?>
+                            <div class="row">
+                                <?php foreach (array_slice($recommendedCourses, 0, 4) as $course): ?>
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card">
+                                            <div class="card-body">
                                                 <h6 class="card-title"><?php echo htmlspecialchars($course['title']); ?></h6>
-                                                <?php if ($course['avg_rating']): ?>
-                                                    <div class="d-flex align-items-center">
-                                                        <small class="text-warning me-1">
-                                                            <i class="fas fa-star"></i> <?php echo round($course['avg_rating'], 1); ?>
-                                                        </small>
-                                                        <small class="text-muted">(<?php echo $course['rating_count']; ?>)</small>
-                                                    </div>
-                                                <?php endif; ?>
-                                            </div>
-                                            <p class="card-text small text-muted mb-2"><?php echo substr(htmlspecialchars($course['description']), 0, 80); ?>...</p>
-                                            
-                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <small class="text-muted">
-                                                    <i class="fas fa-user me-1"></i><?php echo htmlspecialchars($course['instructor_name']); ?>
-                                                </small>
-                                                <small class="text-muted">
-                                                    <i class="fas fa-users me-1"></i><?php echo $course['enrollment_count']; ?> enrolled
-                                                </small>
-                                            </div>
-                                            
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <span class="badge bg-primary"><?php echo htmlspecialchars($course['category_name'] ?? 'General'); ?></span>
-                                                <a href="../course-details.php?id=<?php echo $course['id']; ?>" class="btn btn-outline-primary btn-sm">
+                                                <p class="card-text small text-muted"><?php echo htmlspecialchars($course['description'] ?? ''); ?></p>
+                                                <div class="mb-2">
+                                                    <span class="badge bg-primary"><?php echo htmlspecialchars($course['category_name'] ?? 'General'); ?></span>
+                                                </div>
+                                                <a href="../course-details.php?id=<?php echo $course['id']; ?>" class="btn btn-primary btn-sm">
                                                     View Details
                                                 </a>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <div class="text-center mt-3">
+                                <a href="../courses.php" class="btn btn-outline-primary">Browse All Courses</a>
+                            </div>
+                        <?php endif; ?>
                     </div>
+                </div>
 
-                    <!-- Enhanced Recent Activity Section -->
-                    <div class="dashboard-card">
-                        <h3><i class="fas fa-clock-rotate-left me-2"></i>Recent Activity</h3>
+                <!-- Recent Activity -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-clock-rotate-left me-2"></i>Recent Activity</h5>
+                    </div>
+                    <div class="card-body">
                         <?php if (empty($recentActivity)): ?>
                             <p class="text-muted text-center py-3">No recent activity. Start learning to see your progress!</p>
                         <?php else: ?>
                             <div>
                                 <?php foreach ($recentActivity as $activity): ?>
-                                    <div class="activity-item">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div class="flex-grow-1">
-                                                <div class="d-flex align-items-center">
-                                                    <?php
-                                                    $icon = 'circle';
-                                                    $color = 'primary';
-                                                    switch($activity['type']) {
-                                                        case 'enrollment':
-                                                            $icon = 'graduation-cap';
-                                                            $color = 'success';
-                                                            break;
-                                                        case 'quiz_attempt':
-                                                            $icon = 'brain';
-                                                            $color = 'info';
-                                                            break;
-                                                        case 'lesson_completed':
-                                                            $icon = 'check-circle';
-                                                            $color = 'success';
-                                                            break;
-                                                    }
-                                                    ?>
-                                                    <i class="fas fa-<?php echo $icon; ?> text-<?php echo $color; ?> me-2"></i>
-                                                    <span><?php echo htmlspecialchars($activity['description']); ?></span>
-                                                </div>
-                                            </div>
-                                            <small class="text-muted">
-                                                <?php echo getTimeAgo($activity['created_at']); ?>
-                                            </small>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div>
+                                            <?php
+                                            $icon = 'circle';
+                                            $color = 'primary';
+                                            switch($activity['type']) {
+                                                case 'enrollment':
+                                                    $icon = 'graduation-cap';
+                                                    $color = 'success';
+                                                    break;
+                                                case 'quiz_attempt':
+                                                    $icon = 'brain';
+                                                    $color = 'info';
+                                                    break;
+                                                case 'lesson_completed':
+                                                    $icon = 'check-circle';
+                                                    $color = 'success';
+                                                    break;
+                                            }
+                                            ?>
+                                            <i class="fas fa-<?php echo $icon; ?> text-<?php echo $color; ?> me-2"></i>
+                                            <span><?php echo htmlspecialchars($activity['description']); ?></span>
                                         </div>
+                                        <small class="text-muted">
+                                            <?php echo getTimeAgo($activity['created_at']); ?>
+                                        </small>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -642,60 +576,11 @@ $inProgressCourses = $totalEnrolled - $completedCourses;?>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Floating Action Button -->
-    <button class="floating-btn" onclick="window.location.href='quizzes.php'" title="Take a Quiz">
-        <i class="fas fa-brain"></i>
-    </button>
-
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="../assets/js/main.js"></script>
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Add interactive animations
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.style.opacity = '1';
-                        entry.target.style.transform = 'translateY(0)';
-                    }
-                });
-            });
-            
-            document.querySelectorAll('.stat-card').forEach(card => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                card.style.transition = 'all 0.6s ease';
-                observer.observe(card);
-            });
-            
-            // Add hover effects to cards
-            document.querySelectorAll('.course-card, .quiz-item').forEach(card => {
-                card.addEventListener('mouseenter', function() {
-                    this.style.transform = 'translateY(-5px)';
-                });
-                card.addEventListener('mouseleave', function() {
-                    this.style.transform = 'translateY(0)';
-                });
-            });
-        });
-        
-        // Helper function for time ago (if not defined in main.js)
-        function getTimeAgo(dateString) {
-            const date = new Date(dateString);
-            const now = new Date();
-            const seconds = Math.floor((now - date) / 1000);
-            
-            if (seconds < 60) return 'Just now';
-            if (seconds < 3600) return Math.floor(seconds / 60) + ' minutes ago';
-            if (seconds < 86400) return Math.floor(seconds / 3600) + ' hours ago';
-            if (seconds < 604800) return Math.floor(seconds / 86400) + ' days ago';
-            return date.toLocaleDateString();
-        }
-    </script>
+<!-- Simple Dashboard JavaScript -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="../assets/js/main.js"></script>
 
 <?php
 /**
