@@ -77,7 +77,7 @@ try {
                     <i class="fas fa-user me-1"></i><?php echo htmlspecialchars($discussionDetails['full_name']); ?>
                     <i class="fas fa-book me-1 ms-2"></i><?php echo htmlspecialchars($discussionDetails['course_title'] ?? 'Unknown Course'); ?>
                     <i class="fas fa-clock me-1 ms-2"></i><?php echo date('M j, Y H:i', strtotime($discussionDetails['created_at'])); ?>
-                    <?php if ($discussionDetails['is_pinned']): ?>
+                    <?php if ($discussionDetails['pinned'] ?? 0): ?>
                         <span class="badge bg-warning ms-2"><i class="fas fa-thumbtack me-1"></i>Pinned</span>
                     <?php endif; ?>
                 </div>
@@ -91,11 +91,11 @@ try {
                         <i class="fas fa-trash me-1"></i>Delete
                     </button>
                 <?php elseif ($userRole === 'instructor'): ?>
-                    <button class="btn btn-sm btn-outline-warning" onclick="togglePin(<?php echo $discussionDetails['id']; ?>, <?php echo $discussionDetails['is_pinned'] ? 0 : 1; ?>)">
-                        <i class="fas fa-thumbtack me-1"></i><?php echo $discussionDetails['is_pinned'] ? 'Unpin' : 'Pin'; ?>
+                    <button class="btn btn-sm btn-outline-warning" onclick="togglePin(<?php echo $discussionDetails['id']; ?>, <?php echo ($discussionDetails['pinned'] ?? 0) ? 0 : 1; ?>)">
+                        <i class="fas fa-thumbtack me-1"></i><?php echo ($discussionDetails['pinned'] ?? 0) ? 'Unpin' : 'Pin'; ?>
                     </button>
-                    <button class="btn btn-sm btn-outline-success" onclick="toggleResolve(<?php echo $discussionDetails['id']; ?>, <?php echo $discussionDetails['is_resolved'] ? 0 : 1; ?>)">
-                        <i class="fas fa-check me-1"></i><?php echo $discussionDetails['is_resolved'] ? 'Reopen' : 'Resolve'; ?>
+                    <button class="btn btn-sm btn-outline-success" onclick="toggleResolve(<?php echo $discussionDetails['id']; ?>, <?php echo ($discussionDetails['locked'] ?? 0) ? 0 : 1; ?>)">
+                        <i class="fas fa-check me-1"></i><?php echo ($discussionDetails['locked'] ?? 0) ? 'Reopen' : 'Lock'; ?>
                     </button>
                 <?php endif; ?>
             </div>

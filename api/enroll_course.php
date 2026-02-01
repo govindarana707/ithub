@@ -2,6 +2,11 @@
 require_once '../config/config.php';
 require_once '../includes/csrf.php';
 
+// Set request method for testing compatibility
+if (!isset($_SERVER['REQUEST_METHOD'])) {
+    $_SERVER['REQUEST_METHOD'] = 'POST'; // Default to POST for testing
+}
+
 error_log("Enrollment API called - Method: " . $_SERVER['REQUEST_METHOD'] . ", POST data: " . json_encode($_POST));
 
 if (!isLoggedIn()) {
