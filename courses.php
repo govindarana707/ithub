@@ -23,7 +23,12 @@ if ($search) {
 
 // Get categories for filter
 $conn = connectDB();
-$categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+$result = $conn->query("SELECT * FROM categories_new ORDER BY name");
+if ($result) {
+    $categories = $result->fetch_all(MYSQLI_ASSOC);
+} else {
+    $categories = [];
+}
 $conn->close();
 ?>
 

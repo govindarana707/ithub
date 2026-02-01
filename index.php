@@ -12,16 +12,27 @@
     <?php require_once 'includes/header.php'; ?>
 
     <!-- Hero Section -->
-    <section class="bg-primary text-white py-5">
+    <section class="hero-section">
+        <div class="hero-particles">
+            <div class="particle" style="width: 10px; height: 10px; left: 10%; animation-delay: 0s;"></div>
+            <div class="particle" style="width: 15px; height: 15px; left: 20%; animation-delay: 2s;"></div>
+            <div class="particle" style="width: 8px; height: 8px; left: 30%; animation-delay: 4s;"></div>
+            <div class="particle" style="width: 12px; height: 12px; left: 40%; animation-delay: 6s;"></div>
+            <div class="particle" style="width: 20px; height: 20px; left: 50%; animation-delay: 8s;"></div>
+            <div class="particle" style="width: 6px; height: 6px; left: 60%; animation-delay: 10s;"></div>
+            <div class="particle" style="width: 14px; height: 14px; left: 70%; animation-delay: 12s;"></div>
+            <div class="particle" style="width: 18px; height: 18px; left: 80%; animation-delay: 14s;"></div>
+            <div class="particle" style="width: 9px; height: 9px; left: 90%; animation-delay: 16s;"></div>
+        </div>
         <div class="container">
-            <div class="row align-items-center">
-                <div class="col-lg-6">
-                    <h1 class="display-4 fw-bold mb-4">Welcome to IT HUB</h1>
-                    <p class="lead mb-4">
+            <div class="row align-items-center min-vh-100">
+                <div class="col-lg-6 hero-content">
+                    <h1 class="hero-title">Welcome to IT HUB</h1>
+                    <p class="hero-subtitle">
                         Your premier online learning platform for IT education and professional development. 
                         Learn from industry experts, enhance your skills, and advance your career.
                     </p>
-                    <div class="d-flex gap-3">
+                    <div class="hero-buttons d-flex gap-3">
                         <?php if (!isLoggedIn()): ?>
                             <a href="register.php" class="btn btn-light btn-lg">
                                 <i class="fas fa-user-plus me-2"></i>Get Started
@@ -40,54 +51,48 @@
                     </div>
                 </div>
                 <div class="col-lg-6">
-                    <img src="assets/images/hero1.png" alt="Online Learning" class="img-fluid rounded shadow">
+                    <img src="assets/images/hero1.png" alt="Online Learning" class="img-fluid rounded shadow hero-image">
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Features Section -->
-    <section class="py-5">
+    <section class="section section-light">
         <div class="container">
-            <div class="text-center mb-5">
-                <h2 class="display-5 fw-bold">Why Choose IT HUB?</h2>
-                <p class="lead text-muted">Discover the features that make us the best choice for your IT education</p>
+            <div class="section-header">
+                <h2 class="section-title">Why Choose IT HUB?</h2>
+                <p class="section-subtitle">Discover the features that make us the best choice for your IT education</p>
             </div>
             
             <div class="row g-4">
-                <div class="col-md-4">
-                    <div class="card h-100 text-center p-4">
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <i class="fas fa-chalkboard-teacher fa-3x text-primary"></i>
-                            </div>
-                            <h4 class="card-title">Expert Instructors</h4>
-                            <p class="card-text">Learn from industry professionals with years of real-world experience in IT.</p>
+                <div class="col-md-4 reveal">
+                    <div class="feature-card h-100">
+                        <div class="icon-wrapper">
+                            <i class="fas fa-chalkboard-teacher"></i>
                         </div>
+                        <h4>Expert Instructors</h4>
+                        <p>Learn from industry professionals with years of real-world experience in IT.</p>
                     </div>
                 </div>
                 
-                <div class="col-md-4">
-                    <div class="card h-100 text-center p-4">
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <i class="fas fa-laptop-code fa-3x text-success"></i>
-                            </div>
-                            <h4 class="card-title">Hands-on Learning</h4>
-                            <p class="card-text">Practice with real projects and assignments to build practical skills.</p>
+                <div class="col-md-4 reveal" style="animation-delay: 0.2s">
+                    <div class="feature-card h-100">
+                        <div class="icon-wrapper">
+                            <i class="fas fa-laptop-code"></i>
                         </div>
+                        <h4>Hands-on Learning</h4>
+                        <p>Practice with real projects and assignments to build practical skills.</p>
                     </div>
                 </div>
                 
-                <div class="col-md-4">
-                    <div class="card h-100 text-center p-4">
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <i class="fas fa-certificate fa-3x text-warning"></i>
-                            </div>
-                            <h4 class="card-title">Certification</h4>
-                            <p class="card-text">Earn certificates upon completion to showcase your achievements.</p>
+                <div class="col-md-4 reveal" style="animation-delay: 0.4s">
+                    <div class="feature-card h-100">
+                        <div class="icon-wrapper">
+                            <i class="fas fa-certificate"></i>
                         </div>
+                        <h4>Certification</h4>
+                        <p>Earn certificates upon completion to showcase your achievements.</p>
                     </div>
                 </div>
             </div>
@@ -95,11 +100,11 @@
     </section>
 
     <!-- Popular Courses Section -->
-    <section class="py-5 bg-light">
+    <section class="section">
         <div class="container">
-            <div class="text-center mb-5">
-                <h2 class="display-5 fw-bold">Popular Courses</h2>
-                <p class="lead text-muted">Explore our most sought-after courses</p>
+            <div class="section-header">
+                <h2 class="section-title">Popular Courses</h2>
+                <p class="section-subtitle">Explore our most sought-after courses</p>
             </div>
             
             <div class="row g-4">
@@ -112,7 +117,7 @@
                 
                 foreach ($popularCourses as $c):
                 ?>
-                    <div class="col-md-4">
+                    <div class="col-md-4 reveal">
                         <div class="card course-card h-100">
                             <?php if ($c['thumbnail']): ?>
                                 <img src="<?php echo htmlspecialchars(resolveUploadUrl($c['thumbnail'])); ?>" class="card-img-top" alt="<?php echo htmlspecialchars($c['title']); ?>">
@@ -139,8 +144,8 @@
                 <?php endforeach; ?>
             </div>
             
-            <div class="text-center mt-4">
-                <a href="courses.php" class="btn btn-outline-primary btn-lg">
+            <div class="text-center mt-5">
+                <a href="courses.php" class="btn btn-primary btn-lg">
                     <i class="fas fa-book me-2"></i>View All Courses
                 </a>
             </div>
@@ -148,28 +153,28 @@
     </section>
 
     <!-- Statistics Section -->
-    <section class="py-5">
+    <section class="section section-dark">
         <div class="container">
             <div class="row text-center">
-                <div class="col-md-3">
+                <div class="col-md-3 reveal">
                     <div class="stat-card primary">
                         <h3>1000+</h3>
                         <p>Students</p>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-3 reveal" style="animation-delay: 0.1s">
                     <div class="stat-card success">
                         <h3>50+</h3>
                         <p>Courses</p>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-3 reveal" style="animation-delay: 0.2s">
                     <div class="stat-card info">
                         <h3>20+</h3>
                         <p>Instructors</p>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-3 reveal" style="animation-delay: 0.3s">
                     <div class="stat-card warning">
                         <h3>95%</h3>
                         <p>Success Rate</p>
@@ -180,16 +185,16 @@
     </section>
 
     <!-- Testimonials Section -->
-    <section class="py-5 bg-light">
+    <section class="section section-light">
         <div class="container">
-            <div class="text-center mb-5">
-                <h2 class="display-5 fw-bold">What Our Students Say</h2>
-                <p class="lead text-muted">Real experiences from our learners</p>
+            <div class="section-header">
+                <h2 class="section-title">What Our Students Say</h2>
+                <p class="section-subtitle">Real experiences from our learners</p>
             </div>
             
             <div class="row g-4">
-                <div class="col-md-4">
-                    <div class="card h-100">
+                <div class="col-md-4 reveal">
+                    <div class="card h-100 testimonial-card">
                         <div class="card-body">
                             <div class="mb-3">
                                 <?php for ($i = 0; $i < 5; $i++): ?>
@@ -204,8 +209,8 @@
                     </div>
                 </div>
                 
-                <div class="col-md-4">
-                    <div class="card h-100">
+                <div class="col-md-4 reveal" style="animation-delay: 0.1s">
+                    <div class="card h-100 testimonial-card">
                         <div class="card-body">
                             <div class="mb-3">
                                 <?php for ($i = 0; $i < 5; $i++): ?>
@@ -220,8 +225,8 @@
                     </div>
                 </div>
                 
-                <div class="col-md-4">
-                    <div class="card h-100">
+                <div class="col-md-4 reveal" style="animation-delay: 0.2s">
+                    <div class="card h-100 testimonial-card">
                         <div class="card-body">
                             <div class="mb-3">
                                 <?php for ($i = 0; $i < 5; $i++): ?>
@@ -240,16 +245,16 @@
     </section>
 
     <!-- CTA Section -->
-    <section class="py-5 bg-primary text-white">
+    <section class="section section-dark cta-section">
         <div class="container text-center">
-            <h2 class="display-5 fw-bold mb-4">Ready to Start Your Learning Journey?</h2>
-            <p class="lead mb-4">Join thousands of students advancing their careers with IT HUB</p>
+            <h2 class="section-title text-white">Ready to Start Your Learning Journey?</h2>
+            <p class="section-subtitle text-white">Join thousands of students advancing their careers with IT HUB</p>
             <?php if (!isLoggedIn()): ?>
-                <a href="register.php" class="btn btn-light btn-lg">
+                <a href="register.php" class="btn btn-light btn-lg btn-glass">
                     <i class="fas fa-rocket me-2"></i>Get Started Now
                 </a>
             <?php else: ?>
-                <a href="courses.php" class="btn btn-light btn-lg">
+                <a href="courses.php" class="btn btn-light btn-lg btn-glass">
                     <i class="fas fa-book me-2"></i>Explore Courses
                 </a>
             <?php endif; ?>

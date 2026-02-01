@@ -38,22 +38,46 @@ $stmt->close();
 
 // Get system overview data
 $stmt = $conn->query("SELECT COUNT(*) as total FROM users WHERE role = 'student'");
-$studentCount = $stmt->fetch_assoc()['total'];
+if ($stmt && $row = $stmt->fetch_assoc()) {
+    $studentCount = $row['total'];
+} else {
+    $studentCount = 0;
+}
 
 $stmt = $conn->query("SELECT COUNT(*) as total FROM users WHERE role = 'instructor'");
-$instructorCount = $stmt->fetch_assoc()['total'];
+if ($stmt && $row = $stmt->fetch_assoc()) {
+    $instructorCount = $row['total'];
+} else {
+    $instructorCount = 0;
+}
 
 $stmt = $conn->query("SELECT COUNT(*) as total FROM enrollments");
-$enrollmentCount = $stmt->fetch_assoc()['total'];
+if ($stmt && $row = $stmt->fetch_assoc()) {
+    $enrollmentCount = $row['total'];
+} else {
+    $enrollmentCount = 0;
+}
 
 $stmt = $conn->query("SELECT COUNT(*) as total FROM quiz_attempts");
-$quizAttempts = $stmt->fetch_assoc()['total'];
+if ($stmt && $row = $stmt->fetch_assoc()) {
+    $quizAttempts = $row['total'];
+} else {
+    $quizAttempts = 0;
+}
 
 $stmt = $conn->query("SELECT COUNT(*) as total FROM courses WHERE status = 'published'");
-$publishedCourses = $stmt->fetch_assoc()['total'];
+if ($stmt && $row = $stmt->fetch_assoc()) {
+    $publishedCourses = $row['total'];
+} else {
+    $publishedCourses = 0;
+}
 
 $stmt = $conn->query("SELECT COUNT(*) as total FROM certificates");
-$certificatesCount = $stmt->fetch_assoc()['total'];
+if ($stmt && $row = $stmt->fetch_assoc()) {
+    $certificatesCount = $row['total'];
+} else {
+    $certificatesCount = 0;
+}
 
 // Get recent users
 $stmt = $conn->prepare("SELECT id, full_name, email, role, status, created_at FROM users ORDER BY created_at DESC LIMIT 5");

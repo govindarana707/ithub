@@ -1,553 +1,832 @@
 <?php
-require_once dirname(__DIR__) . '/config/config.php';
-require_once dirname(__DIR__) . '/includes/auth.php';
-require_once dirname(__DIR__) . '/models/User.php';
-
+require_once '../config/config.php';
+require_once '../includes/auth.php';
 requireAdmin();
 
-$user = new User();
+require_once '../models/Database.php';
+require_once '../models/User.php';
 
-// Handle form submissions
-if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    
-    switch ($action) {
-        case 'create_user':
-            $data = [
-                'username' => sanitize($_POST['username']),
-                'email' => sanitize($_POST['email']),
-                'password' => $_POST['password'],
-                'full_name' => sanitize($_POST['full_name']),
-                'role' => sanitize($_POST['role']),
-                'phone' => sanitize($_POST['phone'] ?? ''),
-                'status' => 'active'
-            ];
-            
-            $result = $user->register($data);
-            if ($result['success']) {
-                $_SESSION['success_message'] = 'User created successfully!';
-                logActivity($_SESSION['user_id'], 'user_created', "Created user: {$data['full_name']} ({$data['role']})");
-            } else {
-                $_SESSION['error_message'] = 'Failed to create user: ' . $result['error'];
+$db = new Database();
+$conn = $db->getConnection();
+$userModel = new User();
+
+// Handle AJAX requests
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    header('Content-Type: application/json');
+
+    switch ($_POST['action']) {
+        case 'add_user':
+            $username = trim($_POST['username']);
+            $email = trim($_POST['email']);
+            $password = $_POST['password'];
+            $fullName = trim($_POST['full_name']);
+            $role = $_POST['role'];
+
+            // Validate
+            if (empty($username) || empty($email) || empty($password) || empty($fullName)) {
+                echo json_encode(['success' => false, 'message' => 'All fields are required']);
+                exit;
             }
-            break;
-            
+
+            // Check if username or email exists
+            $stmt = $conn->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
+            $stmt->bind_param('ss', $username, $email);
+            $stmt->execute();
+            if ($stmt->get_result()->num_rows > 0) {
+                echo json_encode(['success' => false, 'message' => 'Username or email already exists']);
+                exit;
+            }
+
+            // Create user
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $conn->prepare("INSERT INTO users (username, email, password, full_name, role, status) VALUES (?, ?, ?, ?, ?, 'active')");
+            $stmt->bind_param('sssss', $username, $email, $hashedPassword, $fullName, $role);
+
+            if ($stmt->execute()) {
+                echo json_encode(['success' => true, 'message' => 'User created successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to create user']);
+            }
+            exit;
+
         case 'update_user':
             $userId = intval($_POST['user_id']);
-            $data = [
-                'full_name' => sanitize($_POST['full_name']),
-                'email' => sanitize($_POST['email']),
-                'phone' => sanitize($_POST['phone'] ?? ''),
-                'role' => sanitize($_POST['role']),
-                'status' => sanitize($_POST['status'])
-            ];
-            
-            if ($user->updateUser($userId, $data)) {
-                $_SESSION['success_message'] = 'User updated successfully!';
-                logActivity($_SESSION['user_id'], 'user_updated', "Updated user ID: $userId");
+            $fullName = trim($_POST['full_name']);
+            $email = trim($_POST['email']);
+            $role = $_POST['role'];
+            $status = $_POST['status'];
+
+            $stmt = $conn->prepare("UPDATE users SET full_name = ?, email = ?, role = ?, status = ? WHERE id = ?");
+            $stmt->bind_param('ssssi', $fullName, $email, $role, $status, $userId);
+
+            if ($stmt->execute()) {
+                echo json_encode(['success' => true, 'message' => 'User updated successfully']);
             } else {
-                $_SESSION['error_message'] = 'Failed to update user';
+                echo json_encode(['success' => false, 'message' => 'Failed to update user']);
             }
-            break;
-            
+            exit;
+
         case 'delete_user':
             $userId = intval($_POST['user_id']);
-            if ($userId != $_SESSION['user_id']) {
-                if ($user->deleteUser($userId)) {
-                    $_SESSION['success_message'] = 'User deleted successfully!';
-                    logActivity($_SESSION['user_id'], 'user_deleted', "Deleted user ID: $userId");
-                } else {
-                    $_SESSION['error_message'] = 'Failed to delete user';
-                }
-            } else {
-                $_SESSION['error_message'] = 'Cannot delete your own account';
+
+            // Don't allow deleting yourself
+            if ($userId == $_SESSION['user_id']) {
+                echo json_encode(['success' => false, 'message' => 'Cannot delete your own account']);
+                exit;
             }
-            break;
-            
-        case 'toggle_status':
+
+            $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
+            $stmt->bind_param('i', $userId);
+
+            if ($stmt->execute()) {
+                echo json_encode(['success' => true, 'message' => 'User deleted successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to delete user']);
+            }
+            exit;
+
+        case 'reset_password':
             $userId = intval($_POST['user_id']);
-            $newStatus = $_POST['status'] === 'active' ? 'blocked' : 'active';
-            
-            if ($user->updateUser($userId, ['status' => $newStatus])) {
-                $_SESSION['success_message'] = "User status updated to $newStatus!";
-                logActivity($_SESSION['user_id'], 'user_status_changed', "Changed user ID: $userId status to $newStatus");
+            $newPassword = password_hash('password123', PASSWORD_DEFAULT);
+
+            $stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+            $stmt->bind_param('si', $newPassword, $userId);
+
+            if ($stmt->execute()) {
+                echo json_encode(['success' => true, 'message' => 'Password reset to: password123']);
             } else {
-                $_SESSION['error_message'] = 'Failed to update user status';
+                echo json_encode(['success' => false, 'message' => 'Failed to reset password']);
             }
-            break;
+            exit;
+
+        case 'bulk_delete':
+            $userIds = json_decode($_POST['user_ids'], true);
+
+            // Remove current user from list
+            $userIds = array_filter($userIds, fn($id) => $id != $_SESSION['user_id']);
+
+            if (empty($userIds)) {
+                echo json_encode(['success' => false, 'message' => 'No users to delete']);
+                exit;
+            }
+
+            $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+            $stmt = $conn->prepare("DELETE FROM users WHERE id IN ($placeholders)");
+            $stmt->bind_param(str_repeat('i', count($userIds)), ...$userIds);
+
+            if ($stmt->execute()) {
+                echo json_encode(['success' => true, 'message' => count($userIds) . ' users deleted']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to delete users']);
+            }
+            exit;
+
+        case 'bulk_status':
+            $userIds = json_decode($_POST['user_ids'], true);
+            $status = $_POST['status'];
+
+            $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+            $stmt = $conn->prepare("UPDATE users SET status = ? WHERE id IN ($placeholders)");
+            $types = 's' . str_repeat('i', count($userIds));
+            $params = array_merge([$status], $userIds);
+            $stmt->bind_param($types, ...$params);
+
+            if ($stmt->execute()) {
+                echo json_encode(['success' => true, 'message' => 'Status updated for ' . count($userIds) . ' users']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to update status']);
+            }
+            exit;
     }
-    
-    header('Location: users.php');
-    exit;
 }
 
-// Get users with pagination and filtering
-$page = max(1, intval($_GET['page'] ?? 1));
-$limit = 20;
-$role = $_GET['role'] ?? '';
-$status = $_GET['status'] ?? '';
+// Get filters
 $search = $_GET['search'] ?? '';
+$roleFilter = $_GET['role'] ?? '';
+$statusFilter = $_GET['status'] ?? '';
+$page = max(1, intval($_GET['page'] ?? 1));
+$perPage = 20;
+$offset = ($page - 1) * $perPage;
 
-$users = $user->getAllUsers($role, $status, $limit, ($page - 1) * $limit, $search);
-
-// Get total count for pagination
-$conn = connectDB();
-$sql = "SELECT COUNT(*) as total FROM users WHERE 1=1";
+// Build query
+$where = [];
 $params = [];
-$types = "";
-
-if ($role) {
-    $sql .= " AND role = ?";
-    $params[] = $role;
-    $types .= "s";
-}
-
-if ($status) {
-    $sql .= " AND status = ?";
-    $params[] = $status;
-    $types .= "s";
-}
+$types = '';
 
 if ($search) {
-    $sql .= " AND (full_name LIKE ? OR email LIKE ? OR username LIKE ?)";
-    $searchTerm = "%$search%";
-    $params[] = $searchTerm;
-    $params[] = $searchTerm;
-    $params[] = $searchTerm;
-    $types .= "sss";
+    $where[] = "(username LIKE ? OR email LIKE ? OR full_name LIKE ?)";
+    $searchParam = "%$search%";
+    $params[] = $searchParam;
+    $params[] = $searchParam;
+    $params[] = $searchParam;
+    $types .= 'sss';
 }
+
+if ($roleFilter) {
+    $where[] = "role = ?";
+    $params[] = $roleFilter;
+    $types .= 's';
+}
+
+if ($statusFilter) {
+    $where[] = "status = ?";
+    $params[] = $statusFilter;
+    $types .= 's';
+}
+
+$whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
+
+// Get total count
+$countSql = "SELECT COUNT(*) as total FROM users $whereClause";
+$stmt = $conn->prepare($countSql);
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$totalUsers = $stmt->get_result()->fetch_assoc()['total'];
+$totalPages = ceil($totalUsers / $perPage);
+
+// Get users
+$sql = "SELECT * FROM users $whereClause ORDER BY created_at DESC LIMIT ? OFFSET ?";
+$params[] = $perPage;
+$params[] = $offset;
+$types .= 'ii';
 
 $stmt = $conn->prepare($sql);
 if (!empty($params)) {
     $stmt->bind_param($types, ...$params);
 }
 $stmt->execute();
-$totalUsers = $stmt->get_result()->fetch_assoc()['total'];
-$stmt->close();
-$conn->close();
+$users = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-$totalPages = ceil($totalUsers / $limit);
+// Get statistics
+$stats = [
+    'total' => $conn->query("SELECT COUNT(*) as c FROM users")->fetch_assoc()['c'],
+    'students' => $conn->query("SELECT COUNT(*) as c FROM users WHERE role = 'student'")->fetch_assoc()['c'],
+    'instructors' => $conn->query("SELECT COUNT(*) as c FROM users WHERE role = 'instructor'")->fetch_assoc()['c'],
+    'admins' => $conn->query("SELECT COUNT(*) as c FROM users WHERE role = 'admin'")->fetch_assoc()['c'],
+    'active' => $conn->query("SELECT COUNT(*) as c FROM users WHERE status = 'active'")->fetch_assoc()['c'],
+];
+
+require_once '../includes/universal_header.php';
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Management - IT HUB</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-shield me-1"></i> Admin
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="dashboard.php">Dashboard</a></li>
-                        <li><a class="dropdown-item" href="users.php">User Management</a></li>
-                        <li><a class="dropdown-item" href="courses.php">Course Management</a></li>
-                        <li><a class="dropdown-item" href="analytics.php">Analytics</a></li>
-                        <li><a class="dropdown-item" href="settings.php">Settings</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </nav>
+<style>
+    .users-container {
+        padding: 30px;
+        max-width: 1600px;
+        margin: 0 auto;
+    }
 
-    <div class="container-fluid py-4">
-        <div class="row">
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 25px;
+        border-radius: 15px;
+        text-align: center;
+        transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .stat-card.success {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+
+    .stat-card.warning {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .stat-card.info {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+
+    .stat-card.danger {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    }
+
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    .stat-label {
+        opacity: 0.9;
+        font-size: 0.95rem;
+    }
+
+    .filters-card {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        margin-bottom: 30px;
+    }
+
+    .users-table-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+
+    .table-header {
+        padding: 25px;
+        border-bottom: 1px solid #e9ecef;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .bulk-actions {
+        display: none;
+        gap: 10px;
+    }
+
+    .bulk-actions.active {
+        display: flex;
+    }
+
+    .users-table {
+        width: 100%;
+    }
+
+    .users-table th {
+        background: #f8f9fa;
+        padding: 15px;
+        font-weight: 600;
+        text-align: left;
+        border-bottom: 2px solid #e9ecef;
+    }
+
+    .users-table td {
+        padding: 15px;
+        border-bottom: 1px solid #f1f3f5;
+    }
+
+    .users-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .avatar-placeholder {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+    }
+
+    .badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .action-btn {
+        padding: 5px 10px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        color: #666;
+        transition: color 0.3s ease;
+    }
+
+    .action-btn:hover {
+        color: #007bff;
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 5px;
+        padding: 25px;
+    }
+
+    .page-btn {
+        padding: 8px 15px;
+        border: 1px solid #dee2e6;
+        background: white;
+        cursor: pointer;
+        border-radius: 5px;
+        transition: all 0.3s ease;
+    }
+
+    .page-btn:hover,
+    .page-btn.active {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+
+    .modal-content {
+        border-radius: 15px;
+        border: none;
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px 15px 0 0;
+    }
+
+    .modal-header .btn-close {
+        filter: brightness(0) invert(1);
+    }
+</style>
+
+<div class="users-container">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-users me-2"></i>User Management</h2>
+        <button class="btn btn-primary" onclick="showAddUserModal()">
+            <i class="fas fa-plus me-2"></i>Add New User
+        </button>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value"><?php echo $stats['total']; ?></div>
+            <div class="stat-label">Total Users</div>
+        </div>
+        <div class="stat-card success">
+            <div class="stat-value"><?php echo $stats['students']; ?></div>
+            <div class="stat-label">Students</div>
+        </div>
+        <div class="stat-card warning">
+            <div class="stat-value"><?php echo $stats['instructors']; ?></div>
+            <div class="stat-label">Instructors</div>
+        </div>
+        <div class="stat-card info">
+            <div class="stat-value"><?php echo $stats['admins']; ?></div>
+            <div class="stat-label">Admins</div>
+        </div>
+        <div class="stat-card danger">
+            <div class="stat-value"><?php echo $stats['active']; ?></div>
+            <div class="stat-label">Active Users</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-card">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <input type="text" class="form-control" name="search" placeholder="Search users..."
+                    value="<?php echo htmlspecialchars($search); ?>">
+            </div>
             <div class="col-md-3">
-                <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="users.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-users-cog me-2"></i> User Management
-                    </a>
-                    <a href="courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-book-open me-2"></i> Course Management
-                    </a>
-                    <a href="categories.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tags me-2"></i> Categories
-                    </a>
-                    <a href="analytics.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-line me-2"></i> Analytics
-                    </a>
-                    <a href="reports.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-file-alt me-2"></i> Reports
-                    </a>
-                    <a href="logs.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-list-alt me-2"></i> Activity Logs
-                    </a>
-                    <a href="settings.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-cog me-2"></i> Settings
-                    </a>
-                </div>
+                <select class="form-select" name="role">
+                    <option value="">All Roles</option>
+                    <option value="student" <?php echo $roleFilter === 'student' ? 'selected' : ''; ?>>Student</option>
+                    <option value="instructor" <?php echo $roleFilter === 'instructor' ? 'selected' : ''; ?>>Instructor
+                    </option>
+                    <option value="admin" <?php echo $roleFilter === 'admin' ? 'selected' : ''; ?>>Admin</option>
+                </select>
             </div>
-            
-            <div class="col-md-9">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1>User Management</h1>
-                    <div>
-                        <span class="badge bg-danger">Administrator</span>
-                    </div>
-                </div>
-
-                <!-- Filters and Search -->
-                <div class="dashboard-card mb-4">
-                    <form method="GET" class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label">Search</label>
-                            <input type="text" name="search" class="form-control" placeholder="Search users..." value="<?php echo htmlspecialchars($search); ?>">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label">Role</label>
-                            <select name="role" class="form-select">
-                                <option value="">All Roles</option>
-                                <option value="student" <?php echo $role === 'student' ? 'selected' : ''; ?>>Student</option>
-                                <option value="instructor" <?php echo $role === 'instructor' ? 'selected' : ''; ?>>Instructor</option>
-                                <option value="admin" <?php echo $role === 'admin' ? 'selected' : ''; ?>>Admin</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label">Status</label>
-                            <select name="status" class="form-select">
-                                <option value="">All Status</option>
-                                <option value="active" <?php echo $status === 'active' ? 'selected' : ''; ?>>Active</option>
-                                <option value="blocked" <?php echo $status === 'blocked' ? 'selected' : ''; ?>>Blocked</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">&nbsp;</label>
-                            <div class="d-flex gap-2">
-                                <button type="submit" class="btn btn-primary">Filter</button>
-                                <a href="users.php" class="btn btn-outline-secondary">Clear</a>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label">&nbsp;</label>
-                            <button class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#createUserModal">
-                                <i class="fas fa-user-plus me-2"></i>Add User
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Users Table -->
-                <div class="dashboard-card">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h3>Users (<?php echo $totalUsers; ?> total)</h3>
-                        <div class="btn-group" role="group">
-                            <button class="btn btn-sm btn-outline-primary" onclick="exportUsers()">
-                                <i class="fas fa-download me-1"></i>Export
-                            </button>
-                            <button class="btn btn-sm btn-outline-info" onclick="refreshUsers()">
-                                <i class="fas fa-sync me-1"></i>Refresh
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Avatar</th>
-                                    <th>Name</th>
-                                    <th>Email</th>
-                                    <th>Username</th>
-                                    <th>Role</th>
-                                    <th>Status</th>
-                                    <th>Joined</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($users)): ?>
-                                    <tr>
-                                        <td colspan="10" class="text-center py-4">
-                                            <i class="fas fa-users fa-2x text-muted mb-2"></i>
-                                            <p class="text-muted">No users found</p>
-                                        </td>
-                                    </tr>
-                                <?php else: ?>
-                                    <?php foreach ($users as $user): ?>
-                                        <tr>
-                                            <td><?php echo $user['id']; ?></td>
-                                            <td>
-                                                <?php if ($user['profile_image']): ?>
-                                                    <img src="../uploads/<?php echo htmlspecialchars($user['profile_image']); ?>" 
-                                                         class="rounded-circle" width="30" height="30" alt="Avatar">
-                                                <?php else: ?>
-                                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
-                                                         style="width: 30px; height: 30px; font-size: 12px;">
-                                                        <?php echo strtoupper(substr($user['full_name'], 0, 1)); ?>
-                                                    </div>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><?php echo htmlspecialchars($user['full_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($user['email']); ?></td>
-                                            <td><?php echo htmlspecialchars($user['username']); ?></td>
-                                            <td>
-                                                <span class="badge bg-<?php echo getRoleBadgeColor($user['role']); ?>">
-                                                    <?php echo ucfirst($user['role']); ?>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <span class="badge bg-<?php echo getStatusBadgeColor($user['status']); ?>">
-                                                    <?php echo ucfirst($user['status']); ?>
-                                                </span>
-                                            </td>
-                                            <td><?php echo date('M j, Y', strtotime($user['created_at'])); ?></td>
-                                            <td>
-                                                <div class="btn-group btn-group-sm" role="group">
-                                                    <button class="btn btn-outline-primary" onclick="editUser(<?php echo $user['id']; ?>)">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
-                                                    <button class="btn btn-outline-<?php echo $user['status'] === 'active' ? 'warning' : 'success'; ?>" 
-                                                            onclick="toggleStatus(<?php echo $user['id']; ?>, '<?php echo $user['status']; ?>')">
-                                                        <i class="fas fa-<?php echo $user['status'] === 'active' ? 'ban' : 'check'; ?>"></i>
-                                                    </button>
-                                                    <button class="btn btn-outline-danger" onclick="deleteUser(<?php echo $user['id']; ?>)">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Pagination -->
-                    <?php if ($totalPages > 1): ?>
-                        <nav class="mt-3">
-                            <ul class="pagination justify-content-center">
-                                <?php if ($page > 1): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page=<?php echo $page - 1; ?>&role=<?php echo $role; ?>&status=<?php echo $status; ?>&search=<?php echo $search; ?>">Previous</a>
-                                    </li>
-                                <?php endif; ?>
-                                
-                                <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
-                                    <li class="page-item <?php echo $i == $page ? 'active' : ''; ?>">
-                                        <a class="page-link" href="?page=<?php echo $i; ?>&role=<?php echo $role; ?>&status=<?php echo $status; ?>&search=<?php echo $search; ?>"><?php echo $i; ?></a>
-                                    </li>
-                                <?php endfor; ?>
-                                
-                                <?php if ($page < $totalPages): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page=<?php echo $page + 1; ?>&role=<?php echo $role; ?>&status=<?php echo $status; ?>&search=<?php echo $search; ?>">Next</a>
-                                    </li>
-                                <?php endif; ?>
-                            </ul>
-                        </nav>
-                    <?php endif; ?>
-                </div>
+            <div class="col-md-3">
+                <select class="form-select" name="status">
+                    <option value="">All Status</option>
+                    <option value="active" <?php echo $statusFilter === 'active' ? 'selected' : ''; ?>>Active</option>
+                    <option value="inactive" <?php echo $statusFilter === 'inactive' ? 'selected' : ''; ?>>Inactive
+                    </option>
+                    <option value="blocked" <?php echo $statusFilter === 'blocked' ? 'selected' : ''; ?>>Blocked</option>
+                </select>
             </div>
-        </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-search me-2"></i>Filter
+                </button>
+            </div>
+        </form>
     </div>
 
-    <!-- Create User Modal -->
-    <div class="modal fade" id="createUserModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Create New User</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST">
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="create_user">
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Username *</label>
-                            <input type="text" name="username" class="form-control" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Email *</label>
-                            <input type="email" name="email" class="form-control" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Password *</label>
-                            <input type="password" name="password" class="form-control" required minlength="6">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Full Name *</label>
-                            <input type="text" name="full_name" class="form-control" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Phone</label>
-                            <input type="tel" name="phone" class="form-control">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Role *</label>
-                            <select name="role" class="form-select" required>
-                                <option value="student">Student</option>
-                                <option value="instructor">Instructor</option>
-                                <option value="admin">Admin</option>
-                            </select>
-                        </div>
+    <!-- Users Table -->
+    <div class="users-table-card">
+        <div class="table-header">
+            <div>
+                <span id="selectedCount">0</span> selected
+            </div>
+            <div class="bulk-actions" id="bulkActions">
+                <button class="btn btn-sm btn-success" onclick="bulkStatus('active')">
+                    <i class="fas fa-check me-1"></i>Activate
+                </button>
+                <button class="btn btn-sm btn-warning" onclick="bulkStatus('inactive')">
+                    <i class="fas fa-pause me-1"></i>Deactivate
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="bulkDelete()">
+                    <i class="fas fa-trash me-1"></i>Delete
+                </button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th width="50">
+                            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                        </th>
+                        <th>User</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Joined</th>
+                        <th width="150">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($users as $user): ?>
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="user-checkbox" value="<?php echo $user['id']; ?>"
+                                    onchange="updateBulkActions()">
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-3">
+                                    <?php if ($user['profile_image']): ?>
+                                        <img src="../<?php echo htmlspecialchars($user['profile_image']); ?>"
+                                            class="user-avatar" alt="Avatar">
+                                    <?php else: ?>
+                                        <div class="avatar-placeholder">
+                                            <?php echo strtoupper(substr($user['full_name'], 0, 1)); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div>
+                                        <div class="fw-bold"><?php echo htmlspecialchars($user['full_name']); ?></div>
+                                        <small
+                                            class="text-muted">@<?php echo htmlspecialchars($user['username']); ?></small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><?php echo htmlspecialchars($user['email']); ?></td>
+                            <td>
+                                <span class="badge bg-<?php
+                                echo $user['role'] === 'admin' ? 'danger' :
+                                    ($user['role'] === 'instructor' ? 'warning' : 'primary');
+                                ?>">
+                                    <?php echo ucfirst($user['role']); ?>
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-<?php
+                                echo $user['status'] === 'active' ? 'success' :
+                                    ($user['status'] === 'blocked' ? 'danger' : 'secondary');
+                                ?>">
+                                    <?php echo ucfirst($user['status']); ?>
+                                </span>
+                            </td>
+                            <td><?php echo date('M d, Y', strtotime($user['created_at'])); ?></td>
+                            <td>
+                                <button class="action-btn" onclick='editUser(<?php echo json_encode($user); ?>)'
+                                    title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn" onclick="resetPassword(<?php echo $user['id']; ?>)"
+                                    title="Reset Password">
+                                    <i class="fas fa-key"></i>
+                                </button>
+                                <button class="action-btn text-danger" onclick="deleteUser(<?php echo $user['id']; ?>)"
+                                    title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <?php if ($totalPages > 1): ?>
+            <div class="pagination">
+                <?php if ($page > 1): ?>
+                    <a href="?page=<?php echo $page - 1; ?>&search=<?php echo urlencode($search); ?>&role=<?php echo $roleFilter; ?>&status=<?php echo $statusFilter; ?>"
+                        class="page-btn">Previous</a>
+                <?php endif; ?>
+
+                <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                    <a href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&role=<?php echo $roleFilter; ?>&status=<?php echo $statusFilter; ?>"
+                        class="page-btn <?php echo $i === $page ? 'active' : ''; ?>">
+                        <?php echo $i; ?>
+                    </a>
+                <?php endfor; ?>
+
+                <?php if ($page < $totalPages): ?>
+                    <a href="?page=<?php echo $page + 1; ?>&search=<?php echo urlencode($search); ?>&role=<?php echo $roleFilter; ?>&status=<?php echo $statusFilter; ?>"
+                        class="page-btn">Next</a>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addUserForm">
+                    <div class="mb-3">
+                        <label class="form-label">Full Name *</label>
+                        <input type="text" class="form-control" name="full_name" required>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-user-plus me-2"></i>Create User
-                        </button>
+                    <div class="mb-3">
+                        <label class="form-label">Username *</label>
+                        <input type="text" class="form-control" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email *</label>
+                        <input type="email" class="form-control" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password *</label>
+                        <input type="password" class="form-control" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Role *</label>
+                        <select class="form-select" name="role" required>
+                            <option value="student">Student</option>
+                            <option value="instructor">Instructor</option>
+                            <option value="admin">Admin</option>
+                        </select>
                     </div>
                 </form>
             </div>
-        </div>
-    </div>
-
-    <!-- Edit User Modal -->
-    <div class="modal fade" id="editUserModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit User</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" id="editUserForm">
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="update_user">
-                        <input type="hidden" name="user_id" id="edit_user_id">
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Full Name *</label>
-                            <input type="text" name="full_name" id="edit_full_name" class="form-control" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Email *</label>
-                            <input type="email" name="email" id="edit_email" class="form-control" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Phone</label>
-                            <input type="tel" name="phone" id="edit_phone" class="form-control">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Role *</label>
-                            <select name="role" id="edit_role" class="form-select" required>
-                                <option value="student">Student</option>
-                                <option value="instructor">Instructor</option>
-                                <option value="admin">Admin</option>
-                            </select>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Status *</label>
-                            <select name="status" id="edit_status" class="form-select" required>
-                                <option value="active">Active</option>
-                                <option value="blocked">Blocked</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save me-2"></i>Save Changes
-                        </button>
-                    </div>
-                </form>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="addUser()">Create User</button>
             </div>
         </div>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="../assets/js/main.js"></script>
-    <script>
-        function editUser(userId) {
-            // Fetch user data and populate modal
-            $.get('api/get_user.php', {user_id: userId}, function(data) {
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <input type="hidden" name="user_id" id="editUserId">
+                    <div class="mb-3">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" class="form-control" name="full_name" id="editFullName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="email" id="editEmail" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Role</label>
+                        <select class="form-select" name="role" id="editRole" required>
+                            <option value="student">Student</option>
+                            <option value="instructor">Instructor</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="status" id="editStatus" required>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="blocked">Blocked</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="updateUser()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Show add user modal
+    function showAddUserModal() {
+        new bootstrap.Modal(document.getElementById('addUserModal')).show();
+    }
+
+    // Add user
+    function addUser() {
+        const form = document.getElementById('addUserForm');
+        const formData = new FormData(form);
+        formData.append('action', 'add_user');
+
+        fetch('users.php', {
+            method: 'POST',
+            body: formData
+        })
+            .then(res => res.json())
+            .then(data => {
                 if (data.success) {
-                    $('#edit_user_id').val(data.user.id);
-                    $('#edit_full_name').val(data.user.full_name);
-                    $('#edit_email').val(data.user.email);
-                    $('#edit_phone').val(data.user.phone || '');
-                    $('#edit_role').val(data.user.role);
-                    $('#edit_status').val(data.user.status);
-                    
-                    $('#editUserModal').modal('show');
+                    alert(data.message);
+                    location.reload();
                 } else {
-                    alert('Failed to load user data');
+                    alert(data.message);
                 }
             });
-        }
-        
-        function toggleStatus(userId, currentStatus) {
-            if (confirm('Are you sure you want to ' + (currentStatus === 'active' ? 'block' : 'unblock') + ' this user?')) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.innerHTML = `
-                    <input type="hidden" name="action" value="toggle_status">
-                    <input type="hidden" name="user_id" value="${userId}">
-                    <input type="hidden" name="status" value="${currentStatus}">
-                `;
-                document.body.appendChild(form);
-                form.submit();
-            }
-        }
-        
-        function deleteUser(userId) {
-            if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.innerHTML = `
-                    <input type="hidden" name="action" value="delete_user">
-                    <input type="hidden" name="user_id" value="${userId}">
-                `;
-                document.body.appendChild(form);
-                form.submit();
-            }
-        }
-        
-        function exportUsers() {
-            window.location.href = 'api/export_users.php';
-        }
-        
-        function refreshUsers() {
-            location.reload();
-        }
-    </script>
-</body>
-</html>
+    }
 
-<?php
-function getRoleBadgeColor($role) {
-    $colors = [
-        'admin' => 'danger',
-        'instructor' => 'primary',
-        'student' => 'success'
-    ];
-    return $colors[$role] ?? 'secondary';
-}
+    // Edit user
+    function editUser(user) {
+        document.getElementById('editUserId').value = user.id;
+        document.getElementById('editFullName').value = user.full_name;
+        document.getElementById('editEmail').value = user.email;
+        document.getElementById('editRole').value = user.role;
+        document.getElementById('editStatus').value = user.status;
 
-function getStatusBadgeColor($status) {
-    $colors = [
-        'active' => 'success',
-        'blocked' => 'danger'
-    ];
-    return $colors[$status] ?? 'warning';
-}
-?>
+        new bootstrap.Modal(document.getElementById('editUserModal')).show();
+    }
+
+    // Update user
+    function updateUser() {
+        const form = document.getElementById('editUserForm');
+        const formData = new FormData(form);
+        formData.append('action', 'update_user');
+
+        fetch('users.php', {
+            method: 'POST',
+            body: formData
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            });
+    }
+
+    // Delete user
+    function deleteUser(userId) {
+        if (!confirm('Are you sure you want to delete this user?')) return;
+
+        const formData = new FormData();
+        formData.append('action', 'delete_user');
+        formData.append('user_id', userId);
+
+        fetch('users.php', {
+            method: 'POST',
+            body: formData
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            });
+    }
+
+    // Reset password
+    function resetPassword(userId) {
+        if (!confirm('Reset password to default (password123)?')) return;
+
+        const formData = new FormData();
+        formData.append('action', 'reset_password');
+        formData.append('user_id', userId);
+
+        fetch('users.php', {
+            method: 'POST',
+            body: formData
+        })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.message);
+            });
+    }
+
+    // Select all
+    function toggleSelectAll() {
+        const checked = document.getElementById('selectAll').checked;
+        document.querySelectorAll('.user-checkbox').forEach(cb => {
+            cb.checked = checked;
+        });
+        updateBulkActions();
+    }
+
+    // Update bulk actions
+    function updateBulkActions() {
+        const selected = document.querySelectorAll('.user-checkbox:checked').length;
+        document.getElementById('selectedCount').textContent = selected;
+        document.getElementById('bulkActions').classList.toggle('active', selected > 0);
+    }
+
+    // Bulk delete
+    function bulkDelete() {
+        const userIds = Array.from(document.querySelectorAll('.user-checkbox:checked')).map(cb => parseInt(cb.value));
+
+        if (!confirm(`Delete ${userIds.length} users?`)) return;
+
+        const formData = new FormData();
+        formData.append('action', 'bulk_delete');
+        formData.append('user_ids', JSON.stringify(userIds));
+
+        fetch('users.php', {
+            method: 'POST',
+            body: formData
+        })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.message);
+                if (data.success) location.reload();
+            });
+    }
+
+    // Bulk status
+    function bulkStatus(status) {
+        const userIds = Array.from(document.querySelectorAll('.user-checkbox:checked')).map(cb => parseInt(cb.value));
+
+        const formData = new FormData();
+        formData.append('action', 'bulk_status');
+        formData.append('user_ids', JSON.stringify(userIds));
+        formData.append('status', status);
+
+        fetch('users.php', {
+            method: 'POST',
+            body: formData
+        })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.message);
+                if (data.success) location.reload();
+            });
+    }
+</script>
+
+<?php require_once '../includes/footer.php'; ?>

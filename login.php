@@ -106,8 +106,31 @@ $(document).ready(function() {
                     submitBtn.prop('disabled', false).html(originalText);
                 }
             },
-            error: function() {
-                showAlert('An error occurred. Please try again.', 'danger');
+            error: function(xhr, status, error) {
+                console.error('Login Error Details:', {
+                    status: status,
+                    error: error,
+                    responseText: xhr.responseText,
+                    statusCode: xhr.status
+                });
+                
+                // Try to parse error response
+                let errorMessage = 'An error occurred. Please try again.';
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    if (response.message) {
+                        errorMessage = response.message;
+                    }
+                } catch (e) {
+                    // If JSON parse fails, check for PHP errors
+                    if (xhr.responseText.includes('Fatal error') || xhr.responseText.includes('Parse error')) {
+                        errorMessage = 'Server error occurred. Please contact support.';
+                    } else if (status === 'parsererror') {
+                        errorMessage = 'Invalid server response. Please try again.';
+                    }
+                }
+                
+                showAlert(errorMessage + ' (' + status + ')', 'danger');
                 submitBtn.prop('disabled', false).html(originalText);
             }
         });

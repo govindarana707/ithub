@@ -2,7 +2,7 @@
 define('DB_HOST', 'localhost');
 define('DB_USER', 'root');
 define('DB_PASS', '');
-define('DB_NAME', 'it_hub_clean');
+define('DB_NAME', 'it_hub_new');
 define('DB_PORT', 3307);
 
 define('BASE_URL', 'http://localhost/store/');
@@ -128,11 +128,18 @@ function sendJSON($data, $statusCode = 200) {
 }
 
 function logActivity($userId, $action, $details = '') {
-    $conn = connectDB();
-    $stmt = $conn->prepare("INSERT INTO admin_logs (user_id, action, details, created_at) VALUES (?, ?, ?, NOW())");
-    $stmt->bind_param("iss", $userId, $action, $details);
-    $stmt->execute();
-    $stmt->close();
-    $conn->close();
+    try {
+        $conn = connectDB();
+        $stmt = $conn->prepare("INSERT INTO admin_logs (user_id, action, details, created_at) VALUES (?, ?, ?, NOW())");
+        if ($stmt) {
+            $stmt->bind_param("iss", $userId, $action, $details);
+            $stmt->execute();
+            $stmt->close();
+        }
+        $conn->close();
+    } catch (Exception $e) {
+        // Silently fail to avoid breaking login process
+        error_log("logActivity failed: " . $e->getMessage());
+    }
 }
 ?>

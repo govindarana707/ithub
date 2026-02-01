@@ -70,10 +70,15 @@
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="fas fa-lock"></i></span>
                                         <input type="password" class="form-control" id="password" name="password" required>
+                                        <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
                                     </div>
-                                    <div class="form-text">Password must be at least 8 characters long</div>
+                                    <div class="form-text">
+                                        Password must be at least 8 characters with uppercase, lowercase, number, and special character.
+                                    </div>
+                                    <div id="passwordStrength" class="mt-2"></div>
                                 </div>
-                                
                                 <div class="col-md-6 mb-3">
                                     <label for="confirm_password" class="form-label">Confirm Password</label>
                                     <div class="input-group">
@@ -82,6 +87,20 @@
                                     </div>
                                 </div>
                             </div>
+                            
+                            <!-- CAPTCHA disabled for development -->
+                            <!-- <div class="mb-3">
+                                <label for="captcha" class="form-label">Security Verification</label>
+                                <div class="row align-items-center">
+                                    <div class="col-md-6">
+                                        <input type="text" class="form-control" id="captcha" name="captcha" placeholder="Enter code above" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <img src="captcha.php" alt="CAPTCHA" class="img-fluid border rounded" id="captchaImage" style="height: 40px; cursor: pointer;">
+                                        <small class="d-block text-muted mt-1">Click to refresh</small>
+                                    </div>
+                                </div>
+                            </div> -->
                             
                             <div class="mb-3 form-check">
                                 <input type="checkbox" class="form-check-input" id="terms" required>
@@ -139,6 +158,75 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         $(document).ready(function() {
+            // Password strength checker
+            $('#password').on('input', function() {
+                const password = $(this).val();
+                const strengthDiv = $('#passwordStrength');
+                let strength = 0;
+                let feedback = [];
+                
+                if (password.length >= 8) strength++;
+                else feedback.push('At least 8 characters');
+                
+                if (/[a-z]/.test(password)) strength++;
+                else feedback.push('One lowercase letter');
+                
+                if (/[A-Z]/.test(password)) strength++;
+                else feedback.push('One uppercase letter');
+                
+                if (/[0-9]/.test(password)) strength++;
+                else feedback.push('One number');
+                
+                if (/[!@#$%^&*(),.?":{}|<>@]/.test(password)) strength++;
+                else feedback.push('One special character');
+                
+                let strengthText = '';
+                let strengthClass = '';
+                
+                if (strength <= 2) {
+                    strengthText = 'Weak';
+                    strengthClass = 'text-danger';
+                } else if (strength <= 3) {
+                    strengthText = 'Fair';
+                    strengthClass = 'text-warning';
+                } else if (strength <= 4) {
+                    strengthText = 'Good';
+                    strengthClass = 'text-info';
+                } else {
+                    strengthText = 'Strong';
+                    strengthClass = 'text-success';
+                }
+                
+                strengthDiv.html(`
+                    <div class="progress" style="height: 5px;">
+                        <div class="progress-bar ${strengthClass === 'text-danger' ? 'bg-danger' : strengthClass === 'text-warning' ? 'bg-warning' : strengthClass === 'text-info' ? 'bg-info' : 'bg-success'}" 
+                             style="width: ${(strength/5)*100}%"></div>
+                    </div>
+                    <small class="${strengthClass}">Password strength: ${strengthText}</small>
+                    ${feedback.length > 0 ? '<div class="text-muted small mt-1">Missing: ' + feedback.join(', ') + '</div>' : ''}
+                `);
+            });
+            
+            // Toggle password visibility
+            $('#togglePassword').click(function() {
+                const passwordField = $('#password');
+                const icon = $(this).find('i');
+                
+                if (passwordField.attr('type') === 'password') {
+                    passwordField.attr('type', 'text');
+                    icon.removeClass('fa-eye').addClass('fa-eye-slash');
+                } else {
+                    passwordField.attr('type', 'password');
+                    icon.removeClass('fa-eye-slash').addClass('fa-eye');
+                }
+            });
+            
+            // CAPTCHA refresh disabled for development
+            // Refresh CAPTCHA
+            // $('#captchaImage').click(function() {
+            //     $(this).attr('src', 'captcha.php?' + new Date().getTime());
+            // });
+            
             $('#registerForm').submit(function(e) {
                 e.preventDefault();
                 
@@ -166,19 +254,48 @@
                     type: 'POST',
                     data: formData,
                     dataType: 'json',
+                    beforeSend: function() {
+                        console.log('Sending registration data...', formData);
+                    },
                     success: function(response) {
+                        console.log('Registration response:', response);
                         if (response.success) {
                             showAlert(response.message, 'success');
                             setTimeout(() => {
-                                window.location.href = 'login.php';
-                            }, 2000);
+                                if (response.requires_verification) {
+                                    window.location.href = 'login.php?message=' + encodeURIComponent(response.message);
+                                } else {
+                                    window.location.href = 'login.php';
+                                }
+                            }, 3000);
                         } else {
                             showAlert(response.message, 'danger');
                             submitBtn.prop('disabled', false).html(originalText);
                         }
                     },
-                    error: function() {
-                        showAlert('An error occurred. Please try again.', 'danger');
+                    error: function(xhr, status, error) {
+                        console.error('Registration error:', {
+                            status: status,
+                            error: error,
+                            responseText: xhr.responseText,
+                            statusCode: xhr.status
+                        });
+                        
+                        // Try to parse error response
+                        let errorMessage = 'An error occurred. Please try again.';
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            if (response.message) {
+                                errorMessage = response.message;
+                            }
+                        } catch (e) {
+                            // If JSON parse fails, check for PHP errors
+                            if (xhr.responseText.includes('Fatal error') || xhr.responseText.includes('Parse error')) {
+                                errorMessage = 'Server error occurred. Please contact support.';
+                            }
+                        }
+                        
+                        showAlert(errorMessage, 'danger');
                         submitBtn.prop('disabled', false).html(originalText);
                     }
                 });
