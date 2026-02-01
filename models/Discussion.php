@@ -11,13 +11,34 @@ class Discussion {
     public function createDiscussion($data) {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("INSERT INTO discussions (course_id, student_id, title, content, parent_id) VALUES (?, ?, ?, ?, ?)");
-        $stmt->bind_param("iisis", $data['course_id'], $data['student_id'], $data['title'], $data['content'], $data['parent_id']);
+        // Check if discussions table exists
+        $tableCheck = $conn->query("SHOW TABLES LIKE 'discussions'");
+        if ($tableCheck->num_rows == 0) {
+            return ['success' => false, 'error' => 'Discussions table does not exist'];
+        }
+        
+        // Validate required data
+        if (!isset($data['course_id']) || !isset($data['student_id']) || !isset($data['title']) || !isset($data['content'])) {
+            return ['success' => false, 'error' => 'Missing required fields'];
+        }
+        
+        // Use the actual table structure
+        $stmt = $conn->prepare("INSERT INTO discussions (course_id, student_id, title, content, lesson_id, pinned, locked) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        
+        if ($stmt === false) {
+            return ['success' => false, 'error' => 'SQL prepare failed: ' . $conn->error];
+        }
+        
+        $lessonId = $data['lesson_id'] ?? null;
+        $pinned = $data['pinned'] ?? 0;
+        $locked = $data['locked'] ?? 0;
+        
+        $stmt->bind_param("iissiii", $data['course_id'], $data['student_id'], $data['title'], $data['content'], $lessonId, $pinned, $locked);
         
         if ($stmt->execute()) {
             return ['success' => true, 'discussion_id' => $conn->insert_id];
         } else {
-            return ['success' => false, 'error' => $stmt->error];
+            return ['success' => false, 'error' => 'SQL execute failed: ' . $stmt->error];
         }
     }
     
@@ -50,8 +71,8 @@ class Discussion {
     public function deleteDiscussion($id) {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("DELETE FROM discussions WHERE id = ? OR parent_id = ?");
-        $stmt->bind_param("ii", $id, $id);
+        $stmt = $conn->prepare("DELETE FROM discussions WHERE id = ?");
+        $stmt->bind_param("i", $id);
         
         return $stmt->execute();
     }
@@ -86,15 +107,14 @@ class Discussion {
             return [];
         }
         
-        // Get main discussions (no parent) with error handling
+        // Get main discussions with error handling (updated for actual table structure)
         $sql = "
-            SELECT d.*, u.full_name, u.profile_image, c.title as course_title,
-                   (SELECT COUNT(*) FROM discussions WHERE parent_id = d.id) as reply_count
+            SELECT d.*, u.full_name, u.profile_image, c.title as course_title
             FROM discussions d
             JOIN users u ON d.student_id = u.id
             LEFT JOIN courses c ON d.course_id = c.id
-            WHERE d.course_id = ? AND d.parent_id IS NULL
-            ORDER BY d.is_pinned DESC, d.created_at DESC
+            WHERE d.course_id = ?
+            ORDER BY d.pinned DESC, d.created_at DESC
             LIMIT ? OFFSET ?
         ";
         
@@ -112,28 +132,13 @@ class Discussion {
         
         $discussions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         
-        // Get replies for each discussion
-        foreach ($discussions as &$discussion) {
-            $discussion['replies'] = $this->getReplies($discussion['id']);
-        }
-        
         return $discussions;
     }
     
     public function getReplies($parentId) {
-        $conn = $this->db->getConnection();
-        
-        $stmt = $conn->prepare("
-            SELECT d.*, u.full_name, u.profile_image
-            FROM discussions d
-            JOIN users u ON d.student_id = u.id
-            WHERE d.parent_id = ?
-            ORDER BY d.created_at ASC
-        ");
-        $stmt->bind_param("i", $parentId);
-        $stmt->execute();
-        
-        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        // Current table structure doesn't support replies (no parent_id column)
+        // Return empty array to maintain compatibility
+        return [];
     }
     
     public function getStudentDiscussions($studentId, $page = 1, $limit = 20) {
@@ -141,11 +146,10 @@ class Discussion {
         $offset = ($page - 1) * $limit;
         
         $stmt = $conn->prepare("
-            SELECT d.*, c.title as course_title,
-                   (SELECT COUNT(*) FROM discussions WHERE parent_id = d.id) as reply_count
+            SELECT d.*, c.title as course_title
             FROM discussions d
             JOIN courses c ON d.course_id = c.id
-            WHERE d.student_id = ? AND d.parent_id IS NULL
+            WHERE d.student_id = ?
             ORDER BY d.created_at DESC
             LIMIT ? OFFSET ?
         ");
@@ -160,12 +164,11 @@ class Discussion {
         $offset = ($page - 1) * $limit;
         
         $stmt = $conn->prepare("
-            SELECT d.*, c.title as course_title, u.full_name as student_name,
-                   (SELECT COUNT(*) FROM discussions WHERE parent_id = d.id) as reply_count
+            SELECT d.*, c.title as course_title, u.full_name as student_name
             FROM discussions d
             JOIN courses c ON d.course_id = c.id
             JOIN users u ON d.student_id = u.id
-            WHERE c.instructor_id = ? AND d.parent_id IS NULL
+            WHERE c.instructor_id = ?
             ORDER BY d.created_at DESC
             LIMIT ? OFFSET ?
         ");
@@ -197,28 +200,50 @@ class Discussion {
         $conn = $this->db->getConnection();
         $stats = [];
         
+        // Check if discussions table exists
+        $tableCheck = $conn->query("SHOW TABLES LIKE 'discussions'");
+        if ($tableCheck->num_rows == 0) {
+            // Return default stats if table doesn't exist
+            return [
+                'total_discussions' => 0,
+                'unresolved' => 0,
+                'total_replies' => 0
+            ];
+        }
+        
         if ($courseId) {
             // Total discussions for course
-            $stmt = $conn->prepare("SELECT COUNT(*) as total FROM discussions WHERE course_id = ? AND parent_id IS NULL");
-            $stmt->bind_param("i", $courseId);
-            $stmt->execute();
-            $stats['total_discussions'] = $stmt->get_result()->fetch_assoc()['total'];
+            $stmt = $conn->prepare("SELECT COUNT(*) as total FROM discussions WHERE course_id = ?");
+            if ($stmt === false) {
+                error_log("SQL prepare failed in getDiscussionStats (course total): " . $conn->error);
+                $stats['total_discussions'] = 0;
+            } else {
+                $stmt->bind_param("i", $courseId);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $stats['total_discussions'] = $result ? $result->fetch_assoc()['total'] : 0;
+            }
             
-            // Unresolved discussions
-            $stmt = $conn->prepare("SELECT COUNT(*) as total FROM discussions WHERE course_id = ? AND parent_id IS NULL AND is_resolved = FALSE");
-            $stmt->bind_param("i", $courseId);
-            $stmt->execute();
-            $stats['unresolved'] = $stmt->get_result()->fetch_assoc()['total'];
+            // Locked discussions (equivalent to resolved)
+            $stmt = $conn->prepare("SELECT COUNT(*) as total FROM discussions WHERE course_id = ? AND locked = 1");
+            if ($stmt === false) {
+                error_log("SQL prepare failed in getDiscussionStats (course locked): " . $conn->error);
+                $stats['unresolved'] = 0;
+            } else {
+                $stmt->bind_param("i", $courseId);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $stats['unresolved'] = $result ? $result->fetch_assoc()['total'] : 0;
+            }
         } else {
             // System-wide stats
-            $result = $conn->query("SELECT COUNT(*) as total FROM discussions WHERE parent_id IS NULL");
-            $stats['total_discussions'] = $result->fetch_assoc()['total'];
+            $result = $conn->query("SELECT COUNT(*) as total FROM discussions");
+            $stats['total_discussions'] = $result ? $result->fetch_assoc()['total'] : 0;
             
-            $result = $conn->query("SELECT COUNT(*) as total FROM discussions WHERE parent_id IS NULL AND is_resolved = FALSE");
-            $stats['unresolved'] = $result->fetch_assoc()['total'];
+            $result = $conn->query("SELECT COUNT(*) as total FROM discussions WHERE locked = 1");
+            $stats['unresolved'] = $result ? $result->fetch_assoc()['total'] : 0;
             
-            $result = $conn->query("SELECT COUNT(*) as total FROM discussions WHERE parent_id IS NOT NULL");
-            $stats['total_replies'] = $result->fetch_assoc()['total'];
+            $stats['total_replies'] = 0; // Not supported in current table structure
         }
         
         return $stats;
@@ -229,12 +254,11 @@ class Discussion {
         $offset = ($page - 1) * $limit;
         
         $stmt = $conn->prepare("
-            SELECT d.*, u.full_name, u.profile_image, c.title as course_title,
-                   (SELECT COUNT(*) FROM discussions WHERE parent_id = d.id) as reply_count
+            SELECT d.*, u.full_name, u.profile_image, c.title as course_title
             FROM discussions d
             JOIN users u ON d.student_id = u.id
             JOIN courses c ON d.course_id = c.id
-            WHERE d.course_id = ? AND d.parent_id IS NULL 
+            WHERE d.course_id = ? 
             AND (d.title LIKE ? OR d.content LIKE ?)
             ORDER BY d.created_at DESC
             LIMIT ? OFFSET ?
@@ -269,19 +293,46 @@ class Discussion {
     }
     
     public function getDiscussionReplies($discussionId) {
+        // Current table structure doesn't support replies (no parent_id column)
+        // Return empty array to maintain compatibility
+        return [];
+    }
+    
+    /**
+     * Alias for getDiscussionsByCourse to maintain compatibility
+     */
+    public function getCourseDiscussions($courseId, $page = 1, $limit = 20) {
+        return $this->getDiscussionsByCourse($courseId, $page, $limit);
+    }
+    
+    /**
+     * Get discussion count for a course
+     */
+    public function getCourseDiscussionCount($courseId) {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("
-            SELECT d.*, u.full_name, u.profile_image
-            FROM discussions d
-            JOIN users u ON d.student_id = u.id
-            WHERE d.parent_id = ?
-            ORDER BY d.created_at ASC
-        ");
-        $stmt->bind_param("i", $discussionId);
-        $stmt->execute();
+        // Check if discussions table exists
+        $tableCheck = $conn->query("SHOW TABLES LIKE 'discussions'");
+        if ($tableCheck->num_rows == 0) {
+            return 0; // Table doesn't exist, return 0
+        }
         
-        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt = $conn->prepare("
+            SELECT COUNT(*) as count
+            FROM discussions 
+            WHERE course_id = ?
+        ");
+        
+        if ($stmt === false) {
+            error_log("SQL prepare failed in getCourseDiscussionCount: " . $conn->error);
+            return 0;
+        }
+        
+        $stmt->bind_param("i", $courseId);
+        $stmt->execute();
+        $result = $stmt->get_result()->fetch_assoc();
+        
+        return $result['count'] ?? 0;
     }
 }
 ?>

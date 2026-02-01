@@ -26,7 +26,12 @@ class User {
 
         error_log("DEBUG: Login attempt for email: " . $email);
 
-        $stmt = $conn->prepare("SELECT id, username, email, password, full_name, role, status FROM users WHERE email = ?");
+        $stmt = $conn->prepare("SELECT id, username, email, password, full_name, role, status, email_verified FROM users WHERE email = ?");
+        if (!$stmt) {
+            error_log("DEBUG: Prepare failed: " . $conn->error);
+            return ['success' => false, 'error' => 'Database query preparation failed'];
+        }
+        
         $stmt->bind_param("s", $email);
         $stmt->execute();
         $result = $stmt->get_result();

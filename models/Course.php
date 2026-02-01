@@ -38,7 +38,7 @@ class Course {
     public function updateCourse($courseId, $data) {
         $conn = $this->db->getConnection();
         
-        $sql = "UPDATE courses SET ";
+        $sql = "UPDATE courses_new SET ";
         $params = [];
         $types = "";
         
@@ -75,7 +75,7 @@ class Course {
         }
         
         // Delete course
-        $stmt = $conn->prepare("DELETE FROM courses WHERE id = ?");
+        $stmt = $conn->prepare("DELETE FROM courses_new WHERE id = ?");
         $stmt->bind_param("i", $courseId);
         
         if ($stmt->execute()) {
@@ -90,11 +90,16 @@ class Course {
         
         $stmt = $conn->prepare("
             SELECT c.*, cat.name as category_name, u.full_name as instructor_name
-            FROM courses c
-            LEFT JOIN categories cat ON c.category_id = cat.id
-            LEFT JOIN users u ON c.instructor_id = u.id
+            FROM courses_new c
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
+            LEFT JOIN users_new u ON c.instructor_id = u.id
             WHERE c.id = ?
         ");
+        
+        if ($stmt === false) {
+            throw new Exception("Failed to prepare query: " . $conn->error);
+        }
+        
         $stmt->bind_param("i", $id);
         $stmt->execute();
         
@@ -106,9 +111,9 @@ class Course {
         
         $sql = "
             SELECT c.*, cat.name as category_name, u.full_name as instructor_name
-            FROM courses c
-            LEFT JOIN categories cat ON c.category_id = cat.id
-            LEFT JOIN users u ON c.instructor_id = u.id
+            FROM courses_new c
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
+            LEFT JOIN users_new u ON c.instructor_id = u.id
             WHERE 1=1
         ";
         
@@ -127,6 +132,9 @@ class Course {
         $types .= "ii";
         
         $stmt = $conn->prepare($sql);
+        if ($stmt === false) {
+            throw new Exception("Failed to prepare SQL query: " . $conn->error . " SQL: " . $sql);
+        }
         $stmt->bind_param($types, ...$params);
         $stmt->execute();
         
@@ -138,9 +146,9 @@ class Course {
         
         $sql = "
             SELECT c.*, cat.name as category_name, u.full_name as instructor_name
-            FROM courses c
-            LEFT JOIN categories cat ON c.category_id = cat.id
-            LEFT JOIN users u ON c.instructor_id = u.id
+            FROM courses_new c
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
+            LEFT JOIN users_new u ON c.instructor_id = u.id
             WHERE c.status = 'published' 
             AND (c.title LIKE ? OR c.description LIKE ?)
         ";
@@ -183,31 +191,50 @@ class Course {
     public function getCourseStats() {
         $conn = $this->db->getConnection();
         
-        $stats = [];
+        $stats = [
+            'total' => 0,
+            'published' => 0,
+            'draft' => 0,
+            'enrollments' => 0,
+            'completed' => 0,
+            'total_attempts' => 0
+        ];
         
         // Total courses
-        $result = $conn->query("SELECT COUNT(*) as total FROM courses");
-        $stats['total'] = $result->fetch_assoc()['total'];
+        $result = $conn->query("SELECT COUNT(*) as total FROM courses_new");
+        if ($result && $row = $result->fetch_assoc()) {
+            $stats['total'] = $row['total'];
+        }
         
         // Published courses
-        $result = $conn->query("SELECT COUNT(*) as published FROM courses WHERE status = 'published'");
-        $stats['published'] = $result->fetch_assoc()['published'];
+        $result = $conn->query("SELECT COUNT(*) as published FROM courses_new WHERE status = 'published'");
+        if ($result && $row = $result->fetch_assoc()) {
+            $stats['published'] = $row['published'];
+        }
         
         // Draft courses
-        $result = $conn->query("SELECT COUNT(*) as draft FROM courses WHERE status = 'draft'");
-        $stats['draft'] = $result->fetch_assoc()['draft'];
+        $result = $conn->query("SELECT COUNT(*) as draft FROM courses_new WHERE status = 'draft'");
+        if ($result && $row = $result->fetch_assoc()) {
+            $stats['draft'] = $row['draft'];
+        }
         
         // Total enrollments
         $result = $conn->query("SELECT COUNT(*) as enrollments FROM enrollments");
-        $stats['enrollments'] = $result->fetch_assoc()['enrollments'];
+        if ($result && $row = $result->fetch_assoc()) {
+            $stats['enrollments'] = $row['enrollments'];
+        }
         
         // Completed courses
         $result = $conn->query("SELECT COUNT(*) as completed FROM enrollments WHERE status = 'completed'");
-        $stats['completed'] = $result->fetch_assoc()['completed'];
+        if ($result && $row = $result->fetch_assoc()) {
+            $stats['completed'] = $row['completed'];
+        }
         
         // Total attempts
         $result = $conn->query("SELECT COUNT(*) as total_attempts FROM quiz_attempts");
-        $stats['total_attempts'] = $result->fetch_assoc()['total_attempts'];
+        if ($result && $row = $result->fetch_assoc()) {
+            $stats['total_attempts'] = $row['total_attempts'];
+        }
         
         return $stats;
     }
@@ -219,9 +246,9 @@ class Course {
             SELECT c.*, COALESCE(cat.name, 'Uncategorized') as category_name, COALESCE(u.full_name, 'Unknown Instructor') as instructor_name,
                    COUNT(e.id) as enrollment_count,
                    COALESCE(AVG(e.progress_percentage), 0) as avg_progress
-            FROM courses c
-            LEFT JOIN categories cat ON c.category_id = cat.id
-            LEFT JOIN users u ON c.instructor_id = u.id
+            FROM courses_new c
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
+            LEFT JOIN users_new u ON c.instructor_id = u.id
             LEFT JOIN enrollments e ON c.id = e.course_id
             WHERE c.status = 'published'
             GROUP BY c.id
@@ -242,13 +269,33 @@ class Course {
     }
     
     public function getRecommendedCourses($studentId, $limit = 5) {
+        // Try to get recommendations from the new recommendation system first
+        require_once __DIR__ . '/RecommendationSystem.php';
+        
+        $recommendationSystem = new RecommendationSystem();
+        
+        // Check for cached recommendations
+        $cachedRecommendations = $recommendationSystem->getCachedRecommendations($studentId, 'knn');
+        
+        if (!empty($cachedRecommendations)) {
+            return array_slice($cachedRecommendations, 0, $limit);
+        }
+        
+        // Generate new KNN recommendations
+        $knnRecommendations = $recommendationSystem->getKNNRecommendations($studentId, $limit);
+        
+        if (!empty($knnRecommendations)) {
+            return $knnRecommendations;
+        }
+        
+        // Fallback to original random recommendations if KNN fails
         $conn = $this->db->getConnection();
         
         $stmt = $conn->prepare("
             SELECT c.*, cat.name as category_name, u.full_name as instructor_name
-            FROM courses c
-            JOIN categories cat ON c.category_id = cat.id
-            JOIN users u ON c.instructor_id = u.id
+            FROM courses_new c
+            JOIN categories_new cat ON c.category_id = cat.id
+            JOIN users_new u ON c.instructor_id = u.id
             WHERE c.status = 'published' 
             AND c.id NOT IN (
                 SELECT course_id FROM enrollments WHERE student_id = ?
@@ -260,7 +307,15 @@ class Course {
         $stmt->execute();
         $result = $stmt->get_result();
         
-        return $result->fetch_all(MYSQLI_ASSOC);
+        $fallbackRecommendations = $result->fetch_all(MYSQLI_ASSOC);
+        
+        // Add basic recommendation scores to fallback
+        foreach ($fallbackRecommendations as &$rec) {
+            $rec['recommendation_score'] = 0.5; // Default score
+            $rec['recommendation_reason'] = 'Popular course';
+        }
+        
+        return $fallbackRecommendations;
     }
     
     public function getCourseStatistics($courseId) {
@@ -308,8 +363,8 @@ class Course {
             SELECT c.*, cat.name as category_name,
                    COUNT(e.id) as enrollment_count,
                    AVG(e.progress_percentage) as avg_progress
-            FROM courses c
-            JOIN categories cat ON c.category_id = cat.id
+            FROM courses_new c
+            JOIN categories_new cat ON c.category_id = cat.id
             LEFT JOIN enrollments e ON c.id = e.course_id
             WHERE c.instructor_id = ?
             GROUP BY c.id
@@ -334,7 +389,7 @@ class Course {
         
         // Create duplicate
         $stmt = $conn->prepare("
-            INSERT INTO courses (title, description, category_id, instructor_id, price, duration_hours, difficulty_level, status, thumbnail, created_at, updated_at) 
+            INSERT INTO courses_new (title, description, category_id, instructor_id, price, duration_hours, difficulty_level, status, thumbnail, created_at, updated_at) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ");
         
@@ -375,6 +430,9 @@ class Course {
                 WHERE l.course_id = ?
                 ORDER BY l.lesson_order
             ");
+            if ($stmt === false) {
+                throw new Exception("Failed to prepare query: " . $conn->error);
+            }
             $stmt->bind_param("ii", $studentId, $courseId);
         } else {
             $stmt = $conn->prepare("
@@ -383,6 +441,9 @@ class Course {
                 WHERE l.course_id = ?
                 ORDER BY l.lesson_order
             ");
+            if ($stmt === false) {
+                throw new Exception("Failed to prepare query: " . $conn->error);
+            }
             $stmt->bind_param("i", $courseId);
         }
         
@@ -462,16 +523,37 @@ class Course {
     public function getEnrolledCourses($studentId) {
         $conn = $this->db->getConnection();
         
+        // First check if enrollments table has any data for this student
+        $checkStmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE student_id = ?");
+        if ($checkStmt === false) {
+            error_log("Failed to prepare enrollment check query: " . $conn->error);
+            return [];
+        }
+        $checkStmt->bind_param("i", $studentId);
+        $checkStmt->execute();
+        $count = $checkStmt->get_result()->fetch_assoc()['count'];
+        $checkStmt->close();
+        
+        if ($count == 0) {
+            return []; // No enrollments found
+        }
+        
         $stmt = $conn->prepare("
             SELECT c.*, e.enrolled_at, e.progress_percentage, e.status as enrollment_status,
                    cat.name as category_name, u.full_name as instructor_name
-            FROM courses c
+            FROM courses_new c
             JOIN enrollments e ON c.id = e.course_id
-            JOIN categories cat ON c.category_id = cat.id
-            JOIN users u ON c.instructor_id = u.id
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
+            LEFT JOIN users_new u ON c.instructor_id = u.id
             WHERE e.student_id = ? AND e.status = 'active'
             ORDER BY e.enrolled_at DESC
         ");
+        
+        if ($stmt === false) {
+            error_log("Failed to prepare enrolled courses query: " . $conn->error);
+            return [];
+        }
+        
         $stmt->bind_param("i", $studentId);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -511,7 +593,7 @@ class Course {
         $stmt = $conn->prepare("
             SELECT u.id, u.username, u.email, u.full_name, u.profile_image,
                    e.enrolled_at, e.progress_percentage, e.status as enrollment_status
-            FROM users u
+            FROM users_new u
             JOIN enrollments e ON u.id = e.student_id
             WHERE e.course_id = ?
             ORDER BY e.enrolled_at DESC
@@ -613,9 +695,9 @@ class Course {
             SELECT c.*, cat.name as category_name, u.full_name as instructor_name,
                    COUNT(e.id) as enrollment_count,
                    ROUND(AVG(e.progress_percentage), 2) as avg_progress
-            FROM courses c
-            LEFT JOIN categories cat ON c.category_id = cat.id
-            LEFT JOIN users u ON c.instructor_id = u.id
+            FROM courses_new c
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
+            LEFT JOIN users_new u ON c.instructor_id = u.id
             LEFT JOIN enrollments e ON c.id = e.course_id
             WHERE 1=1
         ";
@@ -655,6 +737,9 @@ class Course {
         $types .= 'ii';
 
         $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            return [];
+        }
         $stmt->bind_param($types, ...$params);
         $stmt->execute();
 
@@ -669,7 +754,7 @@ class Course {
         $status = $filters['status'] ?? null;
         $instructorId = $filters['instructor_id'] ?? null;
 
-        $sql = "SELECT COUNT(*) as total FROM courses c WHERE 1=1";
+        $sql = "SELECT COUNT(*) as total FROM courses_new c WHERE 1=1";
         $params = [];
         $types = '';
 
@@ -700,13 +785,53 @@ class Course {
         }
 
         $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            return 0;
+        }
         if ($types !== '') {
             $stmt->bind_param($types, ...$params);
         }
         $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
+        $result = $stmt->get_result();
+        $row = $result ? $result->fetch_assoc() : null;
 
         return (int)($row['total'] ?? 0);
+    }
+    
+    /**
+     * Get the next lesson for a student in a course
+     */
+    public function getNextLesson($studentId, $courseId) {
+        $conn = $this->db->getConnection();
+        
+        // Check if required tables exist
+        $lessonsCheck = $conn->query("SHOW TABLES LIKE 'lessons'");
+        $completedLessonsCheck = $conn->query("SHOW TABLES LIKE 'completed_lessons'");
+        
+        if ($lessonsCheck->num_rows == 0 || $completedLessonsCheck->num_rows == 0) {
+            return null; // Tables don't exist, return null
+        }
+        
+        // Get lessons that are not yet completed by the student
+        $stmt = $conn->prepare("
+            SELECT l.*
+            FROM lessons l
+            LEFT JOIN completed_lessons cl ON l.id = cl.lesson_id AND cl.student_id = ?
+            WHERE l.course_id = ? AND cl.lesson_id IS NULL
+            ORDER BY l.lesson_order ASC
+            LIMIT 1
+        ");
+        
+        if ($stmt === false) {
+            error_log("SQL prepare failed in getNextLesson: " . $conn->error);
+            return null;
+        }
+        
+        $stmt->bind_param("ii", $studentId, $courseId);
+        $stmt->execute();
+        
+        $result = $stmt->get_result()->fetch_assoc();
+        return $result ?: null;
     }
 }
 ?>

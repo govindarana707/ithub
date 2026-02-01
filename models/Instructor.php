@@ -171,36 +171,57 @@ class Instructor {
         foreach ($courses as &$course) {
             // Get enrollment count
             $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE course_id = ?");
-            $stmt->bind_param("i", $course['id']);
-            $stmt->execute();
-            $course['enrollment_count'] = $stmt->get_result()->fetch_assoc()['count'];
+            if ($stmt) {
+                $stmt->bind_param("i", $course['id']);
+                $stmt->execute();
+                $course['enrollment_count'] = $stmt->get_result()->fetch_assoc()['count'];
+            } else {
+                $course['enrollment_count'] = 0;
+            }
             
             // Get average progress
             $stmt = $conn->prepare("SELECT AVG(progress_percentage) as avg FROM enrollments WHERE course_id = ?");
-            $stmt->bind_param("i", $course['id']);
-            $stmt->execute();
-            $avg = $stmt->get_result()->fetch_assoc()['avg'];
-            $course['avg_progress'] = $avg ? round($avg, 2) : 0;
+            if ($stmt) {
+                $stmt->bind_param("i", $course['id']);
+                $stmt->execute();
+                $avg = $stmt->get_result()->fetch_assoc()['avg'];
+                $course['avg_progress'] = $avg ? round($avg, 2) : 0;
+            } else {
+                $course['avg_progress'] = 0;
+            }
             
             // Get completed count
             $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE course_id = ? AND progress_percentage = 100");
-            $stmt->bind_param("i", $course['id']);
-            $stmt->execute();
-            $course['completed_count'] = $stmt->get_result()->fetch_assoc()['count'];
+            if ($stmt) {
+                $stmt->bind_param("i", $course['id']);
+                $stmt->execute();
+                $course['completed_count'] = $stmt->get_result()->fetch_assoc()['count'];
+            } else {
+                $course['completed_count'] = 0;
+            }
             
             // Get lesson count
             $stmt = $conn->prepare("SELECT COUNT(*) as count FROM lessons WHERE course_id = ?");
-            $stmt->bind_param("i", $course['id']);
-            $stmt->execute();
-            $course['lesson_count'] = $stmt->get_result()->fetch_assoc()['count'];
+            if ($stmt) {
+                $stmt->bind_param("i", $course['id']);
+                $stmt->execute();
+                $course['lesson_count'] = $stmt->get_result()->fetch_assoc()['count'];
+            } else {
+                $course['lesson_count'] = 0;
+            }
             
             // Get rating
             $stmt = $conn->prepare("SELECT AVG(rating) as avg, COUNT(*) as count FROM course_reviews WHERE course_id = ?");
-            $stmt->bind_param("i", $course['id']);
-            $stmt->execute();
-            $ratingData = $stmt->get_result()->fetch_assoc();
-            $course['avg_rating'] = $ratingData['avg'] ? round($ratingData['avg'], 1) : 0;
-            $course['review_count'] = $ratingData['count'];
+            if ($stmt) {
+                $stmt->bind_param("i", $course['id']);
+                $stmt->execute();
+                $ratingData = $stmt->get_result()->fetch_assoc();
+                $course['avg_rating'] = $ratingData['avg'] ? round($ratingData['avg'], 1) : 0;
+                $course['review_count'] = $ratingData['count'];
+            } else {
+                $course['avg_rating'] = 0;
+                $course['review_count'] = 0;
+            }
             
             // Calculate revenue
             $course['revenue'] = $course['price'] * $course['enrollment_count'];
@@ -703,16 +724,42 @@ class Instructor {
     /**
      * Log instructor activity
      */
-    private function logInstructorActivity($instructorId, $action, $details, $courseId = null) {
-        $conn = $this->db->getConnection();
+    public function logInstructorActivity($instructorId, $action, $details, $courseId = null) {
+        $database = new Database();
+        $conn = $database->getConnection();
+        
+        // Create instructor_activity_log table if it doesn't exist
+        $createTableSQL = "
+            CREATE TABLE IF NOT EXISTS instructor_activity_log (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                instructor_id INT NOT NULL,
+                action VARCHAR(100) NOT NULL,
+                details TEXT,
+                course_id INT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (instructor_id) REFERENCES users_new(id) ON DELETE CASCADE,
+                FOREIGN KEY (course_id) REFERENCES courses_new(id) ON DELETE SET NULL
+            )
+        ";
+        $conn->query($createTableSQL);
         
         $stmt = $conn->prepare("
             INSERT INTO instructor_activity_log (instructor_id, action, details, course_id, created_at)
             VALUES (?, ?, ?, ?, NOW())
         ");
         
+        if ($stmt === false) {
+            // If table creation or prepare fails, log to error_log and return false
+            error_log("Failed to prepare instructor activity log: " . $conn->error);
+            return false;
+        }
+        
         $stmt->bind_param("issi", $instructorId, $action, $details, $courseId);
-        return $stmt->execute();
+        $result = $stmt->execute();
+        $stmt->close();
+        $conn->close();
+        
+        return $result;
     }
     
     /**
@@ -795,6 +842,10 @@ class Instructor {
             ORDER BY ial.created_at DESC
             LIMIT ? OFFSET ?
         ");
+        
+        if (!$stmt) {
+            return [];
+        }
         
         $stmt->bind_param("iii", $instructorId, $limit, $offset);
         $stmt->execute();

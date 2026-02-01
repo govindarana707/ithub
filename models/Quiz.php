@@ -168,8 +168,8 @@ class Quiz {
     public function createQuestion($data) {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("INSERT INTO quiz_questions (quiz_id, question_text, question_type, points, question_order) VALUES (?, ?, ?, ?, ?)");
-        $stmt->bind_param("issdi", $data['quiz_id'], $data['question_text'], $data['question_type'], $data['points'], $data['question_order']);
+        $stmt = $conn->prepare("INSERT INTO quiz_questions (quiz_id, question_text, question_type, points, sort_order) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("issdi", $data['quiz_id'], $data['question_text'], $data['question_type'], $data['points'], $data['sort_order']);
         
         if ($stmt->execute()) {
             return ['success' => true, 'question_id' => $conn->insert_id];
@@ -196,7 +196,7 @@ class Quiz {
                     FROM quiz_options o WHERE o.question_id = q.id) as options
             FROM quiz_questions q
             WHERE q.quiz_id = ?
-            ORDER BY q.question_order
+            ORDER BY q.sort_order
         ");
         $stmt->bind_param("i", $quizId);
         $stmt->execute();
@@ -208,12 +208,17 @@ class Quiz {
             if ($row['options']) {
                 $optionData = explode('|', $row['options']);
                 foreach ($optionData as $option) {
+                    // Use a more robust parsing that handles colons in option text
                     $parts = explode(':', $option);
-                    if (count($parts) === 3) {
+                    if (count($parts) >= 3) {
+                        $id = array_shift($parts); // First part is the ID
+                        $isCorrect = array_pop($parts); // Last part is the is_correct flag
+                        $text = implode(':', $parts); // Everything in between is the text
+                        
                         $options[] = [
-                            'id' => $parts[0],
-                            'text' => $parts[1],
-                            'is_correct' => $parts[2] == '1'
+                            'id' => $id,
+                            'text' => $text,
+                            'is_correct' => $isCorrect == '1'
                         ];
                     }
                 }
@@ -263,12 +268,21 @@ class Quiz {
     public function submitAnswer($attemptId, $questionId, $selectedOptionId = null, $answerText = null) {
         $conn = $this->db->getConnection();
         
+        if (!$conn) {
+            return ['success' => false, 'error' => 'Database connection failed'];
+        }
+        
         // Get question details
         $stmt = $conn->prepare("
             SELECT q.points, q.question_type
             FROM quiz_questions q
             WHERE q.id = ?
         ");
+        
+        if (!$stmt) {
+            return ['success' => false, 'error' => 'Failed to prepare question query: ' . $conn->error];
+        }
+        
         $stmt->bind_param("i", $questionId);
         $stmt->execute();
         $question = $stmt->get_result()->fetch_assoc();
@@ -283,7 +297,24 @@ class Quiz {
         // Check if selected option is correct (for multiple choice)
         if ($selectedOptionId && $question['question_type'] === 'multiple_choice') {
             $stmt = $conn->prepare("SELECT is_correct FROM quiz_options WHERE id = ?");
+            if (!$stmt) {
+                return ['success' => false, 'error' => 'Failed to prepare options query: ' . $conn->error];
+            }
             $stmt->bind_param("i", $selectedOptionId);
+            $stmt->execute();
+            $optionResult = $stmt->get_result()->fetch_assoc();
+            $isCorrect = $optionResult && $optionResult['is_correct'] == 1;
+            $pointsEarned = $isCorrect ? $question['points'] : 0;
+        }
+        
+        // Check if true/false answer is correct
+        elseif ($answerText && $question['question_type'] === 'true_false') {
+            $stmt = $conn->prepare("SELECT is_correct FROM quiz_options WHERE question_id = ? AND LOWER(option_text) = ?");
+            if (!$stmt) {
+                return ['success' => false, 'error' => 'Failed to prepare true/false query: ' . $conn->error];
+            }
+            $userAnswer = strtolower($answerText);
+            $stmt->bind_param("is", $questionId, $userAnswer);
             $stmt->execute();
             $optionResult = $stmt->get_result()->fetch_assoc();
             $isCorrect = $optionResult && $optionResult['is_correct'] == 1;
@@ -292,6 +323,10 @@ class Quiz {
         
         // Check if answer already exists
         $stmt = $conn->prepare("SELECT id FROM quiz_answers WHERE attempt_id = ? AND question_id = ?");
+        if (!$stmt) {
+            return ['success' => false, 'error' => 'Failed to prepare answer check query: ' . $conn->error];
+        }
+        
         $stmt->bind_param("ii", $attemptId, $questionId);
         $stmt->execute();
         
@@ -302,6 +337,9 @@ class Quiz {
                 SET selected_option_id = ?, answer_text = ?, is_correct = ?, points_earned = ?
                 WHERE attempt_id = ? AND question_id = ?
             ");
+            if (!$stmt) {
+                return ['success' => false, 'error' => 'Failed to prepare update query: ' . $conn->error];
+            }
             $stmt->bind_param("isidii", $selectedOptionId, $answerText, $isCorrect, $pointsEarned, $attemptId, $questionId);
         } else {
             // Insert new answer
@@ -309,10 +347,17 @@ class Quiz {
                 INSERT INTO quiz_answers (attempt_id, question_id, selected_option_id, answer_text, is_correct, points_earned)
                 VALUES (?, ?, ?, ?, ?, ?)
             ");
+            if (!$stmt) {
+                return ['success' => false, 'error' => 'Failed to prepare insert query: ' . $conn->error];
+            }
             $stmt->bind_param("iisidd", $attemptId, $questionId, $selectedOptionId, $answerText, $isCorrect, $pointsEarned);
         }
         
-        return $stmt->execute();
+        if ($stmt->execute()) {
+            return ['success' => true, 'points_earned' => $pointsEarned];
+        } else {
+            return ['success' => false, 'error' => $stmt->error];
+        }
     }
     
     public function completeQuizAttempt($attemptId) {
@@ -491,12 +536,22 @@ class Quiz {
             
             // Submit all answers
             foreach ($answers as $questionId => $answer) {
-                if (is_array($answer)) {
-                    // Multiple choice
-                    $selectedOptionId = $answer[0] ?? null;
+                // Get question type to determine how to handle the answer
+                $questionStmt = $conn->prepare("SELECT question_type FROM quiz_questions WHERE id = ?");
+                $questionStmt->bind_param("i", $questionId);
+                $questionStmt->execute();
+                $questionResult = $questionStmt->get_result()->fetch_assoc();
+                $questionType = $questionResult['question_type'] ?? '';
+                
+                if ($questionType === 'multiple_choice') {
+                    // Multiple choice - answer should be the option ID
+                    $selectedOptionId = is_numeric($answer) ? (int)$answer : null;
                     $this->submitAnswer($attemptId, $questionId, $selectedOptionId);
+                } elseif ($questionType === 'true_false') {
+                    // True/false - answer is the text value
+                    $this->submitAnswer($attemptId, $questionId, null, $answer);
                 } else {
-                    // Text answer
+                    // Short answer - text answer
                     $this->submitAnswer($attemptId, $questionId, null, $answer);
                 }
             }
@@ -539,7 +594,7 @@ class Quiz {
             LEFT JOIN quiz_answers qa ON qq.id = qa.question_id AND qa.attempt_id = ?
             LEFT JOIN quiz_options qo ON qa.selected_option_id = qo.id
             WHERE qq.quiz_id = ?
-            ORDER BY qq.question_order
+            ORDER BY qq.sort_order
         ";
         
         $stmt = $conn->prepare($sql);
@@ -625,8 +680,31 @@ class Quiz {
                     }
                 }
             } elseif ($row['question_type'] === 'true_false') {
-                $question['user_answer'] = $row['answer_text'];
-                $question['correct_answer'] = $row['answer_text']; // For T/F, the answer text contains the correct answer
+                // For true/false, get the correct answer from options
+                $tfStmt = $conn->prepare("
+                    SELECT option_text, is_correct 
+                    FROM quiz_options 
+                    WHERE question_id = ? 
+                    ORDER BY option_order
+                ");
+                $tfStmt->bind_param("i", $row['id']);
+                $tfStmt->execute();
+                $tfOptions = $tfStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                
+                // Find correct answer
+                $correctAnswer = null;
+                foreach ($tfOptions as $option) {
+                    if ($option['is_correct']) {
+                        $correctAnswer = strtolower($option['option_text']);
+                        break;
+                    }
+                }
+                
+                // User answer should be stored in answer_text as 'true' or 'false'
+                $userAnswer = strtolower($row['answer_text'] ?? '');
+                
+                $question['user_answer'] = $userAnswer;
+                $question['correct_answer'] = $correctAnswer;
             } else {
                 // Short answer
                 $question['user_answer'] = $row['answer_text'];
@@ -652,6 +730,67 @@ class Quiz {
             'incorrect_count' => $incorrectCount,
             'unanswered_count' => $unansweredCount
         ];
+    }
+    
+    /**
+     * Get quiz statistics for a student in a course
+     */
+    public function getCourseQuizStats($studentId, $courseId) {
+        $conn = $this->db->getConnection();
+        
+        // Check if required tables exist
+        $quizAttemptsCheck = $conn->query("SHOW TABLES LIKE 'quiz_attempts'");
+        $quizzesCheck = $conn->query("SHOW TABLES LIKE 'quizzes'");
+        
+        if ($quizAttemptsCheck->num_rows == 0 || $quizzesCheck->num_rows == 0) {
+            // Return default stats if tables don't exist
+            return [
+                'quizzes_attempted' => 0,
+                'total_attempts' => 0,
+                'average_score' => 0,
+                'best_score' => 0,
+                'passed_quizzes' => 0,
+                'failed_quizzes' => 0
+            ];
+        }
+        
+        $stmt = $conn->prepare("
+            SELECT 
+                COUNT(DISTINCT qa.quiz_id) as quizzes_attempted,
+                COUNT(*) as total_attempts,
+                AVG(qa.percentage) as average_score,
+                MAX(qa.percentage) as best_score,
+                SUM(CASE WHEN qa.passed = 1 THEN 1 ELSE 0 END) as passed_quizzes,
+                SUM(CASE WHEN qa.passed = 0 THEN 1 ELSE 0 END) as failed_quizzes
+            FROM quiz_attempts qa
+            JOIN quizzes q ON qa.quiz_id = q.id
+            WHERE qa.student_id = ? AND q.course_id = ?
+        ");
+        
+        if ($stmt === false) {
+            error_log("SQL prepare failed in getCourseQuizStats: " . $conn->error);
+            // Return default stats on error
+            return [
+                'quizzes_attempted' => 0,
+                'total_attempts' => 0,
+                'average_score' => 0,
+                'best_score' => 0,
+                'passed_quizzes' => 0,
+                'failed_quizzes' => 0
+            ];
+        }
+        
+        $stmt->bind_param("ii", $studentId, $courseId);
+        $stmt->execute();
+        
+        $stats = $stmt->get_result()->fetch_assoc();
+        
+        // Convert null values to 0
+        foreach ($stats as $key => $value) {
+            $stats[$key] = $value ?? 0;
+        }
+        
+        return $stats;
     }
 }
 
