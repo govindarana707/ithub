@@ -376,6 +376,122 @@ $(document).ready(function() {
     
     // Load messages every 5 seconds
     setInterval(loadMessages, 5000);
+    
+    // Scroll Reveal Animation
+    function reveal() {
+        var reveals = document.querySelectorAll('.reveal');
+        
+        reveals.forEach(function(element) {
+            var elementTop = element.getBoundingClientRect().top;
+            var elementVisible = 150;
+            
+            if (elementTop < window.innerHeight - elementVisible) {
+                element.classList.add('active');
+            }
+        });
+    }
+    
+    window.addEventListener('scroll', reveal);
+    reveal(); // Initial check
+    
+    // Parallax scrolling effect
+    function parallax() {
+        var parallaxElements = document.querySelectorAll('.parallax');
+        
+        parallaxElements.forEach(function(element) {
+            var speed = element.dataset.speed || 0.5;
+            var yPos = -(window.pageYOffset * speed);
+            
+            element.style.transform = 'translateY(' + yPos + 'px)';
+        });
+    }
+    
+    window.addEventListener('scroll', parallax);
+    
+    // Smooth scrolling for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(function(anchor) {
+        anchor.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            var target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+    
+    // Animated counter for statistics
+    function animateCounter() {
+        var counters = document.querySelectorAll('.stat-card h3');
+        
+        counters.forEach(function(counter) {
+            var target = parseInt(counter.innerText.replace(/[^0-9]/g, ''));
+            var increment = target / 100;
+            var current = 0;
+            
+            var timer = setInterval(function() {
+                current += increment;
+                
+                if (current >= target) {
+                    counter.innerText = counter.innerText.replace(/[0-9]+/, target);
+                    clearInterval(timer);
+                } else {
+                    counter.innerText = counter.innerText.replace(/[0-9]+/, Math.floor(current));
+                }
+            }, 20);
+        });
+    }
+    
+    // Trigger counter animation when stats section is visible
+    var statsSection = document.querySelector('.stat-card');
+    if (statsSection) {
+        var observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    animateCounter();
+                    observer.unobserve(entry.target);
+                }
+            });
+        });
+        
+        observer.observe(statsSection);
+    }
+    
+    // Add hover effect to cards
+    document.querySelectorAll('.card, .feature-card').forEach(function(card) {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-10px) scale(1.02)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0) scale(1)';
+        });
+    });
+    
+    // Button ripple effect
+    document.querySelectorAll('.btn').forEach(function(button) {
+        button.addEventListener('click', function(e) {
+            var ripple = document.createElement('span');
+            var rect = this.getBoundingClientRect();
+            var size = Math.max(rect.width, rect.height);
+            var x = e.clientX - rect.left - size / 2;
+            var y = e.clientY - rect.top - size / 2;
+            
+            ripple.style.width = ripple.style.height = size + 'px';
+            ripple.style.left = x + 'px';
+            ripple.style.top = y + 'px';
+            ripple.classList.add('ripple');
+            
+            this.appendChild(ripple);
+            
+            setTimeout(function() {
+                ripple.remove();
+            }, 600);
+        });
+    });
 });
 
 // Utility functions
