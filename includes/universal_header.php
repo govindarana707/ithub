@@ -1422,7 +1422,8 @@ $dynamicStyles = "
 ";
 
 // Helper function to convert hex to RGB
-function hex2rgb($hex) {
+function hex2rgb($hex)
+{
     $hex = str_replace("#", "", $hex);
     if (strlen($hex) == 3) {
         $r = hexdec(substr($hex, 0, 1) . substr($hex, 0, 1));
@@ -1439,11 +1440,12 @@ function hex2rgb($hex) {
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($pageTitle); ?></title>
-    
+
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
@@ -1451,16 +1453,24 @@ function hex2rgb($hex) {
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
-    <link href="assets/css/style.css" rel="stylesheet">
-    
+    <link href="<?php echo BASE_URL; ?>assets/css/style.css" rel="stylesheet">
+    <link href="<?php echo BASE_URL; ?>assets/css/ux_additions.css" rel="stylesheet">
+    <!-- SweetAlert2 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <!-- Toastr -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
-        
+
         <?php echo $dynamicStyles; ?>
     </style>
 </head>
+
 <body>
     <!-- Universal Header -->
     <header class="universal-header navbar navbar-expand-lg navbar-dark bg-primary">
@@ -1468,7 +1478,7 @@ function hex2rgb($hex) {
             <a class="navbar-brand" href="../dashboard.php">
                 <i class="fas fa-graduation-cap me-2"></i>IT HUB
             </a>
-            
+
             <div class="navbar-nav ms-auto">
                 <!-- Module-specific menu items -->
                 <?php foreach ($menuItems as $item): ?>
@@ -1477,7 +1487,7 @@ function hex2rgb($hex) {
                         <?php echo htmlspecialchars($item['name']); ?>
                     </a>
                 <?php endforeach; ?>
-                
+
                 <!-- User Menu -->
                 <?php if ($userInfo): ?>
                     <a class="nav-link" href="../logout.php">
@@ -1495,10 +1505,11 @@ function hex2rgb($hex) {
             </div>
         </div>
     </header>
-    
+
     <!-- Breadcrumb Navigation -->
     <?php if (count($breadcrumbItems) > 1): ?>
-        <nav class="universal-header" style="background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.1), rgba(var(--secondary-rgb), 0.1));">
+        <nav class="universal-header"
+            style="background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.1), rgba(var(--secondary-rgb), 0.1));">
             <div class="container-fluid py-2">
                 <ol class="breadcrumb mb-0">
                     <?php foreach ($breadcrumbItems as $index => $item): ?>
@@ -1519,7 +1530,7 @@ function hex2rgb($hex) {
             </div>
         </nav>
     <?php endif; ?>
-    
+
     <!-- Success/Error Messages -->
     <?php if (isset($_SESSION['success_message'])): ?>
         <div class="alert alert-success alert-dismissible fade show m-3" role="alert">
@@ -1529,7 +1540,7 @@ function hex2rgb($hex) {
         </div>
         <?php unset($_SESSION['success_message']); ?>
     <?php endif; ?>
-    
+
     <?php if (isset($_SESSION['error_message'])): ?>
         <div class="alert alert-danger alert-dismissible fade show m-3" role="alert">
             <i class="fas fa-exclamation-triangle me-2"></i>
@@ -1538,7 +1549,7 @@ function hex2rgb($hex) {
         </div>
         <?php unset($_SESSION['error_message']); ?>
     <?php endif; ?>
-    
+
     <?php if (isset($_SESSION['info_message'])): ?>
         <div class="alert alert-info alert-dismissible fade show m-3" role="alert">
             <i class="fas fa-info-circle me-2"></i>
@@ -1548,36 +1559,38 @@ function hex2rgb($hex) {
         <?php unset($_SESSION['info_message']); ?>
     <?php endif; ?>
 
-<!-- JavaScript -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-// Auto-hide alerts after 5 seconds
-$(document).ready(function() {
-    setTimeout(function() {
-        $('.alert').fadeOut('slow', function() {
-            $(this).remove();
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script>
+        // Auto-hide alerts after 5 seconds
+        $(document).ready(function () {
+            setTimeout(function () {
+                $('.alert').fadeOut('slow', function () {
+                    $(this).remove();
+                });
+            }, 5000);
+
+            // Smooth scroll for anchor links
+            $('a[href^="#"]').on('click', function (event) {
+                var target = $(this.getAttribute('href'));
+                if (target.length) {
+                    event.preventDefault();
+                    $('html, body').animate({
+                        scrollTop: target.offset().top - 70
+                    }, 800);
+                }
+            });
+
+            // Active state for navigation
+            var currentPath = window.location.pathname;
+            $('.nav-link').each(function () {
+                var linkPath = $(this).attr('href');
+                if (linkPath && currentPath.includes(linkPath)) {
+                    $(this).addClass('active');
+                }
+            });
         });
-    }, 5000);
-    
-    // Smooth scroll for anchor links
-    $('a[href^="#"]').on('click', function(event) {
-        var target = $(this.getAttribute('href'));
-        if (target.length) {
-            event.preventDefault();
-            $('html, body').animate({
-                scrollTop: target.offset().top - 70
-            }, 800);
-        }
-    });
-    
-    // Active state for navigation
-    var currentPath = window.location.pathname;
-    $('.nav-link').each(function() {
-        var linkPath = $(this).attr('href');
-        if (linkPath && currentPath.includes(linkPath)) {
-            $(this).addClass('active');
-        }
-    });
-});
-</script>
+    </script>

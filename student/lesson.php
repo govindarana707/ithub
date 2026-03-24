@@ -5,11 +5,9 @@ require_once '../models/Course.php';
 require_once '../models/LessonContent.php';
 require_once '../includes/VideoProcessor.php';
 
-if (!isLoggedIn()) {
-    redirect('../login.php');
-}
-
-if (getUserRole() !== 'student' && getUserRole() !== 'admin') {
+// Allow students, admins, and instructors (for preview) to access
+$role = getUserRole();
+if ($role !== 'student' && $role !== 'admin' && $role !== 'instructor') {
     $_SESSION['error_message'] = 'Access denied. Student privileges required.';
     redirect('../dashboard.php');
 }
@@ -18,782 +16,652 @@ $course = new Course();
 $lessonContent = new LessonContent();
 $userId = $_SESSION['user_id'];
 $courseId = intval($_GET['course_id'] ?? 0);
+$isPreview = isset($_GET['preview']);
 
 if ($courseId <= 0) {
     $_SESSION['error_message'] = 'Invalid course ID';
     redirect('courses.php');
 }
 
-// Check if student is enrolled
+// Check if student is enrolled or instructor preview
 $enrollment = $course->getEnrollment($userId, $courseId);
-if (!$enrollment) {
+$isInstructorPreview = false;
+
+// Allow instructors to preview their own courses
+if (!$enrollment && $role === 'instructor') {
+    $courseData = $course->getCourseById($courseId);
+    if ($courseData && (int)$courseData['instructor_id'] === (int)$userId) {
+        $isInstructorPreview = true;
+    }
+}
+
+if (!$enrollment && !$isInstructorPreview) {
     $_SESSION['error_message'] = 'You must enroll in this course first';
     redirect('courses.php');
 }
 
 // Get course details
 $courseData = $course->getCourseById($courseId);
-if (!$courseData) {
-    $_SESSION['error_message'] = 'Course not found';
-    redirect('courses.php');
-}
-
-
 
 // Get lessons for this course
 $lessons = $course->getCourseLessons($courseId, $userId);
 
-// Get current lesson with comprehensive content
+// Get current lesson
 $currentLesson = null;
 $currentLessonIndex = 0;
-
-// Check if specific lesson is requested
 $requestedLessonId = intval($_GET['lesson_id'] ?? 0);
 
 if ($requestedLessonId > 0) {
     foreach ($lessons as $index => $lesson) {
         if ($lesson['id'] == $requestedLessonId) {
             $currentLesson = $lessonContent->getLessonContent($lesson['id'], $userId);
+            // Fallback to simple lesson data if getLessonContent returns null
+            if (!$currentLesson) {
+                $currentLesson = $course->getLessonById($requestedLessonId);
+                if ($currentLesson) {
+                    $currentLesson['is_completed'] = $lesson['is_completed'] ?? 0;
+                    $currentLesson['notes'] = [];
+                    $currentLesson['assignments'] = [];
+                    $currentLesson['resources'] = [];
+                }
+            }
             $currentLessonIndex = $index;
             break;
         }
     }
 }
 
-// If no specific lesson requested or not found, find first incomplete
+// Default to first incomplete if no specific lesson requested
 if (!$currentLesson) {
     foreach ($lessons as $index => $lesson) {
         if (!$lesson['is_completed']) {
             $currentLesson = $lessonContent->getLessonContent($lesson['id'], $userId);
+            // Fallback to simple lesson data if getLessonContent returns null
+            if (!$currentLesson) {
+                $currentLesson = $course->getLessonById($lesson['id']);
+                if ($currentLesson) {
+                    $currentLesson['is_completed'] = $lesson['is_completed'] ?? 0;
+                    $currentLesson['notes'] = [];
+                    $currentLesson['assignments'] = [];
+                    $currentLesson['resources'] = [];
+                }
+            }
             $currentLessonIndex = $index;
             break;
         }
     }
 }
 
-// If all lessons are completed, show last one
+// If all completed, show last
 if (!$currentLesson && !empty($lessons)) {
     $lastLesson = end($lessons);
     $currentLesson = $lessonContent->getLessonContent($lastLesson['id'], $userId);
+    // Fallback to simple lesson data if getLessonContent returns null
+    if (!$currentLesson) {
+        $currentLesson = $course->getLessonById($lastLesson['id']);
+        if ($currentLesson) {
+            $currentLesson['is_completed'] = $lastLesson['is_completed'] ?? 0;
+            $currentLesson['notes'] = [];
+            $currentLesson['assignments'] = [];
+            $currentLesson['resources'] = [];
+        }
+    }
     $currentLessonIndex = count($lessons) - 1;
 }
 
-/**
- * Format bytes to human readable format
- */
-function formatBytes($bytes, $precision = 2)
-{
-    $units = array('B', 'KB', 'MB', 'GB', 'TB');
-
-    for ($i = 0; $bytes > 1024 && $i < count($units) - 1; $i++) {
-        $bytes /= 1024;
-    }
-
-    return round($bytes, $precision) . ' ' . $units[$i];
-}
-
-// Handle lesson completion
+// Handle completion logic (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'complete_lesson') {
     $lessonId = intval($_POST['lesson_id']);
-
     if ($lessonId > 0) {
         $course->markLessonComplete($userId, $lessonId);
         $course->updateCourseProgress($userId, $courseId);
 
-        // Redirect to next lesson or course completion
-        $nextLessonIndex = $currentLessonIndex + 1;
-        if (isset($lessons[$nextLessonIndex])) {
-            header("Location: lesson.php?course_id=$courseId&lesson_id=" . $lessons[$nextLessonIndex]['id']);
+        $nextIdx = $currentLessonIndex + 1;
+        if (isset($lessons[$nextIdx])) {
+            header("Location: lesson.php?course_id=$courseId&lesson_id=" . $lessons[$nextIdx]['id'] . ($isInstructorPreview ? '&preview=1' : ''));
         } else {
-            // Course completed
             header("Location: course-complete.php?course_id=$courseId");
         }
         exit;
     }
 }
 
+// Calculate progress
+$completedCount = 0;
+foreach ($lessons as $l) {
+    if (!empty($l['is_completed'])) $completedCount++;
+}
+$progressPercent = count($lessons) > 0 ? round(($completedCount / count($lessons)) * 100) : 0;
+
 require_once '../includes/universal_header.php';
 ?>
 
 <style>
-    .lesson-sidebar {
-        max-height: 600px;
-        overflow-y: auto;
-    }
-
-    .lesson-item {
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-
-    .lesson-item:hover {
-        background-color: #f8f9fa;
-    }
-
-    .lesson-item.active {
-        background-color: #007bff;
-        color: white;
-    }
-
-    .lesson-item.completed {
-        color: #28a745;
-    }
-
-    .lesson-content {
-        min-height: 400px;
-    }
-
     .video-container {
         position: relative;
-        padding-bottom: 56.25%;
-        height: 0;
+        background: #000;
+        border-radius: 12px;
         overflow: hidden;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
     }
-
-    .video-container video {
-        position: absolute;
-        top: 0;
-        left: 0;
+    .video-container video, .video-container iframe {
         width: 100%;
-        height: 100%;
+        height: 450px;
+        object-fit: contain;
     }
-
+    .lesson-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 16px;
+        color: white;
+    }
+    .lesson-nav-btn {
+        padding: 12px 24px;
+        border-radius: 30px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    .lesson-nav-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
     .progress-ring {
+        width: 60px;
+        height: 60px;
+    }
+    .progress-ring circle {
+        transition: stroke-dashoffset 0.35s;
         transform: rotate(-90deg);
+        transform-origin: 50% 50%;
+    }
+    .sidebar-lesson {
+        border-radius: 10px;
+        padding: 12px 16px;
+        margin-bottom: 8px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    .sidebar-lesson:hover {
+        background: rgba(102, 126, 234, 0.1);
+    }
+    .sidebar-lesson.active {
+        background: rgba(102, 126, 234, 0.2);
+        border-left: 3px solid #667eea;
+    }
+    .sidebar-lesson.completed {
+        opacity: 0.7;
+    }
+    .content-tabs {
+        border-bottom: 2px solid #f0f0f0;
+    }
+    .content-tabs .nav-link {
+        border: none;
+        color: #666;
+        font-weight: 500;
+        padding: 12px 20px;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s;
+    }
+    .content-tabs .nav-link:hover {
+        color: #667eea;
+        border-color: transparent;
+    }
+    .content-tabs .nav-link.active {
+        color: #667eea;
+        border-bottom-color: #667eea;
+        background: transparent;
+    }
+    .completion-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        padding: 14px 32px;
+        border-radius: 30px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    .completion-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+    .resource-card {
+        border: 1px solid #eee;
+        border-radius: 12px;
+        padding: 16px;
+        transition: all 0.2s;
+    }
+    .resource-card:hover {
+        border-color: #667eea;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
     }
 </style>
 
+<?php if ($isInstructorPreview): ?>
+<div class="alert alert-warning alert-dismissible fade show mx-3 mt-3" role="alert">
+    <div class="d-flex align-items-center">
+        <i class="fas fa-eye me-2 fs-4"></i>
+        <div>
+            <strong>Instructor Preview Mode:</strong> You are viewing your own course as a student would see it.
+        </div>
+        <a href="../instructor/course_builder.php?id=<?php echo $courseId; ?>" class="btn btn-sm btn-warning ms-3">
+            <i class="fas fa-edit me-1"></i>Back to Editor
+        </a>
+        <a href="view-course.php?id=<?php echo $courseId; ?>" class="btn btn-sm btn-outline-warning ms-2">
+            <i class="fas fa-list me-1"></i>Back to Course
+        </a>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+<?php endif; ?>
+
 <div class="container-fluid py-4">
-    <!-- Course Header -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col-md-8">
-                            <nav aria-label="breadcrumb">
-                                <ol class="breadcrumb">
-                                    <li class="breadcrumb-item"><a href="dashboard.php">Dashboard</a></li>
-                                    <li class="breadcrumb-item"><a href="my-courses.php">My Courses</a></li>
-                                    <li class="breadcrumb-item active">
-                                        <?php echo htmlspecialchars($courseData['title']); ?>
-                                    </li>
-                                </ol>
-                            </nav>
-                            <h2 class="mb-2"><?php echo htmlspecialchars($courseData['title']); ?></h2>
-                            <p class="text-muted mb-0">
-                                <i
-                                    class="fas fa-user me-1"></i><?php echo htmlspecialchars($courseData['instructor_name']); ?>
-                                <span class="mx-2">|</span>
-                                <i class="fas fa-clock me-1"></i><?php echo $courseData['duration_hours']; ?> hours
-                                <span class="mx-2">|</span>
-                                <i
-                                    class="fas fa-signal me-1"></i><?php echo ucfirst($courseData['difficulty_level']); ?>
-                            </p>
-                        </div>
-                        <div class="col-md-4 text-center">
-                            <div class="progress-ring" style="width: 80px; height: 80px;">
-                                <svg width="80" height="80">
-                                    <circle cx="40" cy="40" r="30" stroke="#e9ecef" stroke-width="8" fill="none" />
-                                    <circle cx="40" cy="40" r="30" stroke="#007bff" stroke-width="8" fill="none"
-                                        stroke-dasharray="<?php echo ($enrollment['progress_percentage'] / 100) * 188; ?> 188"
-                                        stroke-linecap="round" />
-                                </svg>
-                                <div style="margin-top: -55px; font-size: 1rem; font-weight: bold;">
-                                    <?php echo round($enrollment['progress_percentage']); ?>%
-                                </div>
+    <div class="row g-4">
+        
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            
+            <?php if ($currentLesson): ?>
+            
+            <!-- Video Player -->
+            <div class="video-container mb-4">
+                <?php if ($currentLesson['lesson_type'] === 'video'): ?>
+                    <?php
+                    $videoDisplayed = false;
+                    if ($currentLesson['video_source'] === 'upload' && $currentLesson['video_file_path']) {
+                        $videoUrl = '../' . $currentLesson['video_file_path'];
+                        echo "<video id='lessonVideo' controls class='w-100' controlsList='nodownload' playsinline>
+                                <source src='$videoUrl' type='{$currentLesson['video_mime_type']}'>
+                              </video>";
+                        $videoDisplayed = true;
+                    } elseif ($currentLesson['video_source'] === 'external_url' && $currentLesson['video_url']) {
+                        $videoUrl = $currentLesson['video_url'];
+                        if (strpos($videoUrl, 'youtube.com') !== false || strpos($videoUrl, 'youtu.be') !== false) {
+                            preg_match('/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/', $videoUrl, $matches);
+                            $videoId = $matches[1] ?? '';
+                            echo "<div class='ratio ratio-16x9'><iframe src='https://www.youtube.com/embed/$videoId?rel=0&modestbranding=1' allowfullscreen></iframe></div>";
+                            $videoDisplayed = true;
+                        } elseif (strpos($videoUrl, 'drive.google.com') !== false) {
+                            preg_match('/\/file\/d\/([a-zA-Z0-9_-]+)/', $videoUrl, $matches);
+                            $videoId = $matches[1] ?? '';
+                            if ($videoId) {
+                                echo "<div class='ratio ratio-16x9'><iframe src='https://drive.google.com/file/d/$videoId/preview' allowfullscreen></iframe></div>";
+                                $videoDisplayed = true;
+                            }
+                        } else {
+                            echo "<video id='lessonVideo' controls class='w-100' controlsList='nodownload' playsinline>
+                                    <source src='$videoUrl'>
+                                  </video>";
+                            $videoDisplayed = true;
+                        }
+                    } elseif (($currentLesson['video_source'] === 'none' || empty($currentLesson['video_source'])) && !empty($currentLesson['video_url'])) {
+                        $videoUrl = $currentLesson['video_url'];
+                        if (strpos($videoUrl, 'http') !== 0 && strpos($videoUrl, '../') !== 0 && strpos($videoUrl, '/') !== 0) {
+                            $videoUrl = '../' . $videoUrl;
+                        }
+                        echo "<video id='lessonVideo' controls class='w-100' controlsList='nodownload' playsinline>
+                                <source src='$videoUrl'>
+                              </video>";
+                        $videoDisplayed = true;
+                    }
+
+                    if (!$videoDisplayed):
+                    ?>
+                        <div class="d-flex justify-content-center align-items-center" style="height: 450px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);">
+                            <div class="text-center text-white">
+                                <i class="fas fa-film fa-5x mb-4 opacity-50"></i>
+                                <h4>Video content unavailable</h4>
+                                <p class="opacity-75">The video for this lesson is not yet available.</p>
                             </div>
-                            <small class="text-muted d-block">Course Progress</small>
                         </div>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <div class="d-flex justify-content-center align-items-center" style="height: 300px; background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);">
+                        <div class="text-center">
+                            <i class="fas fa-file-alt fa-5x mb-4 text-muted"></i>
+                            <h4 class="text-muted">Reading Material</h4>
+                            <p class="text-muted">Content is available in the tabs below</p>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Lesson Info Header -->
+            <div class="d-flex justify-content-between align-items-start mb-4">
+                <div>
+                    <h2 class="mb-2 fw-bold text-dark"><?php echo htmlspecialchars($currentLesson['title']); ?></h2>
+                    <div class="d-flex gap-3 text-muted">
+                        <?php if (!empty($currentLesson['duration'])): ?>
+                            <span><i class="fas fa-clock me-1"></i><?php echo htmlspecialchars($currentLesson['duration']); ?></span>
+                        <?php elseif (!empty($currentLesson['duration_minutes'])): ?>
+                            <span><i class="fas fa-clock me-1"></i><?php echo $currentLesson['duration_minutes']; ?> min</span>
+                        <?php endif; ?>
+                        <span><i class="fas fa-signal me-1"></i>Lesson <?php echo $currentLessonIndex + 1; ?> of <?php echo count($lessons); ?></span>
+                        <?php if ($currentLesson['is_completed']): ?>
+                            <span class="text-success"><i class="fas fa-check-circle me-1"></i>Completed</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <!-- Navigation Buttons -->
+                <div class="d-flex gap-2">
+                    <?php if ($currentLessonIndex > 0): ?>
+                        <a href="lesson.php?course_id=<?php echo $courseId; ?>&lesson_id=<?php echo $lessons[$currentLessonIndex - 1]['id']; ?><?php echo $isInstructorPreview ? '&preview=1' : ''; ?>" 
+                           class="btn btn-light lesson-nav-btn">
+                            <i class="fas fa-arrow-left me-2"></i>Previous
+                        </a>
+                    <?php endif; ?>
+                    
+                    <?php if ($currentLessonIndex < count($lessons) - 1): ?>
+                        <a href="lesson.php?course_id=<?php echo $courseId; ?>&lesson_id=<?php echo $lessons[$currentLessonIndex + 1]['id']; ?><?php echo $isInstructorPreview ? '&preview=1' : ''; ?>" 
+                           class="btn btn-primary lesson-nav-btn">
+                            Next<i class="fas fa-arrow-right ms-2"></i>
+                        </a>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Completion Button -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1"><?php echo $currentLesson['is_completed'] ? 'Lesson Completed!' : 'Mark as Complete'; ?></h5>
+                            <small class="text-muted">
+                                <?php if ($currentLesson['is_completed']): ?>
+                                    Great job! You've completed this lesson.
+                                <?php else: ?>
+                                    Click to mark this lesson as completed and continue to the next one.
+                                <?php endif; ?>
+                            </small>
+                        </div>
+                        <form method="POST">
+                            <input type="hidden" name="action" value="complete_lesson">
+                            <input type="hidden" name="lesson_id" value="<?php echo $currentLesson['id']; ?>">
+                            <?php if (!$currentLesson['is_completed']): ?>
+                                <button type="submit" class="btn completion-btn text-white">
+                                    <i class="fas fa-check-circle me-2"></i>Mark Complete
+                                </button>
+                            <?php else: ?>
+                                <button type="button" class="btn btn-success" disabled>
+                                    <i class="fas fa-check-double me-2"></i>Completed
+                                </button>
+                            <?php endif; ?>
+                        </form>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <div class="row">
-        <!-- Lesson Sidebar -->
-        <div class="col-md-3">
-            <div class="card lesson-sidebar">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fas fa-list me-2"></i>Course Content</h6>
+            <!-- Content Tabs -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-3">
+                    <ul class="nav content-tabs" id="lessonTabs" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#overview" role="tab">
+                                <i class="fas fa-align-left me-2"></i>Content
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#notes" role="tab">
+                                <i class="fas fa-pen me-2"></i>My Notes
+                            </button>
+                        </li>
+                        <?php if (!empty($currentLesson['resources'])): ?>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#resources" role="tab">
+                                <i class="fas fa-download me-2"></i>Resources
+                            </button>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (!empty($currentLesson['assignments'])): ?>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#assignments" role="tab">
+                                <i class="fas fa-tasks me-2"></i>Assignments
+                            </button>
+                        </li>
+                        <?php endif; ?>
+                    </ul>
                 </div>
-                <div class="list-group list-group-flush">
-                    <?php foreach ($lessons as $index => $lesson): ?>
-                        <div class="list-group-item lesson-item <?php echo $lesson['is_completed'] ? 'completed' : ''; ?> <?php echo ($currentLesson && $lesson['id'] == $currentLesson['id']) ? 'active' : ''; ?>"
-                            onclick="loadLesson(<?php echo $lesson['id']; ?>)">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <i
-                                        class="fas fa-<?php echo $lesson['is_completed'] ? 'check-circle' : ($currentLesson && $lesson['id'] == $currentLesson['id'] ? 'play-circle' : 'circle'); ?> me-2"></i>
-                                    <span><?php echo htmlspecialchars($lesson['title']); ?></span>
+                <div class="card-body p-4">
+                    <div class="tab-content">
+                        <!-- Content Tab -->
+                        <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                            <?php if (!empty($currentLesson['content'])): ?>
+                                <div class="lesson-content">
+                                    <?php echo nl2br(htmlspecialchars($currentLesson['content'])); ?>
                                 </div>
-                                <small class="text-muted"><?php echo $lesson['duration_minutes']; ?>m</small>
+                            <?php elseif (!empty($currentLesson['description'])): ?>
+                                <div class="lesson-content">
+                                    <?php echo nl2br(htmlspecialchars($currentLesson['description'])); ?>
+                                </div>
+                            <?php elseif (!empty($currentLesson['notes'])): ?>
+                                <?php foreach ($currentLesson['notes'] as $note): ?>
+                                    <div class="mb-4">
+                                        <h5><?php echo htmlspecialchars($note['title'] ?? 'Lesson Notes'); ?></h5>
+                                        <div class="lesson-content">
+                                            <?php echo nl2br(htmlspecialchars($note['content'] ?? '')); ?>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <div class="text-center py-5">
+                                    <i class="fas fa-file-alt fa-4x text-muted mb-3"></i>
+                                    <p class="text-muted">No content available for this lesson.</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <!-- Notes Tab -->
+                        <div class="tab-pane fade" id="notes" role="tabpanel">
+                            <h5 class="mb-3">Your Notes</h5>
+                            <textarea id="studentNotesContent" class="form-control" rows="8" 
+                                placeholder="Take notes while you learn. Your notes are saved automatically."
+                                <?php echo $isInstructorPreview ? 'readonly' : ''; ?>
+                            ><?php echo htmlspecialchars($currentLesson['student_notes']['content'] ?? ''); ?></textarea>
+                            <small class="text-muted mt-2 d-block">Notes are saved automatically as you type.</small>
+                        </div>
+                        
+                        <!-- Resources Tab -->
+                        <?php if (!empty($currentLesson['resources'])): ?>
+                        <div class="tab-pane fade" id="resources" role="tabpanel">
+                            <h5 class="mb-3">Downloadable Resources</h5>
+                            <div class="row g-3">
+                                <?php foreach ($currentLesson['resources'] as $resource): ?>
+                                    <div class="col-md-6">
+                                        <div class="resource-card h-100">
+                                            <div class="d-flex align-items-center">
+                                                <div class="me-3">
+                                                    <?php
+                                                    $icon = 'fa-file';
+                                                    $color = 'secondary';
+                                                    if (strpos($resource['resource_type'] ?? '', 'pdf') !== false) {
+                                                        $icon = 'fa-file-pdf';
+                                                        $color = 'danger';
+                                                    } elseif (strpos($resource['resource_type'] ?? '', 'video') !== false) {
+                                                        $icon = 'fa-video';
+                                                        $color = 'primary';
+                                                    } elseif (strpos($resource['resource_type'] ?? '', 'link') !== false) {
+                                                        $icon = 'fa-link';
+                                                        $color = 'info';
+                                                    }
+                                                    ?>
+                                                    <i class="fas <?php echo $icon; ?> fa-2x text-<?php echo $color; ?>"></i>
+                                                </div>
+                                                <div class="flex-grow-1">
+                                                    <h6 class="mb-1"><?php echo htmlspecialchars($resource['title'] ?? 'Resource'); ?></h6>
+                                                    <?php if (!empty($resource['description'])): ?>
+                                                        <small class="text-muted"><?php echo htmlspecialchars($resource['description']); ?></small>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <?php if (!empty($resource['file_path']) || !empty($resource['external_url'])): ?>
+                                                    <a href="<?php echo htmlspecialchars($resource['file_path'] ?? $resource['external_url']); ?>" 
+                                                       class="btn btn-sm btn-outline-primary" target="_blank">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
                             </div>
                         </div>
+                        <?php endif; ?>
+                        
+                        <!-- Assignments Tab -->
+                        <?php if (!empty($currentLesson['assignments'])): ?>
+                        <div class="tab-pane fade" id="assignments" role="tabpanel">
+                            <h5 class="mb-3">Assignments</h5>
+                            <?php foreach ($currentLesson['assignments'] as $assignment): ?>
+                                <div class="card mb-3 border">
+                                    <div class="card-body">
+                                        <h5 class="card-title"><?php echo htmlspecialchars($assignment['title']); ?></h5>
+                                        <?php if (!empty($assignment['description'])): ?>
+                                            <p class="card-text text-muted"><?php echo nl2br(htmlspecialchars($assignment['description'])); ?></p>
+                                        <?php endif; ?>
+                                        <?php if (!empty($assignment['due_date'])): ?>
+                                            <div class="mb-2">
+                                                <i class="fas fa-calendar me-1"></i>
+                                                Due: <?php echo date('M j, Y', strtotime($assignment['due_date'])); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <?php if (!empty($assignment['max_points'])): ?>
+                                            <div class="mb-2">
+                                                <i class="fas fa-star me-1"></i>
+                                                Points: <?php echo $assignment['max_points']; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <button class="btn btn-primary mt-2">
+                                            <i class="fas fa-upload me-2"></i>Submit Assignment
+                                        </button>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            
+            <?php else: ?>
+            <!-- No Lesson Found -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-graduation-cap fa-5x text-muted mb-4"></i>
+                    <h3>Course Completed!</h3>
+                    <p class="text-muted">Congratulations! You've completed all lessons in this course.</p>
+                    <a href="view-course.php?id=<?php echo $courseId; ?>" class="btn btn-primary btn-lg">
+                        <i class="fas fa-certificate me-2"></i>View Certificate
+                    </a>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Course Progress Card -->
+            <div class="card border-0 shadow-sm mb-4 lesson-card">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">Your Progress</h5>
+                        <span class="badge bg-light text-dark"><?php echo $progressPercent; ?>%</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 10px;">
+                        <div class="progress-bar bg-success" style="width: <?php echo $progressPercent; ?>%"></div>
+                    </div>
+                    <p class="mb-0 small opacity-75">
+                        <?php echo $completedCount; ?> of <?php echo count($lessons); ?> lessons completed
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Course Content -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>Course Content</h5>
+                </div>
+                <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
+                    <?php foreach ($lessons as $index => $lesson): ?>
+                        <?php
+                        $isActive = ($currentLesson && $lesson['id'] == $currentLesson['id']);
+                        $isCompleted = !empty($lesson['is_completed']);
+                        ?>
+                        <a href="lesson.php?course_id=<?php echo $courseId; ?>&lesson_id=<?php echo $lesson['id']; ?><?php echo $isInstructorPreview ? '&preview=1' : ''; ?>" 
+                           class="sidebar-lesson d-block text-decoration-none <?php echo $isActive ? 'active' : ''; ?> <?php echo $isCompleted ? 'completed' : ''; ?>">
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">
+                                    <?php if ($isCompleted): ?>
+                                        <i class="fas fa-check-circle text-success fa-lg"></i>
+                                    <?php elseif ($isActive): ?>
+                                        <i class="fas fa-play-circle text-primary fa-lg"></i>
+                                    <?php else: ?>
+                                        <i class="far fa-circle text-muted fa-lg"></i>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <span class="text-muted small">Lesson <?php echo $index + 1; ?></span>
+                                            <h6 class="mb-0 <?php echo $isActive ? 'text-primary' : 'text-dark'; ?>">
+                                                <?php echo htmlspecialchars($lesson['title']); ?>
+                                            </h6>
+                                        </div>
+                                        <?php if (!empty($lesson['duration_minutes'])): ?>
+                                            <small class="text-muted"><?php echo $lesson['duration_minutes']; ?>m</small>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
                     <?php endforeach; ?>
                 </div>
             </div>
-        </div>
-
-        <!-- Lesson Content -->
-        <div class="col-md-9">
-            <?php if ($currentLesson): ?>
-                <div class="card lesson-content">
-                    <div class="card-header">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0"><?php echo htmlspecialchars($currentLesson['title']); ?></h5>
-                            <span class="badge bg-info"><?php echo ucfirst($currentLesson['lesson_type']); ?></span>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <?php if ($currentLesson['lesson_type'] === 'video' && ($currentLesson['video_source'] !== 'none' || $currentLesson['video_url'])): ?>
-                            <div class="video-container mb-4">
-                                <?php
-                                // Handle different video sources
-                                if ($currentLesson['video_source'] === 'upload' && $currentLesson['video_file_path']) {
-                                    $videoUrl = '../' . $currentLesson['video_file_path'];
-                                    $thumbnail = $currentLesson['video_thumbnail'] ? '../' . $currentLesson['video_thumbnail'] : '';
-                                    $downloadable = $currentLesson['is_downloadable'] ? '' : 'controlsList="nodownload"';
-
-                                    if ($currentLesson['video_processing_status'] === 'processing') {
-                                        echo "<div class='alert alert-info text-center'>
-                                                <i class='fas fa-spinner fa-spin me-2'></i>Video is being processed. This may take a few minutes.
-                                                </div>";
-                                    } elseif ($currentLesson['video_processing_status'] === 'failed') {
-                                        echo "<div class='alert alert-warning text-center'>
-                                                <i class='fas fa-exclamation-triangle me-2'></i>Video processing failed. Please contact the instructor.
-                                                </div>";
-                                    }
-
-                                    echo "<video id='lessonVideo' controls preload='metadata' poster='$thumbnail' $downloadable style='width: 100%; height: 400px;' data-lesson-id='{$currentLesson['id']}' data-user-id='{$_SESSION['user_id']}'>
-                                            <source src='$videoUrl' type='{$currentLesson['video_mime_type']}'>
-                                            Your browser does not support the video tag.
-                                        </video>";
-
-                                    if ($currentLesson['video_duration'] || $currentLesson['video_file_size']) {
-                                        echo "<div class='video-info mt-2'>
-                                                <small class='text-muted'>";
-                                        if ($currentLesson['video_duration']) {
-                                            echo "<i class='fas fa-clock me-1'></i>Duration: {$currentLesson['video_duration']} ";
-                                        }
-                                        if ($currentLesson['video_file_size']) {
-                                            echo "<span class='mx-2'>|</span><i class='fas fa-hdd me-1'></i>Size: " . formatBytes($currentLesson['video_file_size']) . " ";
-                                        }
-                                        echo "<span class='mx-2'>|</span><i class='fas fa-tv me-1'></i>Quality: {$currentLesson['video_quality']}</span>
-                                            </small></div>";
-                                    }
-                                } elseif ($currentLesson['video_source'] === 'google_drive' && $currentLesson['google_drive_url']) {
-                                    $videoProcessor = new VideoProcessor();
-                                    $embedUrl = $videoProcessor->getGoogleDriveEmbedUrl($currentLesson['google_drive_url']);
-                                    if ($embedUrl) {
-                                        echo "<iframe src='$embedUrl' style='width: 100%; height: 400px; border: none;' allowfullscreen data-lesson-id='{$currentLesson['id']}' data-user-id='{$_SESSION['user_id']}'></iframe>
-                                            <div class='video-info mt-2'>
-                                                <small class='text-muted'><i class='fab fa-google-drive me-1'></i>Google Drive Video</small>
-                                            </div>";
-                                    }
-                                } elseif ($currentLesson['video_source'] === 'external_url' && $currentLesson['video_url']) {
-                                    $videoUrl = $currentLesson['video_url'];
-
-                                    // Check if it's a YouTube video
-                                    if (strpos($videoUrl, 'youtube.com') !== false || strpos($videoUrl, 'youtu.be') !== false) {
-                                        preg_match('/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/', $videoUrl, $matches);
-                                        $videoId = $matches[1] ?? '';
-                                        $embedUrl = "https://www.youtube.com/embed/$videoId";
-                                        echo "<iframe src='$embedUrl' style='width: 100%; height: 400px; border: none;' allowfullscreen data-lesson-id='{$currentLesson['id']}' data-user-id='{$_SESSION['user_id']}'></iframe>";
-                                    } elseif (strpos($videoUrl, 'vimeo.com') !== false) {
-                                        preg_match('/vimeo\.com\/(\d+)/', $videoUrl, $matches);
-                                        $videoId = $matches[1] ?? '';
-                                        $embedUrl = "https://player.vimeo.com/video/$videoId";
-                                        echo "<iframe src='$embedUrl' style='width: 100%; height: 400px; border: none;' allowfullscreen data-lesson-id='{$currentLesson['id']}' data-user-id='{$_SESSION['user_id']}'></iframe>";
-                                    } else {
-                                        // Direct video link
-                                        echo "<video id='lessonVideo' controls preload='metadata' style='width: 100%; height: 400px;' data-lesson-id='{$currentLesson['id']}' data-user-id='{$_SESSION['user_id']}'>
-                                                <source src='$videoUrl'>
-                                                Your browser does not support the video tag.
-                                            </video>";
-                                    }
-                                } else {
-                                    // Fallback to original video_url for backward compatibility
-                                    $videoUrl = $currentLesson['video_url'];
-                                    if (strpos($videoUrl, 'youtube.com') !== false || strpos($videoUrl, 'youtu.be') !== false) {
-                                        preg_match('/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/', $videoUrl, $matches);
-                                        $videoId = $matches[1] ?? '';
-                                        echo "<iframe src='https://www.youtube.com/embed/$videoId' style='width: 100%; height: 400px; border: none;' allowfullscreen></iframe>";
-                                    } elseif (strpos($videoUrl, 'vimeo.com') !== false) {
-                                        preg_match('/vimeo\.com\/(\d+)/', $videoUrl, $matches);
-                                        $videoId = $matches[1] ?? '';
-                                        echo "<iframe src='https://player.vimeo.com/video/$videoId' style='width: 100%; height: 400px; border: none;' allowfullscreen></iframe>";
-                                    } else {
-                                        echo "<video controls style='width: 100%; height: 400px;'><source src='$videoUrl'>Your browser does not support video tag.</video>";
-                                    }
-                                }
-                                ?>
-                            </div>
-                        <?php endif; ?>
-
-                        <?php if ($currentLesson['content']): ?>
-                            <div class="lesson-text mb-4">
-                                <h6><i class="fas fa-book me-2"></i>Lesson Content</h6>
-                                <?php echo nl2br(htmlspecialchars($currentLesson['content'])); ?>
-                            </div>
-                        <?php endif; ?>
-
-                        <!-- Instructor Notes Section -->
-                        <?php if (!empty($currentLesson['notes'])): ?>
-                            <div class="lesson-notes mb-4">
-                                <h6><i class="fas fa-sticky-note me-2"></i>Instructor Notes</h6>
-                                <div class="accordion" id="notesAccordion">
-                                    <?php foreach ($currentLesson['notes'] as $index => $note): ?>
-                                        <div class="accordion-item">
-                                            <h2 class="accordion-header" id="noteHeading<?php echo $index; ?>">
-                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                                    data-bs-target="#noteCollapse<?php echo $index; ?>">
-                                                    <?php echo htmlspecialchars($note['title']); ?>
-                                                </button>
-                                            </h2>
-                                            <div id="noteCollapse<?php echo $index; ?>" class="accordion-collapse collapse"
-                                                data-bs-parent="#notesAccordion">
-                                                <div class="accordion-body">
-                                                    <?php echo nl2br(htmlspecialchars($note['content'])); ?>
-                                                    <?php if ($note['is_downloadable'] && $note['file_path']): ?>
-                                                        <div class="mt-2">
-                                                            <a href="<?php echo '../' . $note['file_path']; ?>"
-                                                                class="btn btn-sm btn-outline-primary" download>
-                                                                <i class="fas fa-download me-1"></i>Download Notes
-                                                            </a>
-                                                        </div>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        <?php endif; ?>
-
-                        <!-- Assignments Section -->
-                        <?php if (!empty($currentLesson['assignments'])): ?>
-                            <div class="lesson-assignments mb-4">
-                                <h6><i class="fas fa-tasks me-2"></i>Assignments</h6>
-                                <div class="list-group">
-                                    <?php foreach ($currentLesson['assignments'] as $assignment): ?>
-                                        <div class="list-group-item">
-                                            <div class="d-flex justify-content-between align-items-start">
-                                                <div class="flex-grow-1">
-                                                    <h6 class="mb-1"><?php echo htmlspecialchars($assignment['title']); ?></h6>
-                                                    <p class="text-muted mb-2">
-                                                        <?php echo nl2br(htmlspecialchars($assignment['description'])); ?>
-                                                    </p>
-
-                                                    <?php if ($assignment['due_date']): ?>
-                                                        <small class="text-muted">
-                                                            <i class="fas fa-clock me-1"></i>
-                                                            Due: <?php echo date('M j, Y g:i A', strtotime($assignment['due_date'])); ?>
-                                                            <?php if ($assignment['is_overdue']): ?>
-                                                                <span class="badge bg-danger ms-2">Overdue</span>
-                                                            <?php endif; ?>
-                                                        </small>
-                                                    <?php endif; ?>
-
-                                                    <?php if ($assignment['submission']): ?>
-                                                        <div class="mt-2">
-                                                            <span class="badge bg-success">
-                                                                <i class="fas fa-check me-1"></i>Submitted
-                                                            </span>
-                                                            <?php if ($assignment['submission']['graded_at']): ?>
-                                                                <span class="badge bg-info ms-2">
-                                                                    Score: <?php echo $assignment['submission']['percentage_score']; ?>%
-                                                                </span>
-                                                            <?php endif; ?>
-                                                        </div>
-                                                    <?php else: ?>
-                                                        <div class="mt-2">
-                                                            <button class="btn btn-sm btn-primary"
-                                                                onclick="openAssignmentModal(<?php echo $assignment['id']; ?>)">
-                                                                <i class="fas fa-upload me-1"></i>Submit Assignment
-                                                            </button>
-                                                        </div>
-                                                    <?php endif; ?>
-                                                </div>
-                                                <div class="ms-3">
-                                                    <span class="badge bg-secondary"><?php echo $assignment['max_points']; ?>
-                                                        pts</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        <?php endif; ?>
-
-                        <!-- Resources Section -->
-                        <?php if (!empty($currentLesson['resources'])): ?>
-                            <div class="lesson-resources mb-4">
-                                <h6><i class="fas fa-folder-open me-2"></i>Additional Resources</h6>
-                                <div class="row">
-                                    <?php foreach ($currentLesson['resources'] as $resource): ?>
-                                        <div class="col-md-6 mb-3">
-                                            <div class="card h-100">
-                                                <div class="card-body">
-                                                    <h6 class="card-title">
-                                                        <?php
-                                                        $icon = 'fa-file';
-                                                        switch ($resource['resource_type']) {
-                                                            case 'document':
-                                                                $icon = 'fa-file-alt';
-                                                                break;
-                                                            case 'presentation':
-                                                                $icon = 'fa-file-powerpoint';
-                                                                break;
-                                                            case 'video':
-                                                                $icon = 'fa-video';
-                                                                break;
-                                                            case 'audio':
-                                                                $icon = 'fa-headphones';
-                                                                break;
-                                                            case 'link':
-                                                                $icon = 'fa-link';
-                                                                break;
-                                                            case 'image':
-                                                                $icon = 'fa-image';
-                                                                break;
-                                                        }
-                                                        ?>
-                                                        <i class="fas <?php echo $icon; ?> me-2"></i>
-                                                        <?php echo htmlspecialchars($resource['title']); ?>
-                                                    </h6>
-                                                    <?php if ($resource['description']): ?>
-                                                        <p class="card-text text-muted small">
-                                                            <?php echo htmlspecialchars($resource['description']); ?>
-                                                        </p>
-                                                    <?php endif; ?>
-
-                                                    <?php if ($resource['external_url']): ?>
-                                                        <a href="<?php echo htmlspecialchars($resource['external_url']); ?>"
-                                                            target="_blank" class="btn btn-sm btn-outline-primary">
-                                                            <i class="fas fa-external-link-alt me-1"></i>Open Resource
-                                                        </a>
-                                                    <?php elseif ($resource['file_path'] && $resource['is_downloadable']): ?>
-                                                        <a href="<?php echo '../' . $resource['file_path']; ?>"
-                                                            class="btn btn-sm btn-outline-primary" download>
-                                                            <i class="fas fa-download me-1"></i>Download
-                                                        </a>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        <?php endif; ?>
-
-                        <!-- Student Notes Section -->
-                        <div class="student-notes mb-4">
-                            <h6><i class="fas fa-pen me-2"></i>Your Notes</h6>
-                            <div id="studentNotesEditor">
-                                <textarea class="form-control" id="studentNotesContent" rows="4"
-                                    placeholder="Take your personal notes here..."><?php echo htmlspecialchars($currentLesson['student_notes']['content'] ?? ''); ?></textarea>
-                                <div class="mt-2">
-                                    <button class="btn btn-sm btn-success" onclick="saveStudentNotes()">
-                                        <i class="fas fa-save me-1"></i>Save Notes
-                                    </button>
-                                    <span id="notesSaveStatus" class="ms-2"></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Lesson Materials (if any) -->
-                        <?php
-                        $conn = connectDB();
-                        $stmt = $conn->prepare("SELECT * FROM lesson_materials WHERE lesson_id = ?");
-                        $stmt->bind_param("i", $currentLesson['id']);
-                        $stmt->execute();
-                        $materials = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-
-                        if (!empty($materials)):
-                            ?>
-                            <div class="mt-4">
-                                <h6><i class="fas fa-download me-2"></i>Lesson Materials</h6>
-                                <div class="list-group">
-                                    <?php foreach ($materials as $material): ?>
-                                        <a href="<?php echo resolveUploadUrl($material['file_path']); ?>"
-                                            class="list-group-item list-group-item-action" target="_blank">
-                                            <i class="fas fa-file-<?php echo $material['file_type']; ?> me-2"></i>
-                                            <?php echo htmlspecialchars($material['material_name']); ?>
-                                            <small
-                                                class="text-muted float-end"><?php echo round($material['file_size'] / 1024, 2); ?>
-                                                KB</small>
-                                        </a>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        <?php endif; ?>
-                        <?php $conn->close(); ?>
-                    </div>
-
-                    <div class="card-footer">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <?php if ($currentLessonIndex > 0): ?>
-                                    <a href="lesson.php?course_id=<?php echo $courseId; ?>&lesson_id=<?php echo $lessons[$currentLessonIndex - 1]['id']; ?>"
-                                        class="btn btn-outline-secondary">
-                                        <i class="fas fa-arrow-left me-1"></i>Previous Lesson
-                                    </a>
-                                <?php endif; ?>
-                            </div>
-
-                            <div>
-                                <?php if (!$currentLesson['is_completed']): ?>
-                                    <form method="POST" class="d-inline">
-                                        <input type="hidden" name="action" value="complete_lesson">
-                                        <input type="hidden" name="lesson_id" value="<?php echo $currentLesson['id']; ?>">
-                                        <button type="submit" class="btn btn-success">
-                                            <i class="fas fa-check me-1"></i>Mark as Complete
-                                        </button>
-                                    </form>
-                                <?php else: ?>
-                                    <span class="badge bg-success">
-                                        <i class="fas fa-check me-1"></i>Completed
-                                    </span>
-                                <?php endif; ?>
-
-                                <?php if ($currentLessonIndex < count($lessons) - 1): ?>
-                                    <a href="lesson.php?course_id=<?php echo $courseId; ?>&lesson_id=<?php echo $lessons[$currentLessonIndex + 1]['id']; ?>"
-                                        class="btn btn-primary ms-2">
-                                        Next Lesson<i class="fas fa-arrow-right ms-1"></i>
-                                    </a>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            <?php else: ?>
-                <div class="card">
-                    <div class="card-body text-center py-5">
-                        <i class="fas fa-trophy fa-3x text-warning mb-3"></i>
-                        <h4>Congratulations! 🎉</h4>
-                        <p class="text-muted">You have completed all lessons in this course.</p>
-                        <a href="my-courses.php" class="btn btn-primary">Back to My Courses</a>
-                    </div>
-                </div>
-            <?php endif; ?>
+            
+            <!-- Course Actions -->
+            <div class="mt-4">
+                <a href="view-course.php?id=<?php echo $courseId; ?>" class="btn btn-outline-secondary w-100 py-3">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Course
+                </a>
+            </div>
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-    function loadLesson(lessonId) {
-        window.location.href = `lesson.php?course_id=<?php echo $courseId; ?>&lesson_id=${lessonId}`;
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-save notes
+    const notesArea = document.getElementById('studentNotesContent');
+    if (notesArea && !notesArea.readOnly) {
+        let saveTimeout;
+        notesArea.addEventListener('input', function() {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(function() {
+                // Save notes via AJAX
+                const formData = new FormData();
+                formData.append('lesson_id', '<?php echo $currentLesson['id'] ?? 0; ?>');
+                formData.append('content', notesArea.value);
+                
+                fetch('../api/save_notes.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        notesArea.classList.add('border-success');
+                        setTimeout(() => notesArea.classList.remove('border-success'), 1000);
+                    }
+                })
+                .catch(err => console.error('Error saving notes:', err));
+            }, 1500);
+        });
     }
-
-    // Video analytics tracking
-    document.addEventListener('DOMContentLoaded', function () {
-        const video = document.getElementById('lessonVideo');
-        if (video) {
-            let lessonId = video.dataset.lessonId;
-            let userId = video.dataset.userId;
-            let watchStartTime = Date.now();
-            let lastReportedTime = 0;
-
-            // Track video progress
-            video.addEventListener('timeupdate', function () {
-                const currentTime = Math.floor(video.currentTime);
-                const duration = Math.floor(video.duration);
-                const percentage = duration > 0 ? (currentTime / duration) * 100 : 0;
-
-                // Report progress every 10 seconds or at 25%, 50%, 75%, 90%
-                if (currentTime - lastReportedTime >= 10 ||
-                    Math.floor(percentage) === 25 || Math.floor(percentage) === 50 ||
-                    Math.floor(percentage) === 75 || Math.floor(percentage) === 90) {
-
-                    reportVideoProgress(lessonId, userId, currentTime, duration, percentage);
-                    lastReportedTime = currentTime;
-                }
-            });
-
-            // Track when video ends
-            video.addEventListener('ended', function () {
-                reportVideoProgress(lessonId, userId, Math.floor(video.duration), Math.floor(video.duration), 100);
-            });
-        }
-    });
-
-    function reportVideoProgress(lessonId, userId, watchTime, duration, percentage) {
-        fetch('../api/video_analytics.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'update_progress',
-                lesson_id: lessonId,
-                user_id: userId,
-                watch_time_seconds: watchTime,
-                total_video_duration: duration,
-                completion_percentage: percentage,
-                last_watched_position: watchTime
-            })
-        }).catch(error => console.log('Analytics error:', error));
+    
+    // Video ended - prompt to mark complete
+    const video = document.getElementById('lessonVideo');
+    if (video) {
+        video.addEventListener('ended', function() {
+            // Could auto-submit completion form here if desired
+        });
     }
-
-    // Save student notes
-    function saveStudentNotes() {
-        const content = document.getElementById('studentNotesContent').value;
-        const statusSpan = document.getElementById('notesSaveStatus');
-
-        statusSpan.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-
-        fetch('../api/lesson_content.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'save_student_notes',
-                lesson_id: <?php echo $currentLesson['id']; ?>,
-                title: 'Personal Notes',
-                content: content
-            })
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    statusSpan.innerHTML = '<i class="fas fa-check text-success"></i> Saved';
-                    setTimeout(() => {
-                        statusSpan.innerHTML = '';
-                    }, 3000);
-                } else {
-                    statusSpan.innerHTML = '<i class="fas fa-times text-danger"></i> Error';
-                }
-            })
-            .catch(error => {
-                console.error('Error saving notes:', error);
-                statusSpan.innerHTML = '<i class="fas fa-times text-danger"></i> Error';
-            });
-    }
-
-    // Open assignment submission modal
-    function openAssignmentModal(assignmentId) {
-        // Create modal if it doesn't exist
-        if (!document.getElementById('assignmentModal')) {
-            const modalHtml = `
-                    <div class="modal fade" id="assignmentModal" tabindex="-1">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Submit Assignment</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <form id="assignmentForm">
-                                        <input type="hidden" id="assignmentId">
-                                        <div class="mb-3">
-                                            <label class="form-label">Submission Type</label>
-                                            <select class="form-select" id="submissionType" onchange="toggleSubmissionType()">
-                                                <option value="file_upload">Upload File</option>
-                                                <option value="text_submission">Text Submission</option>
-                                            </select>
-                                        </div>
-                                        <div id="fileUploadSection" class="mb-3">
-                                            <label class="form-label">Upload File</label>
-                                            <input type="file" class="form-control" id="submissionFile" accept=".pdf,.doc,.docx,.txt,.zip,.jpg,.png,.gif">
-                                            <div class="form-text">Max file size: 10MB</div>
-                                        </div>
-                                        <div id="textSubmissionSection" class="mb-3" style="display: none;">
-                                            <label class="form-label">Text Submission</label>
-                                            <textarea class="form-control" id="textContent" rows="6"></textarea>
-                                        </div>
-                                    </form>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="button" class="btn btn-primary" onclick="submitAssignment()">Submit</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-        }
-
-        // Set assignment ID and show modal
-        document.getElementById('assignmentId').value = assignmentId;
-        const modal = new bootstrap.Modal(document.getElementById('assignmentModal'));
-        modal.show();
-    }
-
-    function toggleSubmissionType() {
-        const type = document.getElementById('submissionType').value;
-        const fileSection = document.getElementById('fileUploadSection');
-        const textSection = document.getElementById('textSubmissionSection');
-
-        if (type === 'file_upload') {
-            fileSection.style.display = 'block';
-            textSection.style.display = 'none';
-        } else {
-            fileSection.style.display = 'none';
-            textSection.style.display = 'block';
-        }
-    }
-
-    function submitAssignment() {
-        const assignmentId = document.getElementById('assignmentId').value;
-        const submissionType = document.getElementById('submissionType').value;
-        const formData = new FormData();
-
-        formData.append('action', 'submit_assignment');
-        formData.append('assignment_id', assignmentId);
-        formData.append('lesson_id', <?php echo $currentLesson['id']; ?>);
-        formData.append('submission_type', submissionType);
-
-        if (submissionType === 'file_upload') {
-            const fileInput = document.getElementById('submissionFile');
-            if (fileInput.files.length === 0) {
-                alert('Please select a file to upload');
-                return;
-            }
-            formData.append('submission_file', fileInput.files[0]);
-        } else {
-            const textContent = document.getElementById('textContent').value;
-            if (!textContent.trim()) {
-                alert('Please enter your text submission');
-                return;
-            }
-            formData.append('text_content', textContent);
-        }
-
-        fetch('../api/lesson_content.php', {
-            method: 'POST',
-            body: formData
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    bootstrap.Modal.getInstance(document.getElementById('assignmentModal')).hide();
-                    location.reload();
-                } else {
-                    alert(data.message || 'Failed to submit assignment');
-                }
-            })
-            .catch(error => {
-                console.error('Error submitting assignment:', error);
-                alert('Failed to submit assignment');
-            });
-    }
-
-    // Auto-save notes every 30 seconds
-    setInterval(() => {
-        const content = document.getElementById('studentNotesContent').value;
-        if (content.trim()) {
-            saveStudentNotes();
-        }
-    }, 30000);
-
-    // Auto-save progress (every 30 seconds)
-    setInterval(() => {
-        console.log('Auto-saving progress...');
-    }, 30000);
+});
 </script>
+
+<?php require_once '../includes/footer.php'; ?>

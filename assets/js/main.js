@@ -1,5 +1,14 @@
 // IT HUB JavaScript Functions
 
+// Determine base path for API calls
+var basePath = '';
+var currentPath = window.location.pathname;
+if (currentPath.includes('/student/') || currentPath.includes('/instructor/') || currentPath.includes('/admin/')) {
+    basePath = '../';
+} else {
+    basePath = '';
+}
+
 $(document).ready(function() {
     // Initialize tooltips
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -300,7 +309,7 @@ $(document).ready(function() {
     // Notification system
     function checkNotifications() {
         $.ajax({
-            url: 'api/notifications.php',
+            url: basePath + 'api/notifications.php',
             type: 'GET',
             success: function(data) {
                 if (data.count > 0) {
@@ -325,7 +334,7 @@ $(document).ready(function() {
         if (message === '') return;
         
         $.ajax({
-            url: 'api/send_message.php',
+            url: basePath + 'api/send_message.php',
             type: 'POST',
             data: {
                 message: message,
@@ -348,7 +357,7 @@ $(document).ready(function() {
         var courseId = $('#courseId').val();
         
         $.ajax({
-            url: 'api/get_messages.php',
+            url: basePath + 'api/get_messages.php',
             type: 'GET',
             data: {
                 receiver_id: receiverId,

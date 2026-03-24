@@ -1,5 +1,5 @@
 <?php
-require_once 'config/config.php';
+require_once __DIR__ . '/../config/config.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -9,12 +9,12 @@ require_once 'config/config.php';
     <title>IT HUB - Online Learning Platform</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="assets/css/style.css" rel="stylesheet">
+    <link href="<?php echo BASE_URL; ?>assets/css/style.css" rel="stylesheet">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
-            <a class="navbar-brand" href="index.php">
+            <a class="navbar-brand" href="<?php echo BASE_URL; ?>index.php">
                 <i class="fas fa-graduation-cap me-2"></i>IT HUB
             </a>
             
@@ -25,14 +25,14 @@ require_once 'config/config.php';
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="index.php">Home</a>
+                        <a class="nav-link" href="<?php echo BASE_URL; ?>index.php">Home</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="courses.php">Courses</a>
+                        <a class="nav-link" href="<?php echo BASE_URL; ?>courses.php">Courses</a>
                     </li>
                     <?php if (isLoggedIn()): ?>
                         <li class="nav-item">
-                            <a class="nav-link" href="dashboard.php">Dashboard</a>
+                            <a class="nav-link" href="<?php echo BASE_URL; ?>dashboard.php">Dashboard</a>
                         </li>
                     <?php endif; ?>
                 </ul>
@@ -45,18 +45,18 @@ require_once 'config/config.php';
                                 <?php echo $_SESSION['full_name'] ?? 'User'; ?>
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="profile.php">Profile</a></li>
-                                <li><a class="dropdown-item" href="settings.php">Settings</a></li>
+                                <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>profile.php">Profile</a></li>
+                                <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>settings.php">Settings</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="logout.php">Logout</a></li>
+                                <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>logout.php">Logout</a></li>
                             </ul>
                         </li>
                     <?php else: ?>
                         <li class="nav-item">
-                            <a class="nav-link" href="login.php">Login</a>
+                            <a class="nav-link" href="<?php echo BASE_URL; ?>login.php">Login</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="register.php">Register</a>
+                            <a class="nav-link" href="<?php echo BASE_URL; ?>register.php">Register</a>
                         </li>
                     <?php endif; ?>
                 </ul>

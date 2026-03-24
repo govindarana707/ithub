@@ -9,7 +9,7 @@ requireInstructor();
 $courseId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($courseId <= 0) {
     $_SESSION['error_message'] = 'Invalid course';
-    redirect('courses.php');
+    redirect('instructor/courses.php');
 }
 
 $courseModel = new Course();
@@ -18,13 +18,13 @@ $userModel = new User();
 $course = $courseModel->getCourseById($courseId);
 if (!$course) {
     $_SESSION['error_message'] = 'Course not found';
-    redirect('courses.php');
+    redirect('instructor/courses.php');
 }
 
 // Instructors can only edit their own courses
 if (getUserRole() === 'instructor' && (int)$course['instructor_id'] !== (int)($_SESSION['user_id'] ?? 0)) {
     $_SESSION['error_message'] = 'Access denied. You can only edit your own courses.';
-    redirect('courses.php');
+    redirect('instructor/courses.php');
 }
 
 $meta = $courseModel->getCourseMeta($courseId);
@@ -114,7 +114,7 @@ $instructors = $userModel->getInstructors();
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
+            <a class="navbar-brand" href="../instructor/dashboard.php">
                 <i class="fas fa-graduation-cap me-2"></i>IT HUB
             </a>
             <div class="navbar-nav ms-auto">
@@ -123,8 +123,8 @@ $instructors = $userModel->getInstructors();
                         <i class="fas fa-chalkboard-teacher me-1"></i> Instructor
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="dashboard.php">Dashboard</a></li>
-                        <li><a class="dropdown-item" href="courses.php">My Courses</a></li>
+                        <li><a class="dropdown-item" href="../instructor/dashboard.php">Dashboard</a></li>
+                        <li><a class="dropdown-item" href="../instructor/courses.php">My Courses</a></li>
                         <li><a class="dropdown-item" href="analytics.php">Analytics</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
@@ -138,10 +138,10 @@ $instructors = $userModel->getInstructors();
         <div class="row">
             <div class="col-md-3">
                 <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
+                    <a href="../instructor/dashboard.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-tachometer-alt me-2"></i> Dashboard
                     </a>
-                    <a href="courses.php" class="list-group-item list-group-item-action">
+                    <a href="../instructor/courses.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-book-open me-2"></i> My Courses
                     </a>
                     <a href="course_builder.php?id=<?php echo $courseId; ?>" class="list-group-item list-group-item-action active">

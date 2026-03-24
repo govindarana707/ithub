@@ -67,7 +67,6 @@ $quizStats = $quizModel->getQuizStats($quizId);
                 <a class="nav-link" href="courses.php"><i class="fas fa-chalkboard-teacher me-1"></i> My Courses</a>
                 <a class="nav-link" href="students.php"><i class="fas fa-users me-1"></i> Students</a>
                 <a class="nav-link active" href="quizzes.php"><i class="fas fa-question-circle me-1"></i> Quizzes</a>
-                <a class="nav-link" href="analytics.php"><i class="fas fa-chart-line me-1"></i> Analytics</a>
                 <a class="nav-link" href="../logout.php"><i class="fas fa-sign-out-alt me-1"></i> Logout</a>
             </div>
         </div>
@@ -91,9 +90,6 @@ $quizStats = $quizModel->getQuizStats($quizId);
                     </a>
                     <a href="quizzes.php" class="list-group-item list-group-item-action active">
                         <i class="fas fa-question-circle me-2"></i> Quizzes
-                    </a>
-                    <a href="analytics.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-line me-2"></i> Analytics
                     </a>
                     <a href="earnings.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-rupee-sign me-2"></i> Earnings

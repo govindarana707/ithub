@@ -10,6 +10,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 require_once '../config/config.php';
+require_once '../includes/auth.php';
+
+// Check authentication
+if (!isLoggedIn()) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Authentication required']);
+    exit;
+}
+
+// Check role (students, admins can generate; instructors can view but not generate)
+$role = getUserRole();
+if ($role !== 'student' && $role !== 'admin' && $role !== 'instructor') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied']);
+    exit;
+}
 require_once '../models/Database.php';
 require_once '../models/Progress.php';
 
@@ -57,21 +73,40 @@ function handleGetRequest($conn, $action) {
 }
 
 function handlePostRequest($conn, $action, $progress) {
+    global $role;
+    $currentUserId = $_SESSION['user_id'];
+    
     switch ($action) {
         case 'generate_missing':
-            generateMissingCertificates($conn, $progress);
+            // Only allow students to generate their own certificates
+            if ($role === 'student') {
+                generateMissingCertificates($conn, $progress, $currentUserId);
+            } else {
+                // Admins can generate for any student
+                $targetStudentId = $_POST['student_id'] ?? $currentUserId;
+                generateMissingCertificates($conn, $progress, $targetStudentId);
+            }
             break;
             
         case 'generate_eligible':
-            generateEligibleCertificates($conn, $progress);
+            // Only allow students to generate their own certificates
+            if ($role === 'student') {
+                generateEligibleCertificates($conn, $progress, $currentUserId);
+            } else {
+                // Admins can generate for any student
+                $targetStudentId = $_POST['student_id'] ?? $currentUserId;
+                generateEligibleCertificates($conn, $progress, $targetStudentId);
+            }
             break;
             
         case 'generate_single':
             $courseId = $_POST['course_id'] ?? null;
-            $studentId = $_POST['student_id'] ?? null;
-            if (!$courseId || !$studentId) {
+            // Students can only generate for themselves
+            $studentId = ($role === 'admin') ? ($_POST['student_id'] ?? $currentUserId) : $currentUserId;
+            
+            if (!$courseId) {
                 http_response_code(400);
-                echo json_encode(['error' => 'Course ID and Student ID required']);
+                echo json_encode(['error' => 'Course ID required']);
                 return;
             }
             generateSingleCertificate($conn, $courseId, $studentId);
@@ -134,19 +169,33 @@ function verifyCertificate($conn, $certificateId) {
     $stmt->close();
 }
 
-function generateMissingCertificates($conn, $progress) {
+function generateMissingCertificates($conn, $progress, $studentId = null) {
     $generated = 0;
     $errors = [];
     
-    // Get all students with 100% course completion but no certificate
-    $stmt = $conn->prepare("
-        SELECT DISTINCT e.student_id, e.course_id
-        FROM enrollments e
-        LEFT JOIN certificates c ON e.student_id = c.student_id AND e.course_id = c.course_id
-        WHERE e.progress_percentage >= 100 
-        AND c.id IS NULL
-        AND e.status = 'completed'
-    ");
+    // If studentId is provided, generate only for that student
+    if ($studentId) {
+        $stmt = $conn->prepare("
+            SELECT DISTINCT e.student_id, e.course_id
+            FROM enrollments e
+            LEFT JOIN certificates c ON e.student_id = c.student_id AND e.course_id = c.course_id
+            WHERE e.student_id = ?
+            AND e.progress_percentage >= 100 
+            AND c.id IS NULL
+            AND e.status = 'completed'
+        ");
+        $stmt->bind_param("i", $studentId);
+    } else {
+        // Get all students with 100% course completion but no certificate
+        $stmt = $conn->prepare("
+            SELECT DISTINCT e.student_id, e.course_id
+            FROM enrollments e
+            LEFT JOIN certificates c ON e.student_id = c.student_id AND e.course_id = c.course_id
+            WHERE e.progress_percentage >= 100 
+            AND c.id IS NULL
+            AND e.status = 'completed'
+        ");
+    }
     
     if ($stmt === false) {
         echo json_encode(['success' => false, 'message' => 'Database error']);
@@ -179,12 +228,12 @@ function generateMissingCertificates($conn, $progress) {
     ]);
 }
 
-function generateEligibleCertificates($conn, $progress) {
+function generateEligibleCertificates($conn, $progress, $studentId = null) {
     $generated = 0;
     $errors = [];
     
-    // Get current user's eligible courses
-    $studentId = $_SESSION['user_id'] ?? 0;
+    // Get student ID from parameter or session
+    $studentId = $studentId ?? ($_SESSION['user_id'] ?? 0);
     
     if (!$studentId) {
         echo json_encode(['success' => false, 'message' => 'User not authenticated']);
@@ -256,10 +305,10 @@ function generateCertificate($conn, $studentId, $courseId) {
     // Get course and student information
     $stmt = $conn->prepare("
         SELECT co.title, co.description, u.full_name as student_name, u.email as student_email,
-               ins.full_name as instructor_name, co.duration_hours
+               COALESCE(ins.full_name, 'Instructor') as instructor_name, co.duration_hours
         FROM courses_new co
         JOIN users_new u ON u.id = ?
-        JOIN users_new ins ON co.instructor_id = ins.id
+        LEFT JOIN users_new ins ON co.instructor_id = ins.id
         WHERE co.id = ?
     ");
     

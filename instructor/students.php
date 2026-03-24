@@ -242,7 +242,6 @@ function buildStudentsUrl($overrides = []) {
                 <a class="nav-link" href="dashboard.php"><i class="fas fa-tachometer-alt me-1"></i> Dashboard</a>
                 <a class="nav-link" href="courses.php"><i class="fas fa-chalkboard-teacher me-1"></i> My Courses</a>
                 <a class="nav-link" href="students.php"><i class="fas fa-users me-1"></i> Students</a>
-                <a class="nav-link" href="analytics.php"><i class="fas fa-chart-line me-1"></i> Analytics</a>
                 <a class="nav-link" href="../logout.php"><i class="fas fa-sign-out-alt me-1"></i> Logout</a>
             </div>
         </div>
@@ -263,9 +262,6 @@ function buildStudentsUrl($overrides = []) {
                     </a>
                     <a href="students.php" class="list-group-item list-group-item-action active">
                         <i class="fas fa-users me-2"></i> Students
-                    </a>
-                    <a href="analytics.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-line me-2"></i> Analytics
                     </a>
                     <a href="earnings.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-rupee-sign me-2"></i> Earnings

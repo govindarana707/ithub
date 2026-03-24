@@ -19,28 +19,48 @@ if (!$courseDetails) {
 // Get course lessons
 $conn = connectDB();
 $stmt = $conn->prepare("SELECT * FROM lessons WHERE course_id = ? ORDER BY lesson_order");
-$stmt->bind_param("i", $courseId);
-$stmt->execute();
-$lessons = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+if (!$stmt) {
+    error_log("Lessons query prepare failed: " . $conn->error);
+    $lessons = [];
+} else {
+    $stmt->bind_param("i", $courseId);
+    $stmt->execute();
+    $lessons = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+}
 
 // Get enrolled students count
 $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE course_id = ?");
-$stmt->bind_param("i", $courseId);
-$stmt->execute();
-$enrolledCount = $stmt->get_result()->fetch_assoc()['count'];
+if (!$stmt) {
+    error_log("Enrollment count query prepare failed: " . $conn->error);
+    $enrolledCount = 0;
+} else {
+    $stmt->bind_param("i", $courseId);
+    $stmt->execute();
+    $enrolledCount = $stmt->get_result()->fetch_assoc()['count'];
+}
 
 // Get instructor details
 $instructorId = $courseDetails['instructor_id'];
 $stmt = $conn->prepare("SELECT id, username, email, full_name, bio, profile_image FROM users WHERE id = ? AND role = 'instructor'");
-$stmt->bind_param("i", $instructorId);
-$stmt->execute();
-$instructor = $stmt->get_result()->fetch_assoc();
+if (!$stmt) {
+    error_log("Instructor query prepare failed: " . $conn->error);
+    $instructor = null;
+} else {
+    $stmt->bind_param("i", $instructorId);
+    $stmt->execute();
+    $instructor = $stmt->get_result()->fetch_assoc();
+}
 
 // Get instructor's courses count
 $stmt = $conn->prepare("SELECT COUNT(*) as count FROM courses WHERE instructor_id = ? AND status = 'published'");
-$stmt->bind_param("i", $instructorId);
-$stmt->execute();
-$instructorCourseCount = $stmt->get_result()->fetch_assoc()['count'];
+if (!$stmt) {
+    error_log("Instructor courses count query prepare failed: " . $conn->error);
+    $instructorCourseCount = 0;
+} else {
+    $stmt->bind_param("i", $instructorId);
+    $stmt->execute();
+    $instructorCourseCount = $stmt->get_result()->fetch_assoc()['count'];
+}
 
 // Check if user is enrolled and get enrollment date
 $isEnrolled = false;
@@ -48,13 +68,19 @@ $enrollmentDate = null;
 if (isLoggedIn() && getUserRole() === 'student') {
     $studentId = $_SESSION['user_id'];
     $stmt = $conn->prepare("SELECT id, enrolled_at FROM enrollments WHERE student_id = ? AND course_id = ?");
-    $stmt->bind_param("ii", $studentId, $courseId);
-    $stmt->execute();
-    $enrollmentResult = $stmt->get_result();
-    if ($enrollmentResult->num_rows > 0) {
-        $isEnrolled = true;
-        $enrollmentData = $enrollmentResult->fetch_assoc();
-        $enrollmentDate = $enrollmentData['enrolled_at'];
+    if (!$stmt) {
+        error_log("Enrollment check query prepare failed: " . $conn->error);
+        $isEnrolled = false;
+        $enrollmentDate = null;
+    } else {
+        $stmt->bind_param("ii", $studentId, $courseId);
+        $stmt->execute();
+        $enrollmentResult = $stmt->get_result();
+        if ($enrollmentResult->num_rows > 0) {
+            $isEnrolled = true;
+            $enrollmentData = $enrollmentResult->fetch_assoc();
+            $enrollmentDate = $enrollmentData['enrolled_at'];
+        }
     }
 }
 
@@ -70,6 +96,7 @@ $conn->close();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="assets/css/style.css" rel="stylesheet">
+    <link href="assets/css/esewa.css" rel="stylesheet">
 </head>
 <body>
     <?php require_once 'includes/header.php'; ?>
@@ -317,9 +344,14 @@ $conn->close();
                                     if (!empty($courseDetails['max_students']) && $courseDetails['max_students'] > 0) {
                                         $conn = connectDB();
                                         $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE course_id = ?");
-                                        $stmt->bind_param("i", $courseId);
-                                        $stmt->execute();
-                                        $currentEnrollments = $stmt->get_result()->fetch_assoc()['count'];
+                                        if (!$stmt) {
+                                            error_log("Capacity check query prepare failed: " . $conn->error);
+                                            $currentEnrollments = 0;
+                                        } else {
+                                            $stmt->bind_param("i", $courseId);
+                                            $stmt->execute();
+                                            $currentEnrollments = $stmt->get_result()->fetch_assoc()['count'];
+                                        }
                                         
                                         if ($currentEnrollments >= $courseDetails['max_students']) {
                                             $canEnroll = false;
@@ -335,9 +367,14 @@ $conn->close();
                                         $prerequisites = json_decode($courseDetails['prerequisites'], true) ?: [];
                                         foreach ($prerequisites as $prereqId) {
                                             $stmt = $conn->prepare("SELECT COUNT(*) as completed FROM enrollments WHERE student_id = ? AND course_id = ? AND status = 'completed'");
-                                            $stmt->bind_param("ii", $studentId, $prereqId);
-                                            $stmt->execute();
-                                            $isCompleted = $stmt->get_result()->fetch_assoc()['completed'];
+                                            if (!$stmt) {
+                                                error_log("Prerequisite check query prepare failed: " . $conn->error);
+                                                $isCompleted = 0;
+                                            } else {
+                                                $stmt->bind_param("ii", $studentId, $prereqId);
+                                                $stmt->execute();
+                                                $isCompleted = $stmt->get_result()->fetch_assoc()['completed'];
+                                            }
                                             
                                             if (!$isCompleted) {
                                                 $canEnroll = false;
@@ -428,10 +465,10 @@ $conn->close();
                                 </div>
                                 
                                 <div class="payment-methods">
-                                    <h6 class="mb-3">Select Payment Method</h6>
+                                    <h6 class="mb-3"><i class="fas fa-credit-card me-2"></i>Select Payment Method</h6>
                                     
                                     <!-- Esewa Option -->
-                                    <div class="payment-option mb-3" data-method="esewa">
+                                    <div class="payment-option mb-3" data-method="esewa" onclick="selectPaymentMethod('esewa')">
                                         <div class="card">
                                             <div class="card-body">
                                                 <div class="d-flex align-items-center">
@@ -452,7 +489,7 @@ $conn->close();
                                     </div>
                                     
                                     <!-- Khalti Option -->
-                                    <div class="payment-option mb-3" data-method="khalti">
+                                    <div class="payment-option mb-3" data-method="khalti" onclick="selectPaymentMethod('khalti')">
                                         <div class="card">
                                             <div class="card-body">
                                                 <div class="d-flex align-items-center">
@@ -473,7 +510,7 @@ $conn->close();
                                     </div>
                                     
                                     <!-- Trial Option -->
-                                    <div class="payment-option mb-3" data-method="trial">
+                                    <div class="payment-option mb-3" data-method="trial" onclick="selectPaymentMethod('trial')">
                                         <div class="card">
                                             <div class="card-body">
                                                 <div class="d-flex align-items-center">
@@ -646,15 +683,36 @@ $conn->close();
         .payment-option {
             cursor: pointer;
             transition: all 0.3s ease;
+            border: 2px solid transparent;
         }
         
         .payment-option:hover {
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         
         .payment-option.selected {
             border: 2px solid #007bff !important;
             box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+            background-color: #f8f9ff;
+        }
+        
+        .payment-option[data-method="esewa"].selected {
+            border-color: #00A651 !important;
+            box-shadow: 0 0 0 0.2rem rgba(0, 166, 81, 0.25);
+            background-color: #f0fff4;
+        }
+        
+        .payment-option[data-method="khalti"].selected {
+            border-color: #4A2B8C !important;
+            box-shadow: 0 0 0 0.2rem rgba(74, 43, 140, 0.25);
+            background-color: #f8f5ff;
+        }
+        
+        .payment-option[data-method="trial"].selected {
+            border-color: #FF6B6B !important;
+            box-shadow: 0 0 0 0.2rem rgba(255, 107, 107, 0.25);
+            background-color: #fff5f5;
         }
         
         .payment-icon {
@@ -665,6 +723,11 @@ $conn->close();
             justify-content: center;
         }
         
+        .payment-icon img {
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
         .price-tag {
             font-size: 1.5rem;
             font-weight: bold;
@@ -672,7 +735,7 @@ $conn->close();
         }
         
         .course-summary {
-            background: #f8f9fa;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
             padding: 1rem;
             border-radius: 8px;
             border-left: 4px solid #007bff;
@@ -680,6 +743,7 @@ $conn->close();
         
         .payment-methods .card {
             transition: all 0.3s ease;
+            border: 1px solid #dee2e6;
         }
         
         .payment-methods .card:hover {
@@ -690,22 +754,67 @@ $conn->close();
             background-color: #007bff;
             border-color: #007bff;
         }
+        
+        .form-check-input:checked ~ .payment-option {
+            border-color: #007bff;
+        }
     </style>
     
     <script>
         $(document).ready(function() {
+            console.log('Course details page loaded');
+            
+            // Check if user is logged in
+            <?php if (!isLoggedIn()): ?>
+                console.log('User not logged in');
+                $('.enroll-course-btn').click(function(e) {
+                    e.preventDefault();
+                    alert('Please login to enroll in this course.');
+                    window.location.href = 'login.php?redirect=' + encodeURIComponent(window.location.pathname);
+                });
+                return;
+            <?php endif; ?>
+            
             // Handle enrollment - show payment options modal
-            $('.enroll-course-btn').click(function() {
+            $('.enroll-course-btn').click(function(e) {
+                e.preventDefault();
+                console.log('Enroll button clicked');
+                
                 var btn = $(this);
                 var courseId = btn.data('course-id');
+                
+                if (!courseId) {
+                    console.error('Course ID not found');
+                    alert('Error: Course ID not found');
+                    return;
+                }
+                
+                console.log('Course ID:', courseId);
                 
                 // Store course ID for payment processing
                 $('#proceedPayment').data('course-id', courseId);
                 
                 // Show payment options modal
-                var modal = new bootstrap.Modal(document.getElementById('paymentOptionsModal'));
-                modal.show();
+                try {
+                    var modal = new bootstrap.Modal(document.getElementById('paymentOptionsModal'));
+                    modal.show();
+                    console.log('Payment modal shown');
+                } catch (error) {
+                    console.error('Error showing modal:', error);
+                    alert('Error opening payment options. Please try again.');
+                }
             });
+            
+            // Payment method selection function
+            function selectPaymentMethod(method) {
+                console.log('Payment method selected:', method);
+                
+                // Check the radio button
+                $('#' + method).prop('checked', true);
+                
+                // Trigger change event
+                $('input[name="payment_method"][value="' + method + '"]').trigger('change');
+            }
             
             // Handle payment method selection
             $('input[name="payment_method"]').change(function() {
@@ -713,6 +822,8 @@ $conn->close();
                 var proceedBtn = $('#proceedPayment');
                 var paymentInfo = $('#selectedPaymentInfo');
                 var paymentInfoText = $('#paymentInfoText');
+                
+                console.log('Payment method changed to:', selectedMethod);
                 
                 // Enable proceed button
                 proceedBtn.prop('disabled', false);
@@ -736,31 +847,51 @@ $conn->close();
                 }
                 
                 // Highlight selected payment option
-                $('.payment-option').removeClass('border-primary');
-                $('.payment-option[data-method="' + selectedMethod + '"]').addClass('border-primary');
+                $('.payment-option').removeClass('border-primary selected');
+                $('.payment-option[data-method="' + selectedMethod + '"]').addClass('border-primary selected');
             });
             
             // Handle payment processing
             $('#proceedPayment').click(function() {
+                console.log('Proceed payment clicked');
+                
                 var btn = $(this);
                 var courseId = btn.data('course-id');
                 var paymentMethod = $('input[name="payment_method"]:checked').val();
                 var originalText = btn.html();
+                
+                console.log('Payment data:', { courseId: courseId, paymentMethod: paymentMethod });
+                
+                if (!courseId) {
+                    alert('Error: Course ID not found');
+                    btn.prop('disabled', false).html(originalText);
+                    return;
+                }
+                
+                if (!paymentMethod) {
+                    alert('Please select a payment method');
+                    btn.prop('disabled', false).html(originalText);
+                    return;
+                }
                 
                 // Show loading state
                 btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Processing...');
                 
                 // Process based on payment method
                 if (paymentMethod === 'trial') {
+                    console.log('Processing trial enrollment');
                     // Direct enrollment for trial
                     processEnrollment(courseId, 'trial', btn, originalText);
                 } else {
+                    console.log('Processing payment gateway for:', paymentMethod);
                     // Redirect to payment gateway
                     processPaymentGateway(courseId, paymentMethod, btn, originalText);
                 }
             });
             
             function processEnrollment(courseId, paymentMethod, btn, originalText) {
+                console.log('Processing enrollment:', { courseId: courseId, paymentMethod: paymentMethod });
+                
                 $.ajax({
                     url: 'api/enroll_course.php',
                     type: 'POST',
@@ -770,10 +901,19 @@ $conn->close();
                         csrf_token: $('#csrf_token').val()
                     },
                     dataType: 'json',
+                    beforeSend: function() {
+                        console.log('Sending enrollment request...');
+                    },
                     success: function(response) {
+                        console.log('Enrollment response:', response);
+                        
                         if (response.success) {
                             // Close payment modal
-                            bootstrap.Modal.getInstance(document.getElementById('paymentOptionsModal')).hide();
+                            try {
+                                bootstrap.Modal.getInstance(document.getElementById('paymentOptionsModal')).hide();
+                            } catch (error) {
+                                console.error('Error closing modal:', error);
+                            }
                             
                             // Show success modal
                             showEnrollmentSuccessModal(response);
@@ -783,39 +923,99 @@ $conn->close();
                                 location.reload();
                             }, 3000);
                         } else {
+                            console.error('Enrollment failed:', response);
                             handleEnrollmentError(btn, originalText, 'btn-primary', response);
                         }
                     },
                     error: function(xhr, status, error) {
-                        console.error('Enrollment error:', xhr.responseText);
-                        btn.prop('disabled', false)
-                           .removeClass('btn-primary')
-                           .addClass('btn-danger')
-                           .html('<i class="fas fa-exclamation-triangle me-2"></i>Enrollment Failed');
+                        console.error('AJAX error:', { status: status, error: error, responseText: xhr.responseText });
                         
-                        showAlert('Network error. Please check your connection and try again.', 'danger');
+                        var errorMessage = 'Enrollment failed. Please try again.';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMessage = xhr.responseJSON.message;
+                        } else if (xhr.status === 0) {
+                            errorMessage = 'Network error. Please check your connection.';
+                        } else if (xhr.status === 403) {
+                            errorMessage = 'Access denied. Please login again.';
+                        } else if (xhr.status === 500) {
+                            errorMessage = 'Server error. Please try again later.';
+                        }
                         
-                        setTimeout(function() {
-                            btn.prop('disabled', false)
-                               .removeClass('btn-danger')
-                               .addClass('btn-primary')
-                               .html(originalText);
-                        }, 3000);
+                        alert(errorMessage);
+                        btn.prop('disabled', false).removeClass('btn-warning enrollment-loading').addClass('btn-primary').html(originalText);
                     }
                 });
             }
             
             function processPaymentGateway(courseId, paymentMethod, btn, originalText) {
-                // Simulate payment gateway redirect
-                setTimeout(function() {
-                    // Show payment gateway redirect message
-                    showAlert('Redirecting to ' + paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1) + '...', 'info');
+                if (paymentMethod === 'esewa') {
+                    // Show loading state
+                    btn.prop('disabled', true)
+                       .removeClass('btn-primary')
+                       .addClass('btn-warning enrollment-loading')
+                       .html('<i class="fas fa-spinner fa-spin me-2"></i>Processing eSewa Payment...');
                     
-                    // Simulate successful payment (in real implementation, redirect to actual payment gateway)
+                    // Call eSewa payment API
+                    $.ajax({
+                        url: 'api/esewa_payment.php',
+                        method: 'POST',
+                        data: {
+                            course_id: courseId,
+                            csrf_token: $('#csrf_token').val()
+                        },
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.success) {
+                                // Create and submit eSewa payment form
+                                var form = $('<form>', {
+                                    method: 'POST',
+                                    action: response.payment_form.form_action,
+                                    target: '_blank'
+                                });
+                                
+                                // Add form data
+                                $.each(response.payment_form.form_data, function(key, value) {
+                                    form.append($('<input>', {
+                                        type: 'hidden',
+                                        name: key,
+                                        value: value
+                                    }));
+                                });
+                                
+                                // Submit form to eSewa
+                                form.appendTo('body').submit();
+                                
+                                // Show payment initiated message
+                                showAlert('Redirecting to eSewa for payment...', 'info');
+                                
+                                // Reset button
+                                setTimeout(function() {
+                                    btn.prop('disabled', false)
+                                       .removeClass('btn-warning enrollment-loading')
+                                       .addClass('btn-primary')
+                                       .html(originalText);
+                                }, 2000);
+                            } else {
+                                handleEnrollmentError(btn, originalText, 'btn-primary', response);
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            showAlert('Payment processing failed. Please try again.', 'danger');
+                            btn.prop('disabled', false)
+                               .removeClass('btn-warning enrollment-loading')
+                               .addClass('btn-primary')
+                               .html(originalText);
+                        }
+                    });
+                } else {
+                    // Handle other payment methods (existing logic)
                     setTimeout(function() {
-                        processEnrollment(courseId, paymentMethod, btn, originalText);
-                    }, 2000);
-                }, 1000);
+                        showAlert('Redirecting to ' + paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1) + '...', 'info');
+                        setTimeout(function() {
+                            processEnrollment(courseId, paymentMethod, btn, originalText);
+                        }, 2000);
+                    }, 1000);
+                }
             }
             
             function showEnrollmentSuccessModal(response) {

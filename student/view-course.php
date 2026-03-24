@@ -9,7 +9,9 @@ if (!isLoggedIn()) {
     redirect('../login.php');
 }
 
-if (getUserRole() !== 'student' && getUserRole() !== 'admin') {
+// Allow students, admins, and instructors (for preview) to access
+$role = getUserRole();
+if ($role !== 'student' && $role !== 'admin' && $role !== 'instructor') {
     $_SESSION['error_message'] = 'Access denied. Student privileges required.';
     redirect('../dashboard.php');
 }
@@ -37,8 +39,19 @@ if (!$courseDetails) {
 $enrollment = $course->getEnrollment($userId, $courseId);
 $isEnrolled = !empty($enrollment);
 
-// If not enrolled, redirect to course details page
-if (!$isEnrolled) {
+// Allow instructors to preview their own courses
+$isInstructorPreview = false;
+if (!$isEnrolled && getUserRole() === 'instructor') {
+    // Check if the instructor owns this course
+    $instructorId = $courseDetails['instructor_id'] ?? 0;
+    if ((int)$instructorId === (int)$userId) {
+        $isInstructorPreview = true;
+        $_SESSION['info_message'] = 'Previewing your own course (Instructor Preview Mode)';
+    }
+}
+
+// If not enrolled and not instructor preview, redirect to course details page
+if (!$isEnrolled && !$isInstructorPreview) {
     $_SESSION['error_message'] = 'You must be enrolled in this course to view it.';
     redirect('../course-details.php?id=' . $courseId);
 }
@@ -49,7 +62,7 @@ require_once '../includes/universal_header.php';
 $lessons = $course->getCourseLessons($courseId);
 
 // Get course progress from enrollment
-$progress = $enrollment['progress_percentage'] ?? 0;
+$progress = $isInstructorPreview ? 0 : ($enrollment['progress_percentage'] ?? 0);
 
 // Get course quizzes
 $quizzes = $quiz->getCourseQuizzes($courseId);
@@ -92,6 +105,17 @@ $progressPercentage = $totalLessons > 0 ? round(($completedLessons / $totalLesso
 ?>
 
 <div class="container-fluid py-4">
+    <?php if ($isInstructorPreview): ?>
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <i class="fas fa-eye me-2"></i>
+        <strong>Instructor Preview Mode:</strong> You are viewing your own course as a student would see it.
+        <a href="../instructor/course_builder.php?id=<?php echo $courseId; ?>" class="btn btn-sm btn-warning ms-3">
+            <i class="fas fa-edit me-1"></i>Back to Editor
+        </a>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <?php endif; ?>
+    
     <div class="row">
         <!-- Sidebar -->
         <div class="col-md-3">
@@ -173,11 +197,15 @@ $progressPercentage = $totalLessons > 0 ? round(($completedLessons / $totalLesso
                 <!-- Lessons Tab -->
                 <div class="tab-pane fade show active" id="lessons" role="tabpanel">
                     <div class="card">
-                        <div class="card-header">
+                        <div class="card-header d-flex justify-content-between align-items-center">
                             <h5><i class="fas fa-book me-2"></i>Course Lessons</h5>
                             <?php if ($nextLesson): ?>
-                                <a href="lesson.php?course_id=<?php echo $courseId; ?>&lesson_id=<?php echo $nextLesson['id']; ?>" class="btn btn-primary btn-sm">
+                                <a href="lesson.php?course_id=<?php echo $courseId; ?>&lesson_id=<?php echo $nextLesson['id']; ?><?php echo $isInstructorPreview ? '&preview=1' : ''; ?>" class="btn btn-primary btn-sm">
                                     <i class="fas fa-play me-1"></i>Continue Learning
+                                </a>
+                            <?php elseif ($isInstructorPreview && !empty($lessons)): ?>
+                                <a href="lesson.php?course_id=<?php echo $courseId; ?>&lesson_id=<?php echo $lessons[0]['id']; ?>&preview=1" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-play me-1"></i>Preview First Lesson
                                 </a>
                             <?php endif; ?>
                         </div>

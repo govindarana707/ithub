@@ -31,7 +31,7 @@ if ($method === 'GET') {
             // Check enrollment
             $conn = connectDB();
             $stmt = $conn->prepare("
-                SELECT c.id FROM courses c
+                SELECT c.id FROM courses_new c
                 JOIN lessons l ON c.id = l.course_id
                 JOIN enrollments e ON c.id = e.course_id
                 WHERE l.id = ? AND e.student_id = ?
@@ -201,7 +201,7 @@ if (in_array(getUserRole(), ['instructor', 'admin'])) {
                 // Check instructor permissions
                 $conn = connectDB();
                 $stmt = $conn->prepare("
-                    SELECT c.instructor_id FROM courses c
+                    SELECT c.instructor_id FROM courses_new c
                     JOIN lessons l ON c.id = l.course_id
                     WHERE l.id = ?
                 ");

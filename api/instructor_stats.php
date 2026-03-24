@@ -22,7 +22,7 @@ try {
     $stats = [];
     
     // Get courses count
-    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM courses WHERE instructor_id = ?");
+    $stmt = $conn->prepare("SELECT COUNT(*) as count FROM courses_new WHERE instructor_id = ?");
     $stmt->bind_param("i", $userId);
     $stmt->execute();
     $stats['courses'] = $stmt->get_result()->fetch_assoc()['count'];
@@ -31,7 +31,7 @@ try {
     $stmt = $conn->prepare("
         SELECT COUNT(DISTINCT e.student_id) as count 
         FROM enrollments e 
-        JOIN courses c ON e.course_id = c.id 
+        JOIN courses_new c ON e.course_id = c.id 
         WHERE c.instructor_id = ?
     ");
     $stmt->bind_param("i", $userId);
@@ -42,7 +42,7 @@ try {
     $stmt = $conn->prepare("
         SELECT COUNT(*) as count 
         FROM quizzes q 
-        JOIN courses c ON q.course_id = c.id 
+        JOIN courses_new c ON q.course_id = c.id 
         WHERE c.instructor_id = ?
     ");
     $stmt->bind_param("i", $userId);
@@ -53,7 +53,7 @@ try {
     $stmt = $conn->prepare("
         SELECT COUNT(*) as count 
         FROM discussions d 
-        JOIN courses c ON d.course_id = c.id 
+        JOIN courses_new c ON d.course_id = c.id 
         WHERE c.instructor_id = ? AND d.parent_id IS NULL
     ");
     $stmt->bind_param("i", $userId);
@@ -64,7 +64,7 @@ try {
     $stmt = $conn->prepare("
         SELECT COALESCE(SUM(c.price), 0) as total 
         FROM enrollments e 
-        JOIN courses c ON e.course_id = c.id 
+        JOIN courses_new c ON e.course_id = c.id 
         WHERE c.instructor_id = ? AND e.status = 'active'
     ");
     $stmt->bind_param("i", $userId);

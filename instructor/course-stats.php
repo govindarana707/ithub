@@ -122,7 +122,7 @@ $coursePerformance = array_values($coursePerformance)[0] ?? null;
                     <a href="course-students.php?id=<?php echo $courseId; ?>" class="list-group-item list-group-item-action">
                         <i class="fas fa-users me-2"></i> Students
                     </a>
-                    <a href="../admin/course_builder.php?id=<?php echo $courseId; ?>" class="list-group-item list-group-item-action">
+                    <a href="course_builder.php?id=<?php echo $courseId; ?>" class="list-group-item list-group-item-action">
                         <i class="fas fa-screwdriver-wrench me-2"></i> Course Builder
                     </a>
                 </div>

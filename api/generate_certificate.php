@@ -79,7 +79,7 @@ function createCertificatePDF($studentId, $courseId, $certificateCode) {
     
     // Get course details
     $conn = connectDB();
-    $stmt = $conn->prepare("SELECT title FROM courses WHERE id = ?");
+    $stmt = $conn->prepare("SELECT title FROM courses_new WHERE id = ?");
     $stmt->bind_param("i", $courseId);
     $stmt->execute();
     $course = $stmt->get_result()->fetch_assoc();

@@ -21,173 +21,6 @@ foreach ($instructorCourses as $c) {
     $courseMap[(int)$c['id']] = $c;
 }
 
-$requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-if ($requestMethod === 'POST') {
-    $postedToken = $_POST['csrf_token'] ?? '';
-    if (!verifyCSRFToken($postedToken)) {
-        $_SESSION['error_message'] = 'Invalid request token. Please refresh and try again.';
-        header('Location: quizzes.php');
-        exit;
-    }
-
-    $action = $_POST['action'] ?? '';
-
-    if ($action === 'create_quiz') {
-        $courseId = (int)($_POST['course_id'] ?? 0);
-        $title = sanitize($_POST['title'] ?? '');
-        $description = sanitize($_POST['description'] ?? '');
-        $timeLimit = (int)($_POST['time_limit_minutes'] ?? 30);
-        $passingScore = (float)($_POST['passing_score'] ?? 70);
-        $maxAttempts = (int)($_POST['max_attempts'] ?? 3);
-        $status = sanitize($_POST['status'] ?? 'draft');
-        $lessonId = (int)($_POST['lesson_id'] ?? 0);
-
-        if (!isset($courseMap[$courseId])) {
-            $_SESSION['error_message'] = 'Invalid course selection.';
-            header('Location: quizzes.php');
-            exit;
-        }
-
-        if ($title === '' || strlen($title) < 3) {
-            $_SESSION['error_message'] = 'Quiz title must be at least 3 characters.';
-            header('Location: quizzes.php');
-            exit;
-        }
-
-        if ($timeLimit < 0) {
-            $timeLimit = 0;
-        }
-
-        if ($passingScore < 0) {
-            $passingScore = 0;
-        }
-        if ($passingScore > 100) {
-            $passingScore = 100;
-        }
-
-        if ($maxAttempts < 1) {
-            $maxAttempts = 1;
-        }
-
-        if (!in_array($status, ['draft', 'published'], true)) {
-            $status = 'draft';
-        }
-
-        $result = $quizModel->createQuiz([
-            'course_id' => $courseId,
-            'lesson_id' => $lessonId,
-            'title' => $title,
-            'description' => $description,
-            'time_limit_minutes' => $timeLimit,
-            'passing_score' => $passingScore,
-            'max_attempts' => $maxAttempts,
-            'status' => $status,
-        ]);
-
-        if (($result['success'] ?? false)) {
-            $_SESSION['success_message'] = 'Quiz created successfully!';
-            logActivity($_SESSION['user_id'], 'quiz_created', "Created quiz: {$title}");
-        } else {
-            $_SESSION['error_message'] = 'Failed to create quiz: ' . ($result['error'] ?? 'Unknown error');
-        }
-
-        header('Location: quizzes.php');
-        exit;
-    }
-
-    if ($action === 'update_quiz') {
-        $quizId = (int)($_POST['quiz_id'] ?? 0);
-        $quiz = $quizModel->getQuizById($quizId);
-
-        if (!$quiz) {
-            $_SESSION['error_message'] = 'Quiz not found.';
-            header('Location: quizzes.php');
-            exit;
-        }
-
-        $courseId = (int)($quiz['course_id'] ?? 0);
-        if (!isset($courseMap[$courseId])) {
-            $_SESSION['error_message'] = 'Access denied.';
-            header('Location: quizzes.php');
-            exit;
-        }
-
-        $data = [
-            'title' => sanitize($_POST['title'] ?? $quiz['title']),
-            'description' => sanitize($_POST['description'] ?? $quiz['description']),
-            'time_limit_minutes' => (int)($_POST['time_limit_minutes'] ?? $quiz['time_limit_minutes']),
-            'passing_score' => (float)($_POST['passing_score'] ?? $quiz['passing_score']),
-            'max_attempts' => (int)($_POST['max_attempts'] ?? $quiz['max_attempts']),
-            'status' => sanitize($_POST['status'] ?? $quiz['status']),
-        ];
-
-        if ($data['title'] === '' || strlen($data['title']) < 3) {
-            $_SESSION['error_message'] = 'Quiz title must be at least 3 characters.';
-            header('Location: quizzes.php?edit=' . $quizId);
-            exit;
-        }
-
-        if (!in_array($data['status'], ['draft', 'published'], true)) {
-            $data['status'] = 'draft';
-        }
-
-        if ($data['max_attempts'] < 1) {
-            $data['max_attempts'] = 1;
-        }
-
-        if ($data['passing_score'] < 0) {
-            $data['passing_score'] = 0;
-        }
-        if ($data['passing_score'] > 100) {
-            $data['passing_score'] = 100;
-        }
-
-        $ok = $quizModel->updateQuiz($quizId, $data);
-        if ($ok) {
-            $_SESSION['success_message'] = 'Quiz updated successfully!';
-            logActivity($_SESSION['user_id'], 'quiz_updated', "Updated quiz ID: {$quizId}");
-            header('Location: quizzes.php');
-        } else {
-            $_SESSION['error_message'] = 'Failed to update quiz.';
-            header('Location: quizzes.php?edit=' . $quizId);
-        }
-        exit;
-    }
-
-    if ($action === 'delete_quiz') {
-        $quizId = (int)($_POST['quiz_id'] ?? 0);
-        $quiz = $quizModel->getQuizById($quizId);
-
-        if (!$quiz) {
-            $_SESSION['error_message'] = 'Quiz not found.';
-            header('Location: quizzes.php');
-            exit;
-        }
-
-        $courseId = (int)($quiz['course_id'] ?? 0);
-        if (!isset($courseMap[$courseId])) {
-            $_SESSION['error_message'] = 'Access denied.';
-            header('Location: quizzes.php');
-            exit;
-        }
-
-        $ok = $quizModel->deleteQuiz($quizId);
-        if ($ok) {
-            $_SESSION['success_message'] = 'Quiz deleted successfully!';
-            logActivity($_SESSION['user_id'], 'quiz_deleted', "Deleted quiz ID: {$quizId}");
-        } else {
-            $_SESSION['error_message'] = 'Failed to delete quiz.';
-        }
-
-        header('Location: quizzes.php');
-        exit;
-    }
-
-    $_SESSION['error_message'] = 'Unknown action.';
-    header('Location: quizzes.php');
-    exit;
-}
-
 $filterCourseId = (int)($_GET['course_id'] ?? 0);
 $filterStatus = trim((string)($_GET['status'] ?? ''));
 $editId = (int)($_GET['edit'] ?? 0);
@@ -219,15 +52,7 @@ if ($editId > 0) {
         $cid = (int)($candidate['course_id'] ?? 0);
         if (isset($courseMap[$cid])) {
             $editQuiz = $candidate;
-        } else {
-            $_SESSION['error_message'] = 'Access denied.';
-            header('Location: quizzes.php');
-            exit;
         }
-    } else {
-        $_SESSION['error_message'] = 'Quiz not found.';
-        header('Location: quizzes.php');
-        exit;
     }
 }
 ?>
@@ -241,6 +66,7 @@ if ($editId > 0) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         .card-soft {
             background: #fff;
@@ -255,6 +81,26 @@ if ($editId > 0) {
             color: #6c757d;
             font-size: 0.9rem;
         }
+        .quiz-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        .quiz-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -268,7 +114,6 @@ if ($editId > 0) {
                 <a class="nav-link" href="courses.php"><i class="fas fa-chalkboard-teacher me-1"></i> My Courses</a>
                 <a class="nav-link" href="students.php"><i class="fas fa-users me-1"></i> Students</a>
                 <a class="nav-link active" href="quizzes.php"><i class="fas fa-question-circle me-1"></i> Quizzes</a>
-                <a class="nav-link" href="analytics.php"><i class="fas fa-chart-line me-1"></i> Analytics</a>
                 <a class="nav-link" href="../logout.php"><i class="fas fa-sign-out-alt me-1"></i> Logout</a>
             </div>
         </div>
@@ -293,9 +138,6 @@ if ($editId > 0) {
                     <a href="quizzes.php" class="list-group-item list-group-item-action active">
                         <i class="fas fa-question-circle me-2"></i> Quizzes
                     </a>
-                    <a href="analytics.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-line me-2"></i> Analytics
-                    </a>
                     <a href="earnings.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-rupee-sign me-2"></i> Earnings
                     </a>
@@ -311,25 +153,17 @@ if ($editId > 0) {
                         <h1 class="mb-1">Quizzes</h1>
                         <div class="text-muted">Create and manage quizzes for your courses</div>
                     </div>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createQuizModal">
+                        <i class="fas fa-plus me-2"></i>New Quiz
+                    </button>
                 </div>
 
-                <?php if (isset($_SESSION['error_message'])): ?>
-                    <div class="alert alert-danger">
-                        <?php echo htmlspecialchars($_SESSION['error_message']); unset($_SESSION['error_message']); ?>
-                    </div>
-                <?php endif; ?>
-
-                <?php if (isset($_SESSION['success_message'])): ?>
-                    <div class="alert alert-success">
-                        <?php echo htmlspecialchars($_SESSION['success_message']); unset($_SESSION['success_message']); ?>
-                    </div>
-                <?php endif; ?>
-
+                <!-- Filter Section -->
                 <div class="card-soft mb-3">
-                    <form class="row g-2" method="GET">
+                    <form class="row g-2" method="GET" id="filterForm">
                         <div class="col-md-6">
                             <label class="form-label">Course</label>
-                            <select class="form-select" name="course_id">
+                            <select class="form-select" name="course_id" id="filterCourse">
                                 <option value="0">All Courses</option>
                                 <?php foreach ($instructorCourses as $c): ?>
                                     <option value="<?php echo (int)$c['id']; ?>" <?php echo ((int)$filterCourseId === (int)$c['id']) ? 'selected' : ''; ?>>
@@ -340,7 +174,7 @@ if ($editId > 0) {
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Status</label>
-                            <select class="form-select" name="status">
+                            <select class="form-select" name="status" id="filterStatus">
                                 <option value="">All</option>
                                 <option value="draft" <?php echo $filterStatus === 'draft' ? 'selected' : ''; ?>>Draft</option>
                                 <option value="published" <?php echo $filterStatus === 'published' ? 'selected' : ''; ?>>Published</option>
@@ -355,195 +189,518 @@ if ($editId > 0) {
                     </form>
                 </div>
 
-                <?php if ($editQuiz): ?>
-                    <div class="card-soft mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h5 class="mb-0">Edit Quiz</h5>
-                            <a class="btn btn-outline-secondary btn-sm" href="quizzes.php">Close</a>
-                        </div>
-                        <form method="POST" class="row g-3">
-                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
-                            <input type="hidden" name="action" value="update_quiz">
-                            <input type="hidden" name="quiz_id" value="<?php echo (int)$editQuiz['id']; ?>">
-
-                            <div class="col-md-6">
-                                <label class="form-label">Course</label>
-                                <input type="text" class="form-control" value="<?php echo htmlspecialchars($editQuiz['course_title'] ?? ''); ?>" disabled>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Status</label>
-                                <select name="status" class="form-select" required>
-                                    <option value="draft" <?php echo ($editQuiz['status'] ?? '') === 'draft' ? 'selected' : ''; ?>>Draft</option>
-                                    <option value="published" <?php echo ($editQuiz['status'] ?? '') === 'published' ? 'selected' : ''; ?>>Published</option>
-                                </select>
-                            </div>
-
-                            <div class="col-12">
-                                <label class="form-label">Title</label>
-                                <input type="text" name="title" class="form-control" value="<?php echo htmlspecialchars($editQuiz['title'] ?? ''); ?>" required>
-                            </div>
-
-                            <div class="col-12">
-                                <label class="form-label">Description</label>
-                                <textarea name="description" class="form-control" rows="3"><?php echo htmlspecialchars($editQuiz['description'] ?? ''); ?></textarea>
-                            </div>
-
-                            <div class="col-md-4">
-                                <label class="form-label">Time Limit (minutes)</label>
-                                <input type="number" name="time_limit_minutes" class="form-control" min="0" value="<?php echo (int)($editQuiz['time_limit_minutes'] ?? 0); ?>">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Passing Score (%)</label>
-                                <input type="number" step="0.01" min="0" max="100" name="passing_score" class="form-control" value="<?php echo htmlspecialchars((string)($editQuiz['passing_score'] ?? '70')); ?>">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Max Attempts</label>
-                                <input type="number" name="max_attempts" class="form-control" min="1" value="<?php echo (int)($editQuiz['max_attempts'] ?? 3); ?>">
-                            </div>
-
-                            <div class="col-12 d-flex justify-content-end gap-2">
-                                <a class="btn btn-outline-secondary" href="quizzes.php">Cancel</a>
-                                <button type="submit" class="btn btn-success">
-                                    <i class="fas fa-save me-2"></i>Save Changes
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                <?php endif; ?>
-
-                <div class="card-soft mb-3">
-                    <h5 class="mb-3">Create Quiz</h5>
-                    <form method="POST" class="row g-3">
-                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
-                        <input type="hidden" name="action" value="create_quiz">
-
-                        <div class="col-md-6">
-                            <label class="form-label">Course *</label>
-                            <select name="course_id" class="form-select" required>
-                                <option value="">Select Course</option>
-                                <?php foreach ($instructorCourses as $c): ?>
-                                    <option value="<?php echo (int)$c['id']; ?>"><?php echo htmlspecialchars($c['title']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">Status *</label>
-                            <select name="status" class="form-select" required>
-                                <option value="draft">Draft</option>
-                                <option value="published">Published</option>
-                            </select>
-                        </div>
-
+                <!-- Quizzes Grid -->
+                <div class="row g-3 mb-3" id="quizzesContainer">
+                    <?php if (empty($quizzes)): ?>
                         <div class="col-12">
-                            <label class="form-label">Quiz Title *</label>
-                            <input type="text" name="title" class="form-control" required>
-                        </div>
-
-                        <div class="col-12">
-                            <label class="form-label">Description</label>
-                            <textarea name="description" class="form-control" rows="3"></textarea>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Time Limit (minutes)</label>
-                            <input type="number" name="time_limit_minutes" class="form-control" min="0" value="30">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Passing Score (%)</label>
-                            <input type="number" step="0.01" min="0" max="100" name="passing_score" class="form-control" value="70">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Max Attempts</label>
-                            <input type="number" name="max_attempts" class="form-control" min="1" value="3">
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">Lesson ID (optional)</label>
-                            <input type="number" name="lesson_id" class="form-control" min="0" value="0">
-                            <div class="form-text">Set to 0 for course-level quizzes</div>
-                        </div>
-
-                        <div class="col-12 d-flex justify-content-end">
-                            <button type="submit" class="btn btn-success">
-                                <i class="fas fa-plus me-2"></i>Create Quiz
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Your Quizzes</h5>
-
-                        <?php if (empty($quizzes)): ?>
-                            <div class="text-center py-4 text-muted">No quizzes found.</div>
-                        <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th>Quiz</th>
-                                            <th>Course</th>
-                                            <th>Status</th>
-                                            <th class="text-center">Attempts</th>
-                                            <th class="text-center">Avg</th>
-                                            <th class="text-center">Pass</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($quizzes as $q): ?>
-                                            <?php $s = $quizStats[(int)$q['id']] ?? ['total_attempts' => 0, 'average_score' => 0, 'pass_rate' => 0]; ?>
-                                            <tr>
-                                                <td>
-                                                    <div class="fw-semibold"><?php echo htmlspecialchars($q['title']); ?></div>
-                                                    <div class="quiz-meta">
-                                                        <span><i class="fas fa-stopwatch me-1"></i><?php echo (int)($q['time_limit_minutes'] ?? 0); ?> min</span>
-                                                        <span><i class="fas fa-bullseye me-1"></i><?php echo (float)($q['passing_score'] ?? 0); ?>%</span>
-                                                        <span><i class="fas fa-repeat me-1"></i><?php echo (int)($q['max_attempts'] ?? 0); ?></span>
-                                                    </div>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($q['course_title'] ?? ''); ?></td>
-                                                <td>
-                                                    <span class="badge bg-<?php echo ($q['status'] ?? '') === 'published' ? 'success' : 'warning'; ?>">
-                                                        <?php echo ucfirst((string)($q['status'] ?? 'draft')); ?>
-                                                    </span>
-                                                </td>
-                                                <td class="text-center"><?php echo (int)($s['total_attempts'] ?? 0); ?></td>
-                                                <td class="text-center"><?php echo (float)($s['average_score'] ?? 0); ?>%</td>
-                                                <td class="text-center"><?php echo (float)($s['pass_rate'] ?? 0); ?>%</td>
-                                                <td>
-                                                    <div class="d-flex gap-2">
-                                                        <a class="btn btn-outline-secondary btn-sm" href="quiz-questions.php?quiz_id=<?php echo (int)$q['id']; ?>">
-                                                            <i class="fas fa-list-check me-1"></i>Questions
-                                                        </a>
-                                                        <a class="btn btn-outline-primary btn-sm" href="quizzes.php?edit=<?php echo (int)$q['id']; ?>">
-                                                            <i class="fas fa-edit me-1"></i>Edit
-                                                        </a>
-                                                        <form method="POST" class="m-0" onsubmit="return confirm('Delete this quiz?');">
-                                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
-                                                            <input type="hidden" name="action" value="delete_quiz">
-                                                            <input type="hidden" name="quiz_id" value="<?php echo (int)$q['id']; ?>">
-                                                            <button class="btn btn-outline-danger btn-sm" type="submit">
-                                                                <i class="fas fa-trash me-1"></i>Delete
-                                                            </button>
-                                                        </form>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
+                            <div class="text-center py-5 text-muted">
+                                <i class="fas fa-clipboard-list fa-4x mb-3"></i>
+                                <h4>No quizzes found</h4>
+                                <p>Create your first quiz to get started!</p>
                             </div>
-                        <?php endif; ?>
-                    </div>
+                        </div>
+                    <?php else: ?>
+                        <?php foreach ($quizzes as $q): ?>
+                            <?php $s = $quizStats[(int)$q['id']] ?? ['total_attempts' => 0, 'average_score' => 0, 'pass_rate' => 0]; ?>
+                            <div class="col-md-6 col-lg-4" id="quiz-card-<?php echo (int)$q['id']; ?>">
+                                <div class="card quiz-card h-100">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <span class="badge bg-<?php echo ($q['status'] ?? '') === 'published' ? 'success' : 'warning'; ?>">
+                                                <?php echo ucfirst((string)($q['status'] ?? 'draft')); ?>
+                                            </span>
+                                            <div class="dropdown">
+                                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </button>
+                                                <ul class="dropdown-menu">
+                                                    <li><a class="dropdown-item" href="quiz-questions.php?quiz_id=<?php echo (int)$q['id']; ?>">
+                                                        <i class="fas fa-list-check me-2"></i>Questions
+                                                    </a></li>
+                                                    <li><a class="dropdown-item" href="#" onclick="editQuiz(<?php echo (int)$q['id']; ?>); return false;">
+                                                        <i class="fas fa-edit me-2"></i>Edit
+                                                    </a></li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteQuiz(<?php echo (int)$q['id']; ?>, '<?php echo htmlspecialchars($q['title'] ?? '', ENT_QUOTES); ?>'); return false;">
+                                                        <i class="fas fa-trash me-2"></i>Delete
+                                                    </a></li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        <h5 class="card-title"><?php echo htmlspecialchars($q['title']); ?></h5>
+                                        <p class="text-muted small mb-2"><?php echo htmlspecialchars($q['course_title'] ?? ''); ?></p>
+                                        <div class="quiz-meta">
+                                            <span><i class="fas fa-stopwatch me-1"></i><?php echo (int)($q['time_limit_minutes'] ?? 0); ?> min</span>
+                                            <span><i class="fas fa-bullseye me-1"></i><?php echo (float)($q['passing_score'] ?? 0); ?>%</span>
+                                            <span><i class="fas fa-repeat me-1"></i><?php echo (int)($q['max_attempts'] ?? 0); ?></span>
+                                        </div>
+                                        <hr>
+                                        <div class="row text-center small">
+                                            <div class="col-4">
+                                                <div class="fw-bold"><?php echo (int)($s['total_attempts'] ?? 0); ?></div>
+                                                <div class="text-muted">Attempts</div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="fw-bold"><?php echo (float)($s['average_score'] ?? 0); ?>%</div>
+                                                <div class="text-muted">Avg Score</div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="fw-bold"><?php echo (float)($s['pass_rate'] ?? 0); ?>%</div>
+                                                <div class="text-muted">Pass Rate</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card-footer bg-transparent">
+                                        <a href="quiz-questions.php?quiz_id=<?php echo (int)$q['id']; ?>" class="btn btn-outline-primary btn-sm w-100">
+                                            <i class="fas fa-list-check me-1"></i>Manage Questions
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
 
             </div>
         </div>
     </div>
 
+    <!-- Create Quiz Modal -->
+    <div class="modal fade" id="createQuizModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create New Quiz</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="createQuizForm">
+                    <div class="modal-body">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                        <input type="hidden" name="action" value="create_quiz">
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Course *</label>
+                                <select name="course_id" class="form-select" required id="createCourseId">
+                                    <option value="">Select Course</option>
+                                    <?php foreach ($instructorCourses as $c): ?>
+                                        <option value="<?php echo (int)$c['id']; ?>"><?php echo htmlspecialchars($c['title']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label class="form-label">Status *</label>
+                                <select name="status" class="form-select" required>
+                                    <option value="draft">Draft</option>
+                                    <option value="published">Published</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-12">
+                                <label class="form-label">Quiz Title *</label>
+                                <input type="text" name="title" class="form-control" required minlength="3" id="createTitle">
+                            </div>
+                            
+                            <div class="col-12">
+                                <label class="form-label">Description</label>
+                                <textarea name="description" class="form-control" rows="3" id="createDescription"></textarea>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">Time Limit (minutes)</label>
+                                <input type="number" name="time_limit_minutes" class="form-control" min="0" value="30">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Passing Score (%)</label>
+                                <input type="number" name="passing_score" class="form-control" min="0" max="100" value="70">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Max Attempts</label>
+                                <input type="number" name="max_attempts" class="form-control" min="1" value="3">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success" id="createQuizBtn">
+                            <i class="fas fa-plus me-2"></i>Create Quiz
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Quiz Modal -->
+    <div class="modal fade" id="editQuizModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Quiz</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editQuizForm">
+                    <div class="modal-body">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                        <input type="hidden" name="action" value="update_quiz">
+                        <input type="hidden" name="quiz_id" value="" id="editQuizId">
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Course</label>
+                                <input type="text" class="form-control" id="editCourseName" disabled>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label class="form-label">Status *</label>
+                                <select name="status" class="form-select" required id="editStatus">
+                                    <option value="draft">Draft</option>
+                                    <option value="published">Published</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-12">
+                                <label class="form-label">Quiz Title *</label>
+                                <input type="text" name="title" class="form-control" required minlength="3" id="editTitle">
+                            </div>
+                            
+                            <div class="col-12">
+                                <label class="form-label">Description</label>
+                                <textarea name="description" class="form-control" rows="3" id="editDescription"></textarea>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">Time Limit (minutes)</label>
+                                <input type="number" name="time_limit_minutes" class="form-control" min="0" id="editTimeLimit">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Passing Score (%)</label>
+                                <input type="number" name="passing_score" class="form-control" min="0" max="100" id="editPassingScore">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Max Attempts</label>
+                                <input type="number" name="max_attempts" class="form-control" min="1" id="editMaxAttempts">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success" id="updateQuizBtn">
+                            <i class="fas fa-save me-2"></i>Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // CSRF Token
+    const csrfToken = '<?php echo htmlspecialchars($csrfToken); ?>';
+
+    // Create Quiz
+    document.getElementById('createQuizForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const btn = document.getElementById('createQuizBtn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading-spinner"></span> Creating...';
+        
+        const formData = new FormData(this);
+        
+        fetch('<?php echo BASE_URL; ?>api/quiz_api.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: data.message,
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => {
+                    location.reload();
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: data.message
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'An error occurred. Please try again.'
+            });
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        });
+    });
+
+    // Edit Quiz - Fetch quiz data
+    function editQuiz(quizId) {
+        fetch('<?php echo BASE_URL; ?>api/quiz_api.php?action=get_quiz&quiz_id=' + quizId, {
+            method: 'GET',
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const quiz = data.data;
+                document.getElementById('editQuizId').value = quiz.id;
+                document.getElementById('editCourseName').value = quiz.course_title;
+                document.getElementById('editTitle').value = quiz.title;
+                document.getElementById('editDescription').value = quiz.description || '';
+                document.getElementById('editStatus').value = quiz.status;
+                document.getElementById('editTimeLimit').value = quiz.time_limit_minutes;
+                document.getElementById('editPassingScore').value = quiz.passing_score;
+                document.getElementById('editMaxAttempts').value = quiz.max_attempts;
+                
+                var editModal = new bootstrap.Modal(document.getElementById('editQuizModal'));
+                editModal.show();
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: data.message
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Failed to load quiz data.'
+            });
+        });
+    }
+
+    // Update Quiz
+    document.getElementById('editQuizForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const btn = document.getElementById('updateQuizBtn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading-spinner"></span> Saving...';
+        
+        const formData = new FormData(this);
+        
+        fetch('<?php echo BASE_URL; ?>api/quiz_api.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: data.message,
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => {
+                    location.reload();
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: data.message
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'An error occurred. Please try again.'
+            });
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        });
+    });
+
+    // Delete Quiz with confirmation
+    function deleteQuiz(quizId, quizTitle) {
+        Swal.fire({
+            title: 'Delete Quiz?',
+            text: 'Are you sure you want to delete "' + quizTitle + '"? This will also delete all questions and attempts.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, delete it!',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const formData = new FormData();
+                formData.append('action', 'delete_quiz');
+                formData.append('quiz_id', quizId);
+                formData.append('csrf_token', csrfToken);
+                
+                fetch('<?php echo BASE_URL; ?>api/quiz_api.php', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Deleted!',
+                            text: data.message,
+                            timer: 2000,
+                            showConfirmButton: false
+                        }).then(() => {
+                            // Remove the card from DOM
+                            const card = document.getElementById('quiz-card-' + quizId);
+                            if (card) {
+                                card.remove();
+                            }
+                            
+                            // Check if no more quizzes
+                            const container = document.getElementById('quizzesContainer');
+                            if (container.children.length === 0) {
+                                container.innerHTML = `
+                                    <div class="col-12">
+                                        <div class="text-center py-5 text-muted">
+                                            <i class="fas fa-clipboard-list fa-4x mb-3"></i>
+                                            <h4>No quizzes found</h4>
+                                            <p>Create your first quiz to get started!</p>
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: data.message
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'An error occurred. Please try again.'
+                    });
+                });
+            }
+        });
+    }
+
+    // Helper function to add quiz card dynamically
+    function addQuizCard(quiz, stats) {
+        const container = document.getElementById('quizzesContainer');
+        
+        // Remove empty state if exists
+        const emptyMsg = container.querySelector('.text-center');
+        if (emptyMsg) {
+            container.innerHTML = '';
+        }
+        
+        const card = `
+            <div class="col-md-6 col-lg-4" id="quiz-card-${quiz.id}">
+                <div class="card quiz-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <span class="badge bg-${quiz.status === 'published' ? 'success' : 'warning'}">
+                                ${quiz.status}
+                            </span>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="quiz-questions.php?quiz_id=${quiz.id}">
+                                        <i class="fas fa-list-check me-2"></i>Questions
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="editQuiz(${quiz.id}); return false;">
+                                        <i class="fas fa-edit me-2"></i>Edit
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteQuiz(${quiz.id}, '${quiz.title}'); return false;">
+                                        <i class="fas fa-trash me-2"></i>Delete
+                                    </a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <h5 class="card-title">${quiz.title}</h5>
+                        <p class="text-muted small mb-2">${quiz.course_title}</p>
+                        <div class="quiz-meta">
+                            <span><i class="fas fa-stopwatch me-1"></i>${quiz.time_limit_minutes} min</span>
+                            <span><i class="fas fa-bullseye me-1"></i>${quiz.passing_score}%</span>
+                            <span><i class="fas fa-repeat me-1"></i>${quiz.max_attempts}</span>
+                        </div>
+                        <hr>
+                        <div class="row text-center small">
+                            <div class="col-4">
+                                <div class="fw-bold">${stats ? stats.total_attempts : 0}</div>
+                                <div class="text-muted">Attempts</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="fw-bold">${stats ? stats.average_score : 0}%</div>
+                                <div class="text-muted">Avg Score</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="fw-bold">${stats ? stats.pass_rate : 0}%</div>
+                                <div class="text-muted">Pass Rate</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <a href="quiz-questions.php?quiz_id=${quiz.id}" class="btn btn-outline-primary btn-sm w-100">
+                            <i class="fas fa-list-check me-1"></i>Manage Questions
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.insertAdjacentHTML('beforeend', card);
+    }
+    
+    // Show messages from PHP sessions
+    <?php if (isset($_SESSION['error_message'])): ?>
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: '<?php echo htmlspecialchars($_SESSION['error_message']); ?>'
+        });
+        <?php unset($_SESSION['error_message']); ?>
+    <?php endif; ?>
+    
+    <?php if (isset($_SESSION['success_message'])): ?>
+        Swal.fire({
+            icon: 'success',
+            title: 'Success!',
+            text: '<?php echo htmlspecialchars($_SESSION['success_message']); ?>'
+        });
+        <?php unset($_SESSION['success_message']); ?>
+    <?php endif; ?>
+    </script>
 </body>
 </html>

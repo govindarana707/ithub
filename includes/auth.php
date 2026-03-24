@@ -41,7 +41,7 @@ function requireInstructor(): void
 {
     if (!isLoggedIn() || !in_array(getUserRole(), ['instructor', 'admin'], true)) {
         $_SESSION['error_message'] = 'Access denied. Instructor privileges required.';
-        redirect('dashboard.php');
+        redirect('login.php');
         exit;
     }
 }
@@ -51,7 +51,15 @@ function requireInstructor(): void
  */
 function requireStudent(): void
 {
-    if (!isLoggedIn() || !in_array(getUserRole(), ['student', 'admin'], true)) {
+    if (!isLoggedIn()) {
+        $_SESSION['error_message'] = 'Please login to access your courses.';
+        redirect('login.php');
+        exit;
+    }
+    
+    // Normalize role to lowercase for case-insensitive comparison
+    $role = strtolower(getUserRole() ?? '');
+    if (!in_array($role, ['student', 'admin'], true)) {
         $_SESSION['error_message'] = 'Access denied. Student privileges required.';
         redirect('dashboard.php');
         exit;
@@ -76,9 +84,9 @@ function getDashboardData(int $userId, string $role): array
         case 'admin':
 
             $queries = [
-                'total_users'       => "SELECT COUNT(*) total FROM users",
-                'total_courses'     => "SELECT COUNT(*) total FROM courses",
-                'total_enrollments' => "SELECT COUNT(*) total FROM enrollments",
+                'total_users'       => "SELECT COUNT(*) total FROM users_new",
+                'total_courses'     => "SELECT COUNT(*) total FROM courses_new",
+                'total_enrollments' => "SELECT COUNT(*) total FROM enrollments_new",
                 'total_attempts'    => "SELECT COUNT(*) total FROM quiz_attempts"
             ];
 
@@ -90,7 +98,7 @@ function getDashboardData(int $userId, string $role): array
             $result = $conn->query("
                 SELECT al.action, al.details, al.created_at, u.full_name
                 FROM admin_logs al
-                JOIN users u ON u.id = al.user_id
+                JOIN users_new u ON u.id = al.user_id
                 ORDER BY al.created_at DESC
                 LIMIT 10
             ");
@@ -106,7 +114,7 @@ function getDashboardData(int $userId, string $role): array
 
             $stmt = $conn->prepare("
                 SELECT COUNT(*) total
-                FROM courses
+                FROM courses_new
                 WHERE instructor_id = ?
             ");
             $stmt->bind_param('i', $userId);
@@ -116,8 +124,8 @@ function getDashboardData(int $userId, string $role): array
 
             $stmt = $conn->prepare("
                 SELECT COUNT(DISTINCT e.student_id) total
-                FROM enrollments e
-                JOIN courses c ON c.id = e.course_id
+                FROM enrollments_new e
+                JOIN courses_new c ON c.id = e.course_id
                 WHERE c.instructor_id = ?
             ");
             $stmt->bind_param('i', $userId);
@@ -127,8 +135,8 @@ function getDashboardData(int $userId, string $role): array
 
             $stmt = $conn->prepare("
                 SELECT c.id, c.title, c.status, COUNT(e.id) enrollment_count
-                FROM courses c
-                LEFT JOIN enrollments e ON e.course_id = c.id
+                FROM courses_new c
+                LEFT JOIN enrollments_new e ON e.course_id = c.id
                 WHERE c.instructor_id = ?
                 GROUP BY c.id
                 ORDER BY c.created_at DESC
@@ -146,7 +154,7 @@ function getDashboardData(int $userId, string $role): array
 
             $stmt = $conn->prepare("
                 SELECT COUNT(*) total
-                FROM enrollments
+                FROM enrollments_new
                 WHERE student_id = ?
             ");
             $stmt->bind_param('i', $userId);
@@ -179,8 +187,8 @@ function getDashboardData(int $userId, string $role): array
             $stmt = $conn->prepare("
                 SELECT c.id, c.title, c.description,
                        e.progress_percentage, e.enrolled_at
-                FROM enrollments e
-                JOIN courses c ON c.id = e.course_id
+                FROM enrollments_new e
+                JOIN courses_new c ON c.id = e.course_id
                 WHERE e.student_id = ?
                   AND e.status = 'active'
                 ORDER BY e.enrolled_at DESC

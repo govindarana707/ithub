@@ -205,7 +205,7 @@ $conn->close();
                                             <td><?php echo date('M j, Y', strtotime($course['created_at'])); ?></td>
                                             <td>
                                                 <div class="btn-group" role="group">
-                                                    <a href="../admin/course_builder.php?id=<?php echo $course['id']; ?>" class="btn btn-sm btn-outline-primary">
+                                                    <a href="course_builder.php?id=<?php echo $course['id']; ?>" class="btn btn-sm btn-outline-primary">
                                                         <i class="fas fa-edit"></i>
                                                     </a>
                                                     <a href="view-course-stats.php?id=<?php echo $course['id']; ?>" class="btn btn-sm btn-outline-info">

@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $redirectToBuilder = ($_POST['open_builder'] ?? '') === '1';
         if ($redirectToBuilder && !empty($result['course_id'])) {
-            header('Location: ../admin/course_builder.php?id=' . intval($result['course_id']));
+            header('Location: course_builder.php?id=' . intval($result['course_id']));
         } else {
             header('Location: courses.php');
         }

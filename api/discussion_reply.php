@@ -54,7 +54,7 @@ try {
                 $hasAccess = $result['enrolled'] > 0;
             } elseif ($userRole === 'instructor') {
                 // Check if instructor owns the course
-                $stmt = $conn->prepare("SELECT COUNT(*) as owns FROM courses WHERE id = ? AND instructor_id = ?");
+                $stmt = $conn->prepare("SELECT COUNT(*) as owns FROM courses_new WHERE id = ? AND instructor_id = ?");
                 $stmt->bind_param("ii", $discussionDetails['course_id'], $userId);
                 $stmt->execute();
                 $result = $stmt->get_result()->fetch_assoc();

@@ -18,25 +18,41 @@ class Discussion {
         }
         
         // Validate required data
-        if (!isset($data['course_id']) || !isset($data['student_id']) || !isset($data['title']) || !isset($data['content'])) {
+        if (!isset($data['course_id']) || !isset($data['student_id']) || !isset($data['content'])) {
             return ['success' => false, 'error' => 'Missing required fields'];
         }
         
-        // Use the actual table structure
-        $stmt = $conn->prepare("INSERT INTO discussions (course_id, student_id, title, content, lesson_id, pinned, locked) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        // For replies, title can be empty, but for main discussions it's required
+        $isReply = isset($data['parent_id']) && $data['parent_id'] > 0;
+        if (!$isReply && empty($data['title'])) {
+            return ['success' => false, 'error' => 'Title is required for main discussions'];
+        }
+        
+        // Use the actual table structure with parent_id support
+        $stmt = $conn->prepare("INSERT INTO discussions (course_id, student_id, title, content, lesson_id, parent_id, pinned, locked) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         
         if ($stmt === false) {
             return ['success' => false, 'error' => 'SQL prepare failed: ' . $conn->error];
         }
         
         $lessonId = $data['lesson_id'] ?? null;
+        $parentId = $data['parent_id'] ?? null;
+        $title = $data['title'] ?? '';
         $pinned = $data['pinned'] ?? 0;
         $locked = $data['locked'] ?? 0;
         
-        $stmt->bind_param("iissiii", $data['course_id'], $data['student_id'], $data['title'], $data['content'], $lessonId, $pinned, $locked);
+        $stmt->bind_param("iisssiii", $data['course_id'], $data['student_id'], $title, $data['content'], $lessonId, $parentId, $pinned, $locked);
         
         if ($stmt->execute()) {
-            return ['success' => true, 'discussion_id' => $conn->insert_id];
+            $discussionId = $conn->insert_id;
+            
+            // Update replies count for parent discussion if this is a reply
+            if ($isReply) {
+                $this->updateRepliesCount($parentId);
+                $this->updateLastReplyTime($parentId);
+            }
+            
+            return ['success' => true, 'discussion_id' => $discussionId];
         } else {
             return ['success' => false, 'error' => 'SQL execute failed: ' . $stmt->error];
         }
@@ -113,7 +129,7 @@ class Discussion {
             FROM discussions d
             JOIN users u ON d.student_id = u.id
             LEFT JOIN courses c ON d.course_id = c.id
-            WHERE d.course_id = ?
+            WHERE d.course_id = ? AND d.parent_id IS NULL
             ORDER BY d.pinned DESC, d.created_at DESC
             LIMIT ? OFFSET ?
         ";
@@ -136,9 +152,28 @@ class Discussion {
     }
     
     public function getReplies($parentId) {
-        // Current table structure doesn't support replies (no parent_id column)
-        // Return empty array to maintain compatibility
-        return [];
+        $conn = $this->db->getConnection();
+        
+        $stmt = $conn->prepare("
+            SELECT d.*, u.full_name, u.profile_image
+            FROM discussions d
+            JOIN users u ON d.student_id = u.id
+            WHERE d.parent_id = ?
+            ORDER BY d.created_at ASC
+        ");
+        
+        if ($stmt === false) {
+            error_log("SQL prepare failed in getReplies: " . $conn->error);
+            return [];
+        }
+        
+        $stmt->bind_param("i", $parentId);
+        if (!$stmt->execute()) {
+            error_log("SQL execute failed in getReplies: " . $stmt->error);
+            return [];
+        }
+        
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     }
     
     public function getStudentDiscussions($studentId, $page = 1, $limit = 20) {
@@ -253,17 +288,6 @@ class Discussion {
         $conn = $this->db->getConnection();
         $offset = ($page - 1) * $limit;
         
-        $stmt = $conn->prepare("
-            SELECT d.*, u.full_name, u.profile_image, c.title as course_title
-            FROM discussions d
-            JOIN users u ON d.student_id = u.id
-            JOIN courses c ON d.course_id = c.id
-            WHERE d.course_id = ? 
-            AND (d.title LIKE ? OR d.content LIKE ?)
-            ORDER BY d.created_at DESC
-            LIMIT ? OFFSET ?
-        ");
-        
         // Validate inputs
         $courseId = intval($courseId);
         $limit = intval($limit);
@@ -276,6 +300,19 @@ class Discussion {
         
         // Sanitize search query
         $searchTerm = "%" . $conn->real_escape_string($query) . "%";
+        
+        // Fixed SQL query with proper variable definition
+        $sql = "
+            SELECT d.*, u.full_name, u.profile_image, c.title as course_title
+            FROM discussions d
+            JOIN users u ON d.student_id = u.id
+            JOIN courses c ON d.course_id = c.id
+            WHERE d.course_id = ? 
+            AND (d.title LIKE ? OR d.content LIKE ?)
+            AND d.parent_id IS NULL
+            ORDER BY d.pinned DESC, d.created_at DESC
+            LIMIT ? OFFSET ?
+        ";
         
         $stmt = $conn->prepare($sql);
         if ($stmt === false) {
@@ -293,9 +330,74 @@ class Discussion {
     }
     
     public function getDiscussionReplies($discussionId) {
-        // Current table structure doesn't support replies (no parent_id column)
-        // Return empty array to maintain compatibility
-        return [];
+        return $this->getReplies($discussionId);
+    }
+    
+    /**
+     * Update replies count for a discussion
+     */
+    private function updateRepliesCount($discussionId) {
+        $conn = $this->db->getConnection();
+        
+        $stmt = $conn->prepare("
+            UPDATE discussions 
+            SET replies_count = (
+                SELECT COUNT(*) 
+                FROM discussions 
+                WHERE parent_id = ?
+            )
+            WHERE id = ?
+        ");
+        
+        if ($stmt === false) {
+            error_log("SQL prepare failed in updateRepliesCount: " . $conn->error);
+            return false;
+        }
+        
+        $stmt->bind_param("ii", $discussionId, $discussionId);
+        return $stmt->execute();
+    }
+    
+    /**
+     * Update last reply time for a discussion
+     */
+    private function updateLastReplyTime($discussionId) {
+        $conn = $this->db->getConnection();
+        
+        $stmt = $conn->prepare("
+            UPDATE discussions 
+            SET last_reply_at = NOW()
+            WHERE id = ?
+        ");
+        
+        if ($stmt === false) {
+            error_log("SQL prepare failed in updateLastReplyTime: " . $conn->error);
+            return false;
+        }
+        
+        $stmt->bind_param("i", $discussionId);
+        return $stmt->execute();
+    }
+    
+    /**
+     * Increment view count for a discussion
+     */
+    public function incrementViewCount($discussionId) {
+        $conn = $this->db->getConnection();
+        
+        $stmt = $conn->prepare("
+            UPDATE discussions 
+            SET views_count = views_count + 1
+            WHERE id = ?
+        ");
+        
+        if ($stmt === false) {
+            error_log("SQL prepare failed in incrementViewCount: " . $conn->error);
+            return false;
+        }
+        
+        $stmt->bind_param("i", $discussionId);
+        return $stmt->execute();
     }
     
     /**

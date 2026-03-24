@@ -365,16 +365,41 @@ $conn->close();
             const questionIndex = parseInt(element.closest('.question-container').dataset.questionIndex);
             document.querySelectorAll('.progress-dot')[questionIndex].classList.add('answered');
             
-            // Store answer
+            // Store answer in both the variable AND ensure it's in the form
             answers[questionId] = value;
+            
+            // Also set a hidden input directly so it's always submitted
+            let hiddenInput = document.querySelector('input[name="answers[' + questionId + ']"]');
+            if (!hiddenInput) {
+                hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'answers[' + questionId + ']';
+                document.getElementById('quizForm').appendChild(hiddenInput);
+            }
+            hiddenInput.value = value;
         }
         
         // Handle textarea changes
         document.querySelectorAll('textarea').forEach(textarea => {
             textarea.addEventListener('input', function() {
-                const questionId = this.name.match(/\d+/)[0];
+                const match = this.name.match(/answers\[(\d+)\]/);
+                if (!match) return;
+                
+                const questionId = match[1];
+                
                 if (this.value.trim()) {
                     answers[questionId] = this.value.trim();
+                    
+                    // Create or update hidden input immediately
+                    let hiddenInput = document.querySelector('input[name="answers[' + questionId + ']"]');
+                    if (!hiddenInput) {
+                        hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = 'answers[' + questionId + ']';
+                        document.getElementById('quizForm').appendChild(hiddenInput);
+                    }
+                    hiddenInput.value = this.value.trim();
+                    
                     const questionIndex = parseInt(this.closest('.question-container').dataset.questionIndex);
                     document.querySelectorAll('.progress-dot')[questionIndex].classList.add('answered');
                 }
@@ -389,36 +414,59 @@ $conn->close();
                 return;
             }
             
-            // Ensure all radio button answers are included in form data
-            const formData = new FormData(this);
+            // Clear any existing hidden inputs first
+            document.querySelectorAll('#quizForm input[type="hidden"][name^="answers["]').forEach(input => input.remove());
+            
+            // Create a comprehensive answer object
             const answers = {};
             
-            // Collect all radio button answers
+            // Collect all radio button answers (multiple choice & true/false)
             document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
                 const name = radio.name;
-                const value = radio.value;
-                const questionId = name.match(/\d+/)[0];
-                answers[questionId] = value;
-            });
-            
-            // Collect all textarea answers
-            document.querySelectorAll('textarea').forEach(textarea => {
-                const name = textarea.name;
-                const value = textarea.value.trim();
-                if (value) {
-                    const questionId = name.match(/\d+/)[0];
+                // Extract question ID from name like "answers[15]"
+                const match = name.match(/answers\[(\d+)\]/);
+                if (match) {
+                    const questionId = match[1];
+                    const value = radio.value;
                     answers[questionId] = value;
+                    
+                    // Create hidden input
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'answers[' + questionId + ']';
+                    input.value = value;
+                    this.appendChild(input);
                 }
             });
             
-            // Create hidden inputs for all answers to ensure they're submitted
-            Object.keys(answers).forEach(questionId => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'answers[' + questionId + ']';
-                input.value = answers[questionId];
-                this.appendChild(input);
+            // Collect all textarea answers (short answer)
+            document.querySelectorAll('textarea[name^="answers["]').forEach(textarea => {
+                const name = textarea.name;
+                const value = textarea.value.trim();
+                // Extract question ID from name like "answers[15]"
+                const match = name.match(/answers\[(\d+)\]/);
+                if (match && value) {
+                    const questionId = match[1];
+                    answers[questionId] = value;
+                    
+                    // Create hidden input
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'answers[' + questionId + ']';
+                    input.value = value;
+                    this.appendChild(input);
+                }
             });
+            
+            // Debug: Log collected answers
+            console.log('Collected answers:', answers);
+            console.log('Total answers collected:', Object.keys(answers).length);
+            
+            // Show warning if not all questions answered
+            const totalQuestions = <?php echo count($questions); ?>;
+            if (Object.keys(answers).length < totalQuestions) {
+                alert('Warning: You have only answered ' + Object.keys(answers).length + ' out of ' + totalQuestions + ' questions. Unanswered questions will be marked as incorrect.');
+            }
             
             clearInterval(timerInterval);
             this.submit();

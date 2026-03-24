@@ -16,7 +16,7 @@ $conn = $db->getConnection();
 $logs = $conn->query("
     SELECT al.*, u.full_name, u.email
     FROM admin_logs al
-    JOIN users u ON al.user_id = u.id
+    JOIN users_new u ON al.user_id = u.id
     ORDER BY al.created_at DESC
     LIMIT 10000
 ")->fetch_all(MYSQLI_ASSOC);

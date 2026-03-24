@@ -60,9 +60,9 @@ if ($action === 'create') {
         sendJSON(['success' => false, 'message' => 'Missing required fields']);
     }
 
-    // Check instructor permissions
+    // Check instructor permissions - use courses_new table
     if (getUserRole() === 'instructor') {
-        $stmt = $conn->prepare("SELECT instructor_id FROM courses WHERE id = ?");
+        $stmt = $conn->prepare("SELECT instructor_id FROM courses_new WHERE id = ?");
         $stmt->bind_param('i', $courseId);
         $stmt->execute();
         $course = $stmt->get_result()->fetch_assoc();
@@ -143,6 +143,21 @@ if ($action === 'update') {
         sendJSON(['success' => false, 'message' => 'Invalid lesson_id']);
     }
 
+    // Get lesson and verify ownership
+    $stmt = $conn->prepare("SELECT l.course_id, c.instructor_id FROM lessons l JOIN courses_new c ON l.course_id = c.id WHERE l.id = ?");
+    $stmt->bind_param('i', $lessonId);
+    $stmt->execute();
+    $lesson = $stmt->get_result()->fetch_assoc();
+    
+    if (!$lesson) {
+        sendJSON(['success' => false, 'message' => 'Lesson not found']);
+    }
+    
+    // Check access
+    if (getUserRole() === 'instructor' && $lesson['instructor_id'] != $_SESSION['user_id']) {
+        sendJSON(['success' => false, 'message' => 'Access denied']);
+    }
+
     $title = trim((string)($payload['title'] ?? ''));
     $lessonType = (string)($payload['lesson_type'] ?? 'text');
     $durationMinutes = (int)($payload['duration_minutes'] ?? 0);
@@ -170,6 +185,21 @@ if ($action === 'delete') {
         sendJSON(['success' => false, 'message' => 'Invalid lesson_id']);
     }
 
+    // Get lesson and verify ownership
+    $stmt = $conn->prepare("SELECT l.course_id, c.instructor_id FROM lessons l JOIN courses_new c ON l.course_id = c.id WHERE l.id = ?");
+    $stmt->bind_param('i', $lessonId);
+    $stmt->execute();
+    $lesson = $stmt->get_result()->fetch_assoc();
+    
+    if (!$lesson) {
+        sendJSON(['success' => false, 'message' => 'Lesson not found']);
+    }
+    
+    // Check access
+    if (getUserRole() === 'instructor' && $lesson['instructor_id'] != $_SESSION['user_id']) {
+        sendJSON(['success' => false, 'message' => 'Access denied']);
+    }
+
     $stmt = $conn->prepare("DELETE FROM lessons WHERE id = ?");
     $stmt->bind_param('i', $lessonId);
     if (!$stmt->execute()) {
@@ -185,6 +215,18 @@ if ($action === 'reorder') {
 
     if ($courseId <= 0 || !is_array($order)) {
         sendJSON(['success' => false, 'message' => 'Invalid payload']);
+    }
+
+    // Check instructor permissions
+    if (getUserRole() === 'instructor') {
+        $stmt = $conn->prepare("SELECT instructor_id FROM courses_new WHERE id = ?");
+        $stmt->bind_param('i', $courseId);
+        $stmt->execute();
+        $course = $stmt->get_result()->fetch_assoc();
+        
+        if (!$course || $course['instructor_id'] != $_SESSION['user_id']) {
+            sendJSON(['success' => false, 'message' => 'Access denied']);
+        }
     }
 
     $stmt = $conn->prepare("UPDATE lessons SET lesson_order = ?, updated_at = NOW() WHERE id = ? AND course_id = ?");

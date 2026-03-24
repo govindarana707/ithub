@@ -1,0 +1,174 @@
+/* eSewa Payment Integration Styles */
+
+.payment-option {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.payment-option:hover {
+    transform: translateY(-2px);
+}
+
+.payment-option.selected {
+    border: 2px solid #00A651;
+    box-shadow: 0 0 0 0.2rem rgba(0, 166, 81, 0.25);
+}
+
+.payment-option[data-method="esewa"].selected {
+    border-color: #00A651;
+    box-shadow: 0 0 0 0.2rem rgba(0, 166, 81, 0.25);
+}
+
+.payment-option[data-method="khalti"].selected {
+    border-color: #4A2B8C;
+    box-shadow: 0 0 0 0.2rem rgba(74, 43, 140, 0.25);
+}
+
+.payment-option[data-method="trial"].selected {
+    border-color: #FF6B6B;
+    box-shadow: 0 0 0 0.2rem rgba(255, 107, 107, 0.25);
+}
+
+.payment-icon {
+    flex-shrink: 0;
+}
+
+.payment-icon img {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.esewa-loading {
+    position: relative;
+    overflow: hidden;
+}
+
+.esewa-loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: esewa-loading 1.5s infinite;
+}
+
+@keyframes esewa-loading {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+.course-summary {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 12px;
+    padding: 20px;
+    border-left: 4px solid #00A651;
+}
+
+.price-tag {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #00A651;
+}
+
+.payment-methods h6 {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.selected-payment {
+    background: #e8f5e8;
+    border: 1px solid #00A651;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.payment-success-animation {
+    animation: payment-success 0.6s ease-out;
+}
+
+@keyframes payment-success {
+    0% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .payment-option .card-body {
+        padding: 15px;
+    }
+    
+    .payment-icon {
+        margin-right: 15px !important;
+    }
+    
+    .course-summary {
+        padding: 15px;
+    }
+    
+    .price-tag {
+        font-size: 1.25rem;
+    }
+}
+
+/* eSewa brand colors */
+.esewa-primary { color: #00A651; }
+.esewa-secondary { color: #00D084; }
+.esewa-bg-primary { background-color: #00A651; }
+.esewa-bg-secondary { background-color: #00D084; }
+
+/* Payment status indicators */
+.payment-status-pending {
+    background-color: #fff3cd;
+    border-color: #ffc107;
+    color: #856404;
+}
+
+.payment-status-completed {
+    background-color: #d4edda;
+    border-color: #28a745;
+    color: #155724;
+}
+
+.payment-status-failed {
+    background-color: #f8d7da;
+    border-color: #dc3545;
+    color: #721c24;
+}
+
+/* Loading spinner for payment processing */
+.payment-processing {
+    position: relative;
+    pointer-events: none;
+}
+
+.payment-processing::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #00A651;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 10;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

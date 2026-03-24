@@ -36,6 +36,15 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="assets/js/main.js"></script>
+    <?php 
+    // Get the relative path based on script location
+    $scriptPath = $_SERVER['SCRIPT_NAME'];
+    if (strpos($scriptPath, '/student/') !== false || strpos($scriptPath, '/instructor/') !== false || strpos($scriptPath, '/admin/') !== false) {
+        $jsPath = '../assets/js/main.js';
+    } else {
+        $jsPath = 'assets/js/main.js';
+    }
+    ?>
+    <script src="<?php echo $jsPath; ?>"></script>
 </body>
 </html>

@@ -88,9 +88,6 @@ $profile = $instructor->getInstructorProfile($instructorId);
                 <a class="nav-link" href="students.php">
                     <i class="fas fa-users me-1"></i> Students
                 </a>
-                <a class="nav-link" href="analytics.php">
-                    <i class="fas fa-chart-line me-1"></i> Analytics
-                </a>
                 <a class="nav-link" href="earnings.php">
                     <i class="fas fa-dollar-sign me-1"></i> Earnings
                 </a>
@@ -113,9 +110,6 @@ $profile = $instructor->getInstructorProfile($instructorId);
                     </a>
                     <a href="students.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-users me-2"></i> Students
-                    </a>
-                    <a href="analytics.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-line me-2"></i> Analytics
                     </a>
                     <a href="earnings.php" class="list-group-item list-group-item-action active">
                         <i class="fas fa-rupee-sign me-2"></i> Earnings
@@ -235,7 +229,7 @@ $profile = $instructor->getInstructorProfile($instructorId);
                                                     <a href="course-stats.php?id=<?php echo $course['id']; ?>" class="btn btn-sm btn-outline-primary" title="View Stats">
                                                         <i class="fas fa-chart-bar"></i>
                                                     </a>
-                                                    <a href="../admin/course_builder.php?id=<?php echo $course['id']; ?>" class="btn btn-sm btn-outline-success" title="Edit Course">
+                                                    <a href="course_builder.php?id=<?php echo $course['id']; ?>" class="btn btn-sm btn-outline-success" title="Edit Course">
                                                         <i class="fas fa-edit"></i>
                                                     </a>
                                                 </div>

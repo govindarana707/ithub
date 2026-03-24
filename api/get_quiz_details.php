@@ -32,7 +32,7 @@ $stmt = $conn->prepare("
     SELECT qa.*, q.title as quiz_title, c.title as course_title, q.passing_score
     FROM quiz_attempts qa
     JOIN quizzes q ON qa.quiz_id = q.id
-    JOIN courses c ON q.course_id = c.id
+    JOIN courses_new c ON q.course_id = c.id
     WHERE qa.id = ?
 ");
 $stmt->bind_param("i", $attemptId);

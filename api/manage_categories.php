@@ -23,7 +23,7 @@ switch ($action) {
         $description = sanitize($_POST['description'] ?? '');
         
         $conn = connectDB();
-        $stmt = $conn->prepare("INSERT INTO categories (name, description, created_at) VALUES (?, ?, NOW())");
+        $stmt = $conn->prepare("INSERT INTO categories_new (name, description, created_at) VALUES (?, ?, NOW())");
         $stmt->bind_param("ss", $name, $description);
         
         if ($stmt->execute()) {
@@ -43,7 +43,7 @@ switch ($action) {
         $description = sanitize($_POST['description'] ?? '');
         
         $conn = connectDB();
-        $stmt = $conn->prepare("UPDATE categories SET name = ?, description = ? WHERE id = ?");
+        $stmt = $conn->prepare("UPDATE categories_new SET name = ?, description = ? WHERE id = ?");
         $stmt->bind_param("ssi", $name, $description, $categoryId);
         
         if ($stmt->execute()) {
@@ -61,7 +61,7 @@ switch ($action) {
         
         $conn = connectDB();
         // Check if category is being used
-        $stmt = $conn->prepare("SELECT COUNT(*) as course_count FROM courses WHERE category_id = ?");
+        $stmt = $conn->prepare("SELECT COUNT(*) as course_count FROM courses_new WHERE category_id = ?");
         $stmt->bind_param("i", $categoryId);
         $stmt->execute();
         $courseCount = $stmt->get_result()->fetch_assoc()['course_count'];
@@ -71,7 +71,7 @@ switch ($action) {
             sendJSON(['success' => false, 'message' => 'Cannot delete category with associated courses']);
         }
         
-        $stmt = $conn->prepare("DELETE FROM categories WHERE id = ?");
+        $stmt = $conn->prepare("DELETE FROM categories_new WHERE id = ?");
         $stmt->bind_param("i", $categoryId);
         
         if ($stmt->execute()) {

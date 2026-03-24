@@ -5,6 +5,14 @@ define('DB_PASS', '');
 define('DB_NAME', 'it_hub_new');
 define('DB_PORT', 3307);
 
+// Table name constants for maintainability
+define('USERS_TABLE', 'users_new');
+define('COURSES_TABLE', 'courses_new');
+define('CATEGORIES_TABLE', 'categories_new');
+define('ENROLLMENTS_TABLE', 'enrollments_new');
+define('LESSONS_TABLE', 'lessons');
+define('PAYMENTS_TABLE', 'payments');
+
 define('BASE_URL', 'http://localhost/store/');
 define('ROOT_PATH', $_SERVER['DOCUMENT_ROOT'] . '/store/');
 

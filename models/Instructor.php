@@ -27,15 +27,15 @@ class Instructor {
         
         if ($profile) {
             // Get course statistics
-            $stmt = $conn->prepare("SELECT COUNT(*) as total FROM courses WHERE instructor_id = ?");
+            $stmt = $conn->prepare("SELECT COUNT(*) as total FROM courses_new WHERE instructor_id = ?");
             $stmt->bind_param("i", $instructorId);
             $stmt->execute();
             $profile['total_courses'] = $stmt->get_result()->fetch_assoc()['total'];
             
             $stmt = $conn->prepare("
-                SELECT COUNT(DISTINCT e.student_id) as total 
-                FROM enrollments e 
-                JOIN courses c ON e.course_id = c.id 
+                SELECT COUNT(DISTINCT e.user_id) as total 
+                FROM enrollments_new e 
+                JOIN courses_new c ON e.course_id = c.id 
                 WHERE c.instructor_id = ?
             ");
             $stmt->bind_param("i", $instructorId);
@@ -44,8 +44,8 @@ class Instructor {
             
             $stmt = $conn->prepare("
                 SELECT AVG(e.progress_percentage) as avg_progress 
-                FROM enrollments e 
-                JOIN courses c ON e.course_id = c.id 
+                FROM enrollments_new e 
+                JOIN courses_new c ON e.course_id = c.id 
                 WHERE c.instructor_id = ?
             ");
             $stmt->bind_param("i", $instructorId);
@@ -56,8 +56,8 @@ class Instructor {
             // Calculate total revenue
             $stmt = $conn->prepare("
                 SELECT SUM(c.price) as total_revenue 
-                FROM enrollments e 
-                JOIN courses c ON e.course_id = c.id 
+                FROM enrollments_new e 
+                JOIN courses_new c ON e.course_id = c.id 
                 WHERE c.instructor_id = ?
             ");
             $stmt->bind_param("i", $instructorId);
@@ -142,8 +142,8 @@ class Instructor {
         // Build basic query
         $sql = "
             SELECT c.*, cat.name as category_name
-            FROM courses c
-            LEFT JOIN categories cat ON c.category_id = cat.id
+            FROM courses_new c
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
             WHERE c.instructor_id = ?
         ";
         
@@ -170,7 +170,7 @@ class Instructor {
         // Add statistics for each course
         foreach ($courses as &$course) {
             // Get enrollment count
-            $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE course_id = ?");
+            $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments_new WHERE course_id = ?");
             if ($stmt) {
                 $stmt->bind_param("i", $course['id']);
                 $stmt->execute();
@@ -180,7 +180,7 @@ class Instructor {
             }
             
             // Get average progress
-            $stmt = $conn->prepare("SELECT AVG(progress_percentage) as avg FROM enrollments WHERE course_id = ?");
+            $stmt = $conn->prepare("SELECT AVG(progress_percentage) as avg FROM enrollments_new WHERE course_id = ?");
             if ($stmt) {
                 $stmt->bind_param("i", $course['id']);
                 $stmt->execute();
@@ -191,7 +191,7 @@ class Instructor {
             }
             
             // Get completed count
-            $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE course_id = ? AND progress_percentage = 100");
+            $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments_new WHERE course_id = ? AND progress_percentage = 100");
             if ($stmt) {
                 $stmt->bind_param("i", $course['id']);
                 $stmt->execute();
@@ -243,8 +243,8 @@ class Instructor {
                    MAX(e.enrolled_at) as last_enrollment,
                    SUM(CASE WHEN e.progress_percentage = 100 THEN 1 ELSE 0 END) as completed_courses
             FROM users u
-            JOIN enrollments e ON u.id = e.student_id
-            JOIN courses c ON e.course_id = c.id
+            JOIN enrollments_new e ON u.id = e.user_id
+            JOIN courses_new c ON e.course_id = c.id
             WHERE c.instructor_id = ? AND u.role = 'student'
         ";
         
@@ -285,13 +285,13 @@ class Instructor {
             SELECT 
                 COUNT(DISTINCT c.id) as total_courses,
                 COUNT(DISTINCT CASE WHEN c.status = 'published' THEN c.id END) as published_courses,
-                COUNT(DISTINCT e.student_id) as total_students,
+                COUNT(DISTINCT e.user_id) as total_students,
                 COUNT(DISTINCT e.id) as total_enrollments,
                 AVG(e.progress_percentage) as avg_progress,
                 SUM(c.price) as potential_revenue,
-                COUNT(DISTINCT CASE WHEN e.progress_percentage = 100 THEN e.student_id END) as completed_students
-            FROM courses c
-            LEFT JOIN enrollments e ON c.id = e.course_id
+                COUNT(DISTINCT CASE WHEN e.progress_percentage = 100 THEN e.user_id END) as completed_students
+            FROM courses_new c
+            LEFT JOIN enrollments_new e ON c.id = e.course_id
             WHERE c.instructor_id = ?
         ");
         
@@ -315,8 +315,8 @@ class Instructor {
         // Recent enrollments
         $stmt = $conn->prepare("
             SELECT COUNT(*) as enrollments, DATE(e.enrolled_at) as date
-            FROM enrollments e
-            JOIN courses c ON e.course_id = c.id
+            FROM enrollments_new e
+            JOIN courses_new c ON e.course_id = c.id
             WHERE c.instructor_id = ? AND $dateCondition
             GROUP BY DATE(e.enrolled_at)
             ORDER BY date DESC
@@ -337,10 +337,10 @@ class Instructor {
             SELECT c.id, c.title, c.status,
                    COUNT(e.id) as enrollments,
                    AVG(e.progress_percentage) as avg_progress,
-                   COUNT(DISTINCT CASE WHEN e.progress_percentage = 100 THEN e.student_id END) as completions,
+                   COUNT(DISTINCT CASE WHEN e.progress_percentage = 100 THEN e.user_id END) as completions,
                    (SELECT AVG(rating) FROM course_reviews WHERE course_id = c.id) as avg_rating
-            FROM courses c
-            LEFT JOIN enrollments e ON c.id = e.course_id
+            FROM courses_new c
+            LEFT JOIN enrollments_new e ON c.id = e.course_id
             WHERE c.instructor_id = ?
             GROUP BY c.id
             ORDER BY enrollments DESC
@@ -353,10 +353,10 @@ class Instructor {
                 SELECT c.id, c.title, c.status,
                        COUNT(e.id) as enrollments,
                        AVG(e.progress_percentage) as avg_progress,
-                       COUNT(DISTINCT CASE WHEN e.progress_percentage = 100 THEN e.student_id END) as completions,
+                       COUNT(DISTINCT CASE WHEN e.progress_percentage = 100 THEN e.user_id END) as completions,
                        0 as avg_rating
-                FROM courses c
-                LEFT JOIN enrollments e ON c.id = e.course_id
+                FROM courses_new c
+                LEFT JOIN enrollments_new e ON c.id = e.course_id
                 WHERE c.instructor_id = ?
                 GROUP BY c.id
                 ORDER BY enrollments DESC
@@ -371,12 +371,12 @@ class Instructor {
         // Student engagement
         $stmt = $conn->prepare("
             SELECT 
-                COUNT(DISTINCT CASE WHEN e.progress_percentage > 0 THEN e.student_id END) as active_students,
-                COUNT(DISTINCT CASE WHEN e.progress_percentage = 100 THEN e.student_id END) as completed_students,
-                COUNT(DISTINCT CASE WHEN e.progress_percentage > 0 AND e.progress_percentage < 100 THEN e.student_id END) as in_progress_students,
-                COUNT(DISTINCT CASE WHEN e.progress_percentage = 0 THEN e.student_id END) as not_started_students
-            FROM enrollments e
-            JOIN courses c ON e.course_id = c.id
+                COUNT(DISTINCT CASE WHEN e.progress_percentage > 0 THEN e.user_id END) as active_students,
+                COUNT(DISTINCT CASE WHEN e.progress_percentage = 100 THEN e.user_id END) as completed_students,
+                COUNT(DISTINCT CASE WHEN e.progress_percentage > 0 AND e.progress_percentage < 100 THEN e.user_id END) as in_progress_students,
+                COUNT(DISTINCT CASE WHEN e.progress_percentage = 0 THEN e.user_id END) as not_started_students
+            FROM enrollments_new e
+            JOIN courses_new c ON e.course_id = c.id
             WHERE c.instructor_id = ?
         ");
         
@@ -404,7 +404,7 @@ class Instructor {
         $conn = $this->db->getConnection();
         
         // Validate instructor exists and is active
-        $stmt = $conn->prepare("SELECT id FROM users WHERE id = ? AND role = 'instructor' AND status = 'active'");
+        $stmt = $conn->prepare("SELECT id FROM users_new WHERE id = ? AND role = 'instructor' AND status = 'active'");
         $stmt->bind_param("i", $instructorId);
         $stmt->execute();
         
@@ -418,7 +418,7 @@ class Instructor {
         
         // Insert course
         $stmt = $conn->prepare("
-            INSERT INTO courses (title, description, category_id, instructor_id, price, 
+            INSERT INTO courses_new (title, description, category_id, instructor_id, price, 
                                duration_hours, difficulty_level, status, thumbnail, created_at, updated_at) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ");
@@ -454,7 +454,7 @@ class Instructor {
         $conn = $this->db->getConnection();
         
         // Verify ownership
-        $stmt = $conn->prepare("SELECT id FROM courses WHERE id = ? AND instructor_id = ?");
+        $stmt = $conn->prepare("SELECT id FROM courses_new WHERE id = ? AND instructor_id = ?");
         $stmt->bind_param("ii", $courseId, $instructorId);
         $stmt->execute();
         
@@ -463,7 +463,7 @@ class Instructor {
         }
         
         // Build update query
-        $sql = "UPDATE courses SET ";
+        $sql = "UPDATE courses_new SET ";
         $params = [];
         $types = "";
         
@@ -504,8 +504,8 @@ class Instructor {
         // Verify ownership and check enrollments
         $stmt = $conn->prepare("
             SELECT c.title, COUNT(e.id) as enrollment_count 
-            FROM courses c 
-            LEFT JOIN enrollments e ON c.id = e.course_id 
+            FROM courses_new c 
+            LEFT JOIN enrollments_new e ON c.id = e.course_id 
             WHERE c.id = ? AND c.instructor_id = ?
             GROUP BY c.id
         ");
@@ -523,7 +523,7 @@ class Instructor {
         }
         
         // Delete course
-        $stmt = $conn->prepare("DELETE FROM courses WHERE id = ? AND instructor_id = ?");
+        $stmt = $conn->prepare("DELETE FROM courses_new WHERE id = ? AND instructor_id = ?");
         $stmt->bind_param("ii", $courseId, $instructorId);
         
         if ($stmt->execute()) {
@@ -550,8 +550,8 @@ class Instructor {
                 SUM(c.price) as total_revenue,
                 COUNT(e.id) as total_enrollments,
                 AVG(c.price) as avg_course_price
-            FROM enrollments e
-            JOIN courses c ON e.course_id = c.id
+            FROM enrollments_new e
+            JOIN courses_new c ON e.course_id = c.id
             WHERE c.instructor_id = ? AND $dateCondition
         ");
         $stmt->bind_param("i", $instructorId);
@@ -564,8 +564,8 @@ class Instructor {
                 c.id, c.title, c.price,
                 COUNT(e.id) as enrollments,
                 SUM(c.price) as revenue
-            FROM courses c
-            LEFT JOIN enrollments e ON c.id = e.course_id
+            FROM courses_new c
+            LEFT JOIN enrollments_new e ON c.id = e.course_id
             WHERE c.instructor_id = ? AND $dateCondition
             GROUP BY c.id
             ORDER BY revenue DESC
@@ -581,8 +581,8 @@ class Instructor {
                 DATE_FORMAT(e.enrolled_at, '%Y-%m') as month,
                 SUM(c.price) as monthly_revenue,
                 COUNT(e.id) as monthly_enrollments
-            FROM enrollments e
-            JOIN courses c ON e.course_id = c.id
+            FROM enrollments_new e
+            JOIN courses_new c ON e.course_id = c.id
             WHERE c.instructor_id = ? AND $dateCondition
             GROUP BY DATE_FORMAT(e.enrolled_at, '%Y-%m')
             ORDER BY month DESC
@@ -790,11 +790,11 @@ class Instructor {
             SELECT u.id, u.username, u.email, u.full_name, u.bio, u.profile_image, 
                    u.phone, u.status, u.created_at,
                    COUNT(DISTINCT c.id) as course_count,
-                   COUNT(DISTINCT e.student_id) as student_count,
+                   COUNT(DISTINCT e.user_id) as student_count,
                    AVG(e.progress_percentage) as avg_progress
             FROM users u
-            LEFT JOIN courses c ON u.id = c.instructor_id
-            LEFT JOIN enrollments e ON c.id = e.course_id
+            LEFT JOIN courses_new c ON u.id = c.instructor_id
+            LEFT JOIN enrollments_new e ON c.id = e.course_id
             WHERE u.role = 'instructor'
         ";
         
@@ -837,7 +837,7 @@ class Instructor {
         $stmt = $conn->prepare("
             SELECT ial.*, c.title as course_title
             FROM instructor_activity_log ial
-            LEFT JOIN courses c ON ial.course_id = c.id
+            LEFT JOIN courses_new c ON ial.course_id = c.id
             WHERE ial.instructor_id = ?
             ORDER BY ial.created_at DESC
             LIMIT ? OFFSET ?

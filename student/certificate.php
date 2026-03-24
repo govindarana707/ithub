@@ -21,6 +21,43 @@ if ($courseId <= 0) {
     redirect('my-courses.php');
 }
 
+// Ensure certificates table exists (with all required columns)
+$conn = connectDB();
+$conn->query("CREATE TABLE IF NOT EXISTS certificates (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    course_id INT NOT NULL,
+    certificate_code VARCHAR(100) UNIQUE NOT NULL,
+    issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('active', 'revoked', 'expired') DEFAULT 'active',
+    pdf_path VARCHAR(500) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_student_id (student_id),
+    INDEX idx_course_id (course_id),
+    INDEX idx_certificate_code (certificate_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+// Add certificate_code column if missing (for existing tables)
+$conn->query("ALTER TABLE certificates ADD COLUMN IF NOT EXISTS certificate_code VARCHAR(100) UNIQUE AFTER course_id");
+$conn->query("ALTER TABLE certificates ADD COLUMN IF NOT EXISTS issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP AFTER certificate_code");
+$conn->query("ALTER TABLE certificates ADD COLUMN IF NOT EXISTS status ENUM('active', 'revoked', 'expired') DEFAULT 'active' AFTER issued_at");
+
+// Ensure notifications table exists
+$conn->query("CREATE TABLE IF NOT EXISTS notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT,
+    notification_type ENUM('info', 'success', 'warning', 'error') DEFAULT 'info',
+    is_read TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id),
+    INDEX idx_is_read (is_read)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+$conn->close();
+
 // Check if student is enrolled and has completed the course
 $enrollment = $course->getEnrollment($userId, $courseId);
 if (!$enrollment || $enrollment['progress_percentage'] < 100) {
@@ -37,16 +74,30 @@ if (!$courseData) {
 
 // Check if certificate already exists
 $conn = connectDB();
+$certificateId = null; // Initialize variable
 $stmt = $conn->prepare("SELECT id, certificate_code, issued_at FROM certificates WHERE student_id = ? AND course_id = ?");
-$stmt->bind_param("ii", $userId, $courseId);
-$stmt->execute();
-$existingCertificate = $stmt->get_result()->fetch_assoc();
+if ($stmt === false) {
+    error_log("Certificate check prepare failed: " . $conn->error);
+    $existingCertificate = null;
+} else {
+    $stmt->bind_param("ii", $userId, $courseId);
+    $stmt->execute();
+    $existingCertificate = $stmt->get_result()->fetch_assoc();
+    if ($existingCertificate) {
+        $certificateId = $existingCertificate['id'];
+    }
+}
 
 // Generate certificate if it doesn't exist
 if (!$existingCertificate) {
     $certificateCode = 'ITHUB-' . strtoupper(uniqid()) . '-' . date('Y');
     
     $stmt = $conn->prepare("INSERT INTO certificates (student_id, course_id, certificate_code, issued_at) VALUES (?, ?, ?, NOW())");
+    if ($stmt === false) {
+        error_log("Certificate insert prepare failed: " . $conn->error);
+        $_SESSION['error_message'] = 'Failed to generate certificate. Database error: ' . $conn->error;
+        redirect('my-courses.php');
+    }
     $stmt->bind_param("iis", $userId, $courseId, $certificateCode);
     
     if ($stmt->execute()) {
@@ -57,10 +108,12 @@ if (!$existingCertificate) {
         
         // Create notification
         $stmt = $conn->prepare("INSERT INTO notifications (user_id, title, message, notification_type) VALUES (?, ?, ?, 'success')");
-        $title = "🎉 Certificate Earned!";
-        $message = "Congratulations! You've earned a certificate for completing '{$courseData['title']}'.";
-        $stmt->bind_param("iss", $userId, $title, $message);
-        $stmt->execute();
+        if ($stmt !== false) {
+            $title = "🎉 Certificate Earned!";
+            $message = "Congratulations! You've earned a certificate for completing '{$courseData['title']}'.";
+            $stmt->bind_param("iss", $userId, $title, $message);
+            $stmt->execute();
+        }
         
         $existingCertificate = [
             'id' => $certificateId,
@@ -301,7 +354,14 @@ $conn->close();
                     </div>
                     
                     <div class="certificate-date">
-                        <strong>Issued on:</strong> <?php echo date('F j, Y', strtotime($existingCertificate['issued_at'])); ?>
+                        <strong>Issued on:</strong> 
+                        <?php 
+                        if (!empty($existingCertificate['issued_at'])) {
+                            echo date('F j, Y', strtotime($existingCertificate['issued_at']));
+                        } else {
+                            echo date('F j, Y');
+                        }
+                        ?>
                     </div>
                     
                     <div class="certificate-seal">
@@ -310,7 +370,7 @@ $conn->close();
                     
                     <div class="text-center mt-3">
                         <small class="text-muted">
-                            Certificate Code: <?php echo htmlspecialchars($existingCertificate['certificate_code']); ?>
+                            Certificate Code: <?php echo htmlspecialchars($existingCertificate['certificate_code'] ?? $certificateId ?? 'N/A'); ?>
                         </small>
                     </div>
                 </div>
@@ -326,7 +386,7 @@ $conn->close();
                 <div class="row">
                     <div class="col-md-6">
                         <div class="input-group">
-                            <input type="text" class="form-control" value="<?php echo htmlspecialchars($existingCertificate['certificate_code']); ?>" readonly>
+                            <input type="text" class="form-control" value="<?php echo htmlspecialchars($existingCertificate['certificate_code'] ?? $certificateId); ?>" readonly>
                             <button class="btn btn-outline-primary" onclick="copyCertificateCode()">
                                 <i class="fas fa-copy me-1"></i>Copy
                             </button>
@@ -334,7 +394,7 @@ $conn->close();
                     </div>
                     <div class="col-md-6">
                         <div class="input-group">
-                            <input type="text" class="form-control" value="<?php echo BASE_URL; ?>verify-certificate.php?code=<?php echo htmlspecialchars($existingCertificate['certificate_code']); ?>" readonly>
+                            <input type="text" class="form-control" value="<?php echo BASE_URL; ?>verify-certificate.php?code=<?php echo htmlspecialchars($existingCertificate['certificate_code'] ?? $certificateId); ?>" readonly>
                             <button class="btn btn-outline-primary" onclick="copyVerificationLink()">
                                 <i class="fas fa-link me-1"></i>Copy Link
                             </button>

@@ -214,9 +214,6 @@ $stats = $discussion->getDiscussionStats();
                     <a href="earnings.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-rupee-sign me-2"></i> Earnings
                     </a>
-                    <a href="analytics.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-bar me-2"></i> Analytics
-                    </a>
                     <a href="profile.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-user me-2"></i> Profile
                     </a>

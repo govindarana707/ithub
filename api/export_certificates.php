@@ -18,7 +18,7 @@ $certificates = $conn->query("
            u.full_name as student_name, u.email as student_email,
            c.title as course_title
     FROM certificates c
-    JOIN users u ON c.student_id = u.id
+    JOIN users_new u ON c.student_id = u.id
     ORDER BY c.issued_at DESC
 ")->fetch_all(MYSQLI_ASSOC);
 

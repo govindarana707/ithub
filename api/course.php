@@ -47,7 +47,7 @@ switch ($action) {
         
     case 'get_categories':
         $conn = connectDB();
-        $categories = $conn->query("SELECT id, name FROM categories ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+        $categories = $conn->query("SELECT id, name FROM categories_new ORDER BY name")->fetch_all(MYSQLI_ASSOC);
         $conn->close();
         
         echo json_encode(['success' => true, 'data' => $categories]);

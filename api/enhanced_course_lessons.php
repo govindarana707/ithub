@@ -75,7 +75,7 @@ if ($method === 'GET') {
 
     // Check if instructor owns the course
     if (getUserRole() === 'instructor') {
-        $stmt = $conn->prepare("SELECT instructor_id FROM courses WHERE id = ?");
+        $stmt = $conn->prepare("SELECT instructor_id FROM courses_new WHERE id = ?");
         if ($stmt === false) {
             safeSendJSON(['success' => false, 'message' => 'Database error']);
         }
@@ -188,7 +188,7 @@ if ($action === 'create') {
 
     // Check instructor permissions
     if (getUserRole() === 'instructor') {
-        $stmt = $conn->prepare("SELECT instructor_id FROM courses WHERE id = ?");
+        $stmt = $conn->prepare("SELECT instructor_id FROM courses_new WHERE id = ?");
         if ($stmt === false) {
             safeSendJSON(['success' => false, 'message' => 'Database error']);
         }
@@ -245,7 +245,7 @@ if ($action === 'update') {
 
     // Check instructor permissions
     if (getUserRole() === 'instructor') {
-        $stmt = $conn->prepare("SELECT c.instructor_id FROM lessons l JOIN courses c ON l.course_id = c.id WHERE l.id = ?");
+        $stmt = $conn->prepare("SELECT c.instructor_id FROM lessons l JOIN courses_new c ON l.course_id = c.id WHERE l.id = ?");
         if ($stmt === false) {
             safeSendJSON(['success' => false, 'message' => 'Database error']);
         }
@@ -294,7 +294,7 @@ if ($action === 'delete') {
 
     // Check instructor permissions
     if (getUserRole() === 'instructor') {
-        $stmt = $conn->prepare("SELECT c.instructor_id, l.video_file_path FROM lessons l JOIN courses c ON l.course_id = c.id WHERE l.id = ?");
+        $stmt = $conn->prepare("SELECT c.instructor_id, l.video_file_path FROM lessons l JOIN courses_new c ON l.course_id = c.id WHERE l.id = ?");
         if ($stmt === false) {
             safeSendJSON(['success' => false, 'message' => 'Database error']);
         }
@@ -334,7 +334,7 @@ if ($action === 'reorder') {
     // Check instructor permissions for first lesson
     $firstLessonId = (int)key($lessonOrders);
     if (getUserRole() === 'instructor' && $firstLessonId > 0) {
-        $stmt = $conn->prepare("SELECT c.instructor_id FROM lessons l JOIN courses c ON l.course_id = c.id WHERE l.id = ?");
+        $stmt = $conn->prepare("SELECT c.instructor_id FROM lessons l JOIN courses_new c ON l.course_id = c.id WHERE l.id = ?");
         if ($stmt === false) {
             safeSendJSON(['success' => false, 'message' => 'Database error']);
         }

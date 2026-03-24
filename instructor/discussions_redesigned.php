@@ -572,11 +572,7 @@ $stats = $discussion->getDiscussionStats();
                                 <i class="fas fa-dollar-sign nav-icon"></i>
                                 Earnings
                             </a>
-                            <a href="analytics.php" class="nav-item">
-                                <i class="fas fa-chart-bar nav-icon"></i>
-                                Analytics
-                            </a>
-                            <a href="profile.php" class="nav-item">
+                                                        <a href="profile.php" class="nav-item">
                                 <i class="fas fa-user nav-icon"></i>
                                 Profile
                             </a>

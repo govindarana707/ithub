@@ -67,15 +67,13 @@ function handleVideoUpload($conn, $userId) {
         // Verify that the course exists and belongs to the instructor
         $stmt = $conn->prepare("
             SELECT id, title FROM courses_new WHERE id = ? AND instructor_id = ?
-            UNION
-            SELECT id, title FROM courses WHERE id = ? AND instructor_id = ?
         ");
         
         if ($stmt === false) {
             return ['success' => false, 'message' => 'Database error occurred'];
         }
         
-        $stmt->bind_param("iiii", $courseId, $userId, $courseId, $userId);
+        $stmt->bind_param("ii", $courseId, $userId);
         $stmt->execute();
         $courseResult = $stmt->get_result();
         

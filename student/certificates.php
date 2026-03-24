@@ -8,7 +8,8 @@ if (!isLoggedIn()) {
     redirect('../login.php');
 }
 
-if (getUserRole() !== 'student' && getUserRole() !== 'admin') {
+// Allow students, admins, and instructors to view certificates
+if (!in_array(getUserRole(), ['student', 'admin', 'instructor'])) {
     $_SESSION['error_message'] = 'Access denied. Student privileges required.';
     redirect('../dashboard.php');
 }
@@ -16,21 +17,36 @@ if (getUserRole() !== 'student' && getUserRole() !== 'admin') {
 require_once dirname(__DIR__) . '/includes/universal_header.php';
 
 $studentId = $_SESSION['user_id'];
-$database = new Database();
-$conn = $database->getConnection();
+
+try {
+    $database = new Database();
+    $conn = $database->getConnection();
+    if (!$conn) {
+        throw new Exception('Failed to connect to database');
+    }
+} catch (Exception $e) {
+    error_log('Database connection error: ' . $e->getMessage());
+    $_SESSION['error_message'] = 'Unable to load certificates. Please try again later.';
+    redirect('../dashboard.php');
+}
+
 $progress = new Progress();
 
 // Get student certificates with enhanced data
 $stmt = $conn->prepare("
-    SELECT c.*, co.title as course_title, co.description as course_description,
-           co.thumbnail, co.duration_hours, co.difficulty_level,
-           u.full_name as instructor_name,
+    SELECT c.*, 
+           COALESCE(co.title, 'Course') as course_title, 
+           COALESCE(co.description, 'No description available') as course_description,
+           co.thumbnail, 
+           COALESCE(co.duration_hours, 0) as duration_hours, 
+           COALESCE(co.difficulty_level, 'beginner') as difficulty_level,
+           COALESCE(u.full_name, 'Instructor') as instructor_name,
            e.completed_at as course_completed_at,
-           e.progress_percentage as final_progress
+           COALESCE(e.progress_percentage, 100) as final_progress
     FROM certificates c
-    JOIN courses_new co ON c.course_id = co.id
-    JOIN users_new u ON co.instructor_id = u.id
-    LEFT JOIN enrollments e ON e.course_id = co.id AND e.student_id = c.student_id
+    LEFT JOIN courses_new co ON c.course_id = co.id
+    LEFT JOIN users_new u ON co.instructor_id = u.id
+    LEFT JOIN enrollments e ON e.course_id = c.course_id AND e.student_id = c.student_id
     WHERE c.student_id = ? AND c.status = 'issued'
     ORDER BY c.issued_date DESC
 ");
@@ -67,29 +83,38 @@ $conn->close();
                     <a href="dashboard.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-tachometer-alt me-2"></i> Dashboard
                     </a>
+                    <a href="courses.php" class="list-group-item list-group-item-action">
+                        <i class="fas fa-book me-2"></i> Browse Courses
+                    </a>
                     <a href="my-courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-graduation-cap me-2"></i> My Courses
-                        <span class="badge bg-primary float-end">0</span>
-                    </a>
-                    <a href="quizzes.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-brain me-2"></i> Quizzes
-                        <span class="badge bg-info float-end">0</span>
-                    </a>
-                    <a href="quiz-results.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-bar me-2"></i> Quiz Results
-                    </a>
-                    <a href="discussions.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-comments me-2"></i> Discussions
+                        <i class="fas fa-book-open me-2"></i> My Courses
                     </a>
                     <a href="certificates.php" class="list-group-item list-group-item-action active">
                         <i class="fas fa-certificate me-2"></i> Certificates
                     </a>
+                    <a href="quiz-results.php" class="list-group-item list-group-item-action">
+                        <i class="fas fa-chart-bar me-2"></i> Quiz Results
+                    </a>
+                    <a href="quizzes.php" class="list-group-item list-group-item-action">
+                        <i class="fas fa-brain me-2"></i> Quizzes
+                    </a>
+                    <a href="discussions.php" class="list-group-item list-group-item-action">
+                        <i class="fas fa-comments me-2"></i> Discussions
+                    </a>
+                    <a href="notifications.php" class="list-group-item list-group-item-action">
+                        <i class="fas fa-bell me-2"></i> Notifications
+                    </a>
                     <a href="profile.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-user me-2"></i> Profile
                     </a>
-                    <a href="../logout.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-sign-out-alt me-2"></i> Logout
+                    <a href="settings.php" class="list-group-item list-group-item-action">
+                        <i class="fas fa-cog me-2"></i> Settings
                     </a>
+                    <div class="mt-3 p-2">
+                        <a href="../logout.php" class="btn btn-outline-danger w-100">
+                            <i class="fas fa-sign-out-alt me-2"></i> Logout
+                        </a>
+                    </div>
                 </div>
             </div>
             
@@ -151,19 +176,40 @@ $conn->close();
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h3 class="mb-0">Achievement Certificates</h3>
                         <div class="btn-group" role="group">
-                            <button type="button" class="btn btn-outline-primary btn-sm active" onclick="filterCertificates('all')">
+                            <button type="button" class="btn btn-outline-primary btn-sm active" onclick="filterCertificates('all', event)">
                                 All (<?php echo count($certificates); ?>)
                             </button>
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterCertificates('recent')">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterCertificates('recent', event)">
                                 Recent
                             </button>
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterCertificates('advanced')">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="filterCertificates('advanced', event)">
                                 Advanced
                             </button>
                         </div>
                     </div>
                     
                     <?php if (empty($certificates)): ?>
+                        <!-- Show eligible courses if any -->
+                        <?php if (!empty($eligibleCourses)): ?>
+                            <div class="alert alert-success mb-4">
+                                <h5><i class="fas fa-trophy me-2"></i>Course Completed!</h5>
+                                <p>You have completed the following course(s) and can now generate your certificate(s):</p>
+                                <div class="list-group">
+                                    <?php foreach ($eligibleCourses as $course): ?>
+                                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="mb-1"><?php echo htmlspecialchars($course['title']); ?></h6>
+                                                <small class="text-success"><i class="fas fa-check-circle"></i> 100% Complete</small>
+                                            </div>
+                                            <a href="course-complete.php?course_id=<?php echo $course['id']; ?>" class="btn btn-success btn-sm">
+                                                <i class="fas fa-certificate me-1"></i>Get Certificate
+                                            </a>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                        
                         <div class="text-center py-5">
                             <i class="fas fa-certificate fa-4x text-muted mb-3"></i>
                             <h4>No certificates earned yet</h4>
@@ -180,7 +226,7 @@ $conn->close();
                     <?php else: ?>
                         <div class="certificates-grid" id="certificatesContainer">
                             <?php foreach ($certificates as $certificate): ?>
-                                <div class="certificate-item" data-difficulty="<?php echo $certificate['difficulty_level']; ?>" data-date="<?php echo $certificate['issued_date']; ?>">
+                                <div class="certificate-item" data-difficulty="<?php echo htmlspecialchars($certificate['difficulty_level'] ?? 'beginner'); ?>" data-date="<?php echo !empty($certificate['issued_date']) ? htmlspecialchars($certificate['issued_date']) : date('Y-m-d'); ?>">
                                     <div class="certificate-card">
                                         <div class="certificate-header">
                                             <?php if ($certificate['thumbnail']): ?>
@@ -200,21 +246,21 @@ $conn->close();
                                         </div>
                                         
                                         <div class="certificate-body">
-                                            <h5 class="certificate-title"><?php echo htmlspecialchars($certificate['course_title']); ?></h5>
-                                            <p class="certificate-description"><?php echo substr(htmlspecialchars($certificate['course_description']), 0, 120); ?>...</p>
+                                            <h5 class="certificate-title"><?php echo !empty($certificate['course_title']) ? htmlspecialchars($certificate['course_title']) : 'Course Completed'; ?></h5>
+                                            <p class="certificate-description"><?php echo htmlspecialchars(mb_substr($certificate['course_description'] ?? '', 0, 120)); ?>...</p>
                                             
                                             <div class="certificate-meta">
                                                 <div class="meta-item">
                                                     <i class="fas fa-user-tie"></i>
-                                                    <span><?php echo htmlspecialchars($certificate['instructor_name']); ?></span>
+                                                    <span><?php echo htmlspecialchars($certificate['instructor_name'] ?? 'Instructor'); ?></span>
                                                 </div>
                                                 <div class="meta-item">
                                                     <i class="fas fa-clock"></i>
-                                                    <span><?php echo $certificate['duration_hours']; ?> hours</span>
+                                                    <span><?php echo intval($certificate['duration_hours'] ?? 0); ?> hours</span>
                                                 </div>
                                                 <div class="meta-item">
                                                     <i class="fas fa-trophy"></i>
-                                                    <span><?php echo round($certificate['final_progress']); ?>% completed</span>
+                                                    <span><?php echo intval($certificate['final_progress'] ?? 0); ?>% completed</span>
                                                 </div>
                                             </div>
                                             
@@ -222,46 +268,66 @@ $conn->close();
                                                 <div class="certificate-info">
                                                     <small class="text-muted">
                                                         <i class="fas fa-certificate me-1"></i>
-                                                        ID: <?php echo htmlspecialchars($certificate['certificate_id']); ?>
+                                                        ID: <?php echo !empty($certificate['certificate_id']) ? htmlspecialchars($certificate['certificate_id']) : 'N/A'; ?>
                                                     </small>
                                                     <small class="text-muted">
                                                         <i class="fas fa-calendar me-1"></i>
-                                                        <?php echo date('M j, Y', strtotime($certificate['issued_date'])); ?>
+                                                        <?php echo !empty($certificate['issued_date']) ? date('M j, Y', strtotime($certificate['issued_date'])) : 'N/A'; ?>
                                                     </small>
                                                 </div>
                                                 
                                                 <div class="certificate-actions">
                                                     <?php 
-                                                    $certificatePath = BASE_URL . 'uploads/' . $certificate['file_path'];
-                                                    $fullPath = dirname(__DIR__) . '/uploads/' . $certificate['file_path'];
-                                                    $fileExists = file_exists($fullPath);
+                                                    $certificatePath = !empty($certificate['file_path']) ? '../uploads/' . $certificate['file_path'] : '';
+                                                    $fullPath = !empty($certificate['file_path']) ? dirname(__DIR__) . '/uploads/' . $certificate['file_path'] : '';
+                                                    $fileExists = !empty($certificate['file_path']) && file_exists($fullPath);
+                                                    $certId = !empty($certificate['certificate_id']) ? urlencode($certificate['certificate_id']) : '';
+                                                    $hasValidCertId = !empty($certificate['certificate_id']);
                                                     ?>
                                                     
                                                     <?php if ($fileExists): ?>
-                                                        <button onclick="viewCertificate('<?php echo $certificatePath; ?>', '<?php echo urlencode($certificate['certificate_id']); ?>')" 
+                                                        <button type="button" onclick="viewCertificate('<?php echo htmlspecialchars($certificatePath); ?>', '<?php echo $certId; ?>')" 
                                                                 class="btn btn-sm btn-outline-primary" title="View Certificate">
                                                             <i class="fas fa-eye"></i>
                                                         </button>
                                                     <?php else: ?>
-                                                        <button class="btn btn-sm btn-outline-secondary" disabled title="Certificate file not available">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Certificate file not available">
                                                             <i class="fas fa-eye-slash"></i>
                                                         </button>
                                                     <?php endif; ?>
                                                     
-                                                    <a href="<?php echo BASE_URL; ?>generate_real_pdf.php?id=<?php echo urlencode($certificate['certificate_id']); ?>" 
-                                                       class="btn btn-sm btn-primary" title="Download PDF">
-                                                        <i class="fas fa-file-pdf"></i>
-                                                    </a>
+                                                    <?php if ($hasValidCertId): ?>
+                                                        <a href="../generate_real_pdf.php?id=<?php echo $certId; ?>" 
+                                                           class="btn btn-sm btn-primary" title="Download PDF" target="_blank">
+                                                            <i class="fas fa-file-pdf"></i>
+                                                        </a>
+                                                    <?php else: ?>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Certificate ID not available">
+                                                            <i class="fas fa-file-pdf"></i>
+                                                        </button>
+                                                    <?php endif; ?>
                                                     
-                                                    <button onclick="shareCertificate('<?php echo urlencode($certificate['certificate_id']); ?>', '<?php echo urlencode($certificate['course_title']); ?>')" 
-                                                            class="btn btn-sm btn-outline-success" title="Share Certificate">
-                                                        <i class="fas fa-share-alt"></i>
-                                                    </button>
+                                                    <?php if ($hasValidCertId): ?>
+                                                        <button type="button" onclick="shareCertificate('<?php echo $certId; ?>', '<?php echo urlencode($certificate['course_title'] ?? 'Course'); ?>')" 
+                                                                class="btn btn-sm btn-outline-success" title="Share Certificate">
+                                                            <i class="fas fa-share-alt"></i>
+                                                        </button>
+                                                    <?php else: ?>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Certificate ID not available">
+                                                            <i class="fas fa-share-alt"></i>
+                                                        </button>
+                                                    <?php endif; ?>
                                                     
-                                                    <button onclick="verifyCertificate('<?php echo urlencode($certificate['certificate_id']); ?>')" 
-                                                            class="btn btn-sm btn-outline-info" title="Verify Certificate">
-                                                        <i class="fas fa-check-circle"></i>
-                                                    </button>
+                                                    <?php if ($hasValidCertId): ?>
+                                                        <button type="button" onclick="verifyCertificate('<?php echo $certId; ?>')" 
+                                                                class="btn btn-sm btn-outline-info" title="Verify Certificate">
+                                                            <i class="fas fa-check-circle"></i>
+                                                        </button>
+                                                    <?php else: ?>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Certificate ID not available">
+                                                            <i class="fas fa-check-circle"></i>
+                                                        </button>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
                                         </div>
@@ -379,9 +445,8 @@ $conn->close();
             currentCertificateId = certificateId;
             $('#certificateFrame').attr('src', url);
             $('#certificateModal').modal('show');
-            
             // Set download button to use PDF
-            $('#downloadCertificate').attr('href', '<?php echo BASE_URL; ?>generate_real_pdf.php?id=' + certificateId);
+            $('#downloadCertificate').attr('href', '../generate_real_pdf.php?id=' + certificateId);
         }
         
         // Print certificate
@@ -401,23 +466,29 @@ $conn->close();
         }
         
         // Copy share link
-        function copyShareLink() {
+        async function copyShareLink() {
             const shareLink = document.getElementById('shareLink');
-            shareLink.select();
-            document.execCommand('copy');
             
-            // Show success feedback
-            const btn = event.target.closest('button');
-            const originalHTML = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-            btn.classList.add('btn-success');
-            btn.classList.remove('btn-outline-primary');
-            
-            setTimeout(() => {
-                btn.innerHTML = originalHTML;
-                btn.classList.remove('btn-success');
-                btn.classList.add('btn-outline-primary');
-            }, 2000);
+            try {
+                await navigator.clipboard.writeText(shareLink.value);
+                
+                // Show success feedback
+                const btn = event.target.closest('button');
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                btn.classList.add('btn-success');
+                btn.classList.remove('btn-outline-primary');
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-primary');
+                }, 2000);
+            } catch (err) {
+                // Fallback for older browsers
+                shareLink.select();
+                document.execCommand('copy');
+            }
         }
         
         // Share on LinkedIn
@@ -487,13 +558,15 @@ $conn->close();
         }
         
         // Filter certificates
-        function filterCertificates(filter) {
+        function filterCertificates(filter, event) {
             const certificates = document.querySelectorAll('.certificate-item');
             const buttons = document.querySelectorAll('.btn-group .btn');
             
             // Update active button
             buttons.forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
             
             certificates.forEach(cert => {
                 let show = true;
@@ -514,8 +587,15 @@ $conn->close();
         // Generate missing certificates
         function generateMissingCertificates() {
             if (confirm('This will generate certificates for all completed courses. Continue?')) {
+                const btn = event.target;
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Generating...';
+                
                 $.post('<?php echo BASE_URL; ?>api/generate_certificates.php', { action: 'generate_missing' })
                     .done(function(response) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
                         if (response.success) {
                             alert(`Successfully generated ${response.generated} certificates!`);
                             location.reload();
@@ -524,6 +604,8 @@ $conn->close();
                         }
                     })
                     .fail(function() {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
                         alert('Error generating certificates. Please try again.');
                     });
             }
@@ -532,8 +614,15 @@ $conn->close();
         // Generate all eligible certificates
         function generateAllEligibleCertificates() {
             if (confirm('Generate certificates for all eligible completed courses?')) {
+                const btn = event.target;
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Generating...';
+                
                 $.post('<?php echo BASE_URL; ?>api/generate_certificates.php', { action: 'generate_eligible' })
                     .done(function(response) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
                         if (response.success) {
                             alert(`Successfully generated ${response.generated} certificates!`);
                             location.reload();
@@ -542,6 +631,8 @@ $conn->close();
                         }
                     })
                     .fail(function() {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
                         alert('Error generating certificates. Please try again.');
                     });
             }

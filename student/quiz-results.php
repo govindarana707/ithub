@@ -58,29 +58,38 @@ $conn->close();
                     <a href="dashboard.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-tachometer-alt me-2"></i> Dashboard
                     </a>
+                    <a href="courses.php" class="list-group-item list-group-item-action">
+                        <i class="fas fa-book me-2"></i> Browse Courses
+                    </a>
                     <a href="my-courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-graduation-cap me-2"></i> My Courses
-                        <span class="badge bg-primary float-end">0</span>
-                    </a>
-                    <a href="quizzes.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-brain me-2"></i> Quizzes
-                        <span class="badge bg-info float-end">0</span>
-                    </a>
-                    <a href="quiz-results.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-chart-bar me-2"></i> Quiz Results
-                    </a>
-                    <a href="discussions.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-comments me-2"></i> Discussions
+                        <i class="fas fa-book-open me-2"></i> My Courses
                     </a>
                     <a href="certificates.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-certificate me-2"></i> Certificates
                     </a>
+                    <a href="quiz-results.php" class="list-group-item list-group-item-action active">
+                        <i class="fas fa-chart-bar me-2"></i> Quiz Results
+                    </a>
+                    <a href="quizzes.php" class="list-group-item list-group-item-action">
+                        <i class="fas fa-brain me-2"></i> Quizzes
+                    </a>
+                    <a href="discussions.php" class="list-group-item list-group-item-action">
+                        <i class="fas fa-comments me-2"></i> Discussions
+                    </a>
+                    <a href="notifications.php" class="list-group-item list-group-item-action">
+                        <i class="fas fa-bell me-2"></i> Notifications
+                    </a>
                     <a href="profile.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-user me-2"></i> Profile
                     </a>
-                    <a href="../logout.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-sign-out-alt me-2"></i> Logout
+                    <a href="settings.php" class="list-group-item list-group-item-action">
+                        <i class="fas fa-cog me-2"></i> Settings
                     </a>
+                    <div class="mt-3 p-2">
+                        <a href="../logout.php" class="btn btn-outline-danger w-100">
+                            <i class="fas fa-sign-out-alt me-2"></i> Logout
+                        </a>
+                    </div>
                 </div>
             </div>
             

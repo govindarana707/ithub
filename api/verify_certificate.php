@@ -10,6 +10,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 require_once '../config/config.php';
+require_once '../includes/auth.php';
+
+// Allow public verification but log the request
+$isAuthenticated = isLoggedIn();
 require_once '../models/Database.php';
 
 $database = new Database();

@@ -18,8 +18,8 @@ $enrollments = $conn->query("
            u.full_name as student_name, u.email as student_email,
            c.title as course_title
     FROM enrollments e
-    JOIN users u ON e.student_id = u.id
-    JOIN courses c ON e.course_id = c.id
+    JOIN users_new u ON e.student_id = u.id
+    JOIN courses_new c ON e.course_id = c.id
     ORDER BY e.enrolled_at DESC
 ")->fetch_all(MYSQLI_ASSOC);
 

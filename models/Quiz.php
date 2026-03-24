@@ -73,7 +73,7 @@ class Quiz {
         $stmt = $conn->prepare("
             SELECT q.*, c.title as course_title, l.title as lesson_title
             FROM quizzes q
-            LEFT JOIN courses c ON q.course_id = c.id
+            LEFT JOIN courses_new c ON q.course_id = c.id
             LEFT JOIN lessons l ON q.lesson_id = l.id
             WHERE q.id = ?
         ");
@@ -91,7 +91,7 @@ class Quiz {
             $stmt = $conn->prepare("
                 SELECT q.*, c.title as course_title
                 FROM quizzes q
-                JOIN courses c ON q.course_id = c.id
+                JOIN courses_new c ON q.course_id = c.id
                 WHERE q.course_id = ? AND q.status = ?
                 ORDER BY q.created_at DESC
             ");
@@ -100,7 +100,7 @@ class Quiz {
             $stmt = $conn->prepare("
                 SELECT q.*, c.title as course_title
                 FROM quizzes q
-                JOIN courses c ON q.course_id = c.id
+                JOIN courses_new c ON q.course_id = c.id
                 WHERE q.course_id = ?
                 ORDER BY q.created_at DESC
             ");
@@ -137,7 +137,7 @@ class Quiz {
             SELECT qa.*, q.title as quiz_title, c.title as course_title
             FROM quiz_attempts qa
             JOIN quizzes q ON qa.quiz_id = q.id
-            JOIN courses c ON q.course_id = c.id
+            JOIN courses_new c ON q.course_id = c.id
             WHERE qa.student_id = ? AND qa.quiz_id = ?
             ORDER BY qa.percentage DESC, qa.started_at DESC
         ");
@@ -154,7 +154,7 @@ class Quiz {
         $stmt = $conn->prepare("
             SELECT q.*, c.title as course_title
             FROM quizzes q
-            JOIN courses c ON q.course_id = c.id
+            JOIN courses_new c ON q.course_id = c.id
             WHERE c.instructor_id = ?
             ORDER BY q.created_at DESC
         ");
@@ -168,8 +168,8 @@ class Quiz {
     public function createQuestion($data) {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("INSERT INTO quiz_questions (quiz_id, question_text, question_type, points, sort_order) VALUES (?, ?, ?, ?, ?)");
-        $stmt->bind_param("issdi", $data['quiz_id'], $data['question_text'], $data['question_type'], $data['points'], $data['sort_order']);
+        $stmt = $conn->prepare("INSERT INTO quiz_questions (quiz_id, question_text, question_type, points, question_order) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("issdi", $data['quiz_id'], $data['question_text'], $data['question_type'], $data['points'], $data['question_order']);
         
         if ($stmt->execute()) {
             return ['success' => true, 'question_id' => $conn->insert_id];
@@ -196,7 +196,7 @@ class Quiz {
                     FROM quiz_options o WHERE o.question_id = q.id) as options
             FROM quiz_questions q
             WHERE q.quiz_id = ?
-            ORDER BY q.sort_order
+            ORDER BY q.question_order
         ");
         $stmt->bind_param("i", $quizId);
         $stmt->execute();
@@ -330,6 +330,9 @@ class Quiz {
         $stmt->bind_param("ii", $attemptId, $questionId);
         $stmt->execute();
         
+        // Handle null selectedOptionId - convert to null string for MySQL
+        $optionIdForDb = $selectedOptionId !== null ? $selectedOptionId : null;
+        
         if ($stmt->get_result()->num_rows > 0) {
             // Update existing answer
             $stmt = $conn->prepare("
@@ -340,7 +343,14 @@ class Quiz {
             if (!$stmt) {
                 return ['success' => false, 'error' => 'Failed to prepare update query: ' . $conn->error];
             }
-            $stmt->bind_param("isidii", $selectedOptionId, $answerText, $isCorrect, $pointsEarned, $attemptId, $questionId);
+            
+            // Use appropriate bind type based on whether optionId is null
+            if ($optionIdForDb === null) {
+                $nullOption = null;
+                $stmt->bind_param("isidii", $nullOption, $answerText, $isCorrect, $pointsEarned, $attemptId, $questionId);
+            } else {
+                $stmt->bind_param("isidii", $optionIdForDb, $answerText, $isCorrect, $pointsEarned, $attemptId, $questionId);
+            }
         } else {
             // Insert new answer
             $stmt = $conn->prepare("
@@ -350,7 +360,14 @@ class Quiz {
             if (!$stmt) {
                 return ['success' => false, 'error' => 'Failed to prepare insert query: ' . $conn->error];
             }
-            $stmt->bind_param("iisidd", $attemptId, $questionId, $selectedOptionId, $answerText, $isCorrect, $pointsEarned);
+            
+            // Use appropriate bind type based on whether optionId is null
+            if ($optionIdForDb === null) {
+                $nullOption = null;
+                $stmt->bind_param("iisidd", $attemptId, $questionId, $nullOption, $answerText, $isCorrect, $pointsEarned);
+            } else {
+                $stmt->bind_param("iisidd", $attemptId, $questionId, $optionIdForDb, $answerText, $isCorrect, $pointsEarned);
+            }
         }
         
         if ($stmt->execute()) {
@@ -420,7 +437,7 @@ class Quiz {
                 SELECT qa.*, q.title as quiz_title, c.title as course_title
                 FROM quiz_attempts qa
                 JOIN quizzes q ON qa.quiz_id = q.id
-                JOIN courses c ON q.course_id = c.id
+                JOIN courses_new c ON q.course_id = c.id
                 WHERE qa.student_id = ? AND qa.quiz_id = ?
                 ORDER BY qa.started_at DESC
             ");
@@ -430,7 +447,7 @@ class Quiz {
                 SELECT qa.*, q.title as quiz_title, c.title as course_title
                 FROM quiz_attempts qa
                 JOIN quizzes q ON qa.quiz_id = q.id
-                JOIN courses c ON q.course_id = c.id
+                JOIN courses_new c ON q.course_id = c.id
                 WHERE qa.student_id = ?
                 ORDER BY qa.started_at DESC
             ");
@@ -531,43 +548,96 @@ class Quiz {
     public function submitQuizAttempt($attemptId, $answers) {
         $conn = $this->db->getConnection();
         
+        // First, get the quiz_id from the attempt
+        $stmt = $conn->prepare("SELECT quiz_id FROM quiz_attempts WHERE id = ?");
+        $stmt->bind_param("i", $attemptId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $attempt = $result->fetch_assoc();
+        $quizId = $attempt['quiz_id'];
+        
+        // Get all questions for this quiz
+        $stmt = $conn->prepare("SELECT id, question_type FROM quiz_questions WHERE quiz_id = ? ORDER BY question_order");
+        $stmt->bind_param("i", $quizId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $questions = [];
+        while ($row = $result->fetch_assoc()) {
+            $questions[] = $row;
+        }
+        
+        error_log("submitQuizAttempt: Attempt ID=$attemptId, Quiz ID=$quizId, Questions count=" . count($questions));
+        error_log("submitQuizAttempt: Received answers: " . json_encode($answers));
+        
         try {
             mysqli_begin_transaction($conn);
             
-            // Submit all answers
-            foreach ($answers as $questionId => $answer) {
-                // Get question type to determine how to handle the answer
-                $questionStmt = $conn->prepare("SELECT question_type FROM quiz_questions WHERE id = ?");
-                $questionStmt->bind_param("i", $questionId);
-                $questionStmt->execute();
-                $questionResult = $questionStmt->get_result()->fetch_assoc();
-                $questionType = $questionResult['question_type'] ?? '';
+            $answeredCount = 0;
+            $errors = [];
+            
+            // Process all questions, not just the ones in the answers array
+            foreach ($questions as $question) {
+                $questionId = $question['id'];
+                $questionType = $question['question_type'];
                 
-                if ($questionType === 'multiple_choice') {
-                    // Multiple choice - answer should be the option ID
-                    $selectedOptionId = is_numeric($answer) ? (int)$answer : null;
-                    $this->submitAnswer($attemptId, $questionId, $selectedOptionId);
-                } elseif ($questionType === 'true_false') {
-                    // True/false - answer is the text value
-                    $this->submitAnswer($attemptId, $questionId, null, $answer);
+                // Check if this question was answered
+                if (isset($answers[$questionId])) {
+                    $answer = $answers[$questionId];
+                    $answeredCount++;
+                    
+                    error_log("submitQuizAttempt: Processing Q$questionId (type: $questionType), answer: $answer");
+                    
+                    if ($questionType === 'multiple_choice') {
+                        // Multiple choice - answer should be the option ID
+                        $selectedOptionId = is_numeric($answer) ? (int)$answer : null;
+                        $result = $this->submitAnswer($attemptId, $questionId, $selectedOptionId);
+                        if (!$result['success']) {
+                            $errors[] = "Q$questionId: " . $result['error'];
+                        }
+                    } elseif ($questionType === 'true_false') {
+                        // True/false - answer is the text value ('true' or 'false')
+                        $result = $this->submitAnswer($attemptId, $questionId, null, $answer);
+                        if (!$result['success']) {
+                            $errors[] = "Q$questionId: " . $result['error'];
+                        }
+                    } else {
+                        // Short answer - text answer
+                        $result = $this->submitAnswer($attemptId, $questionId, null, $answer);
+                        if (!$result['success']) {
+                            $errors[] = "Q$questionId: " . $result['error'];
+                        }
+                    }
                 } else {
-                    // Short answer - text answer
-                    $this->submitAnswer($attemptId, $questionId, null, $answer);
+                    // Question not answered - record as unanswered
+                    error_log("submitQuizAttempt: Q$questionId NOT answered, recording as unanswered");
+                    // Insert empty answer to mark as unanswered
+                    $stmt = $conn->prepare("INSERT INTO quiz_answers (attempt_id, question_id, selected_option_id, answer_text, is_correct, points_earned) VALUES (?, ?, NULL, NULL, 0, 0)");
+                    $stmt->bind_param("ii", $attemptId, $questionId);
+                    if (!$stmt->execute()) {
+                        $errors[] = "Q$questionId (unanswered): " . $stmt->error;
+                    }
                 }
             }
             
-            // Complete attempt
-            $result = $this->completeQuizAttempt($attemptId);
+            if (!empty($errors)) {
+                error_log("submitQuizAttempt errors: " . implode("; ", $errors));
+            }
             
-            if ($result['success']) {
+            error_log("submitQuizAttempt: Total answered: $answeredCount out of " . count($questions));
+            
+            // Complete attempt
+            $completionResult = $this->completeQuizAttempt($attemptId);
+            
+            if ($completionResult['success']) {
                 mysqli_commit($conn);
-                return $result;
+                return $completionResult;
             } else {
                 mysqli_rollback($conn);
-                return $result;
+                return $completionResult;
             }
         } catch (Exception $e) {
             mysqli_rollback($conn);
+            error_log("submitQuizAttempt exception: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
@@ -594,7 +664,7 @@ class Quiz {
             LEFT JOIN quiz_answers qa ON qq.id = qa.question_id AND qa.attempt_id = ?
             LEFT JOIN quiz_options qo ON qa.selected_option_id = qo.id
             WHERE qq.quiz_id = ?
-            ORDER BY qq.sort_order
+            ORDER BY qq.question_order ASC, qq.id ASC
         ";
         
         $stmt = $conn->prepare($sql);

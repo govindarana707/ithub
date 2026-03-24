@@ -22,21 +22,26 @@ class LessonContent
     {
         $lessonId = (int) $lessonId;
 
-        // Get basic lesson info
+        // Get basic lesson info - use LEFT JOIN to handle missing data gracefully
         $stmt = $this->conn->prepare("
-            SELECT l.*, c.instructor_id, u.full_name as instructor_name, u.email as instructor_email
+            SELECT l.*, 
+                   COALESCE(c.instructor_id, 0) as instructor_id, 
+                   COALESCE(u.full_name, 'Unknown') as instructor_name, 
+                   COALESCE(u.email, '') as instructor_email
             FROM lessons l
-            JOIN courses c ON l.course_id = c.id
-            JOIN users u ON c.instructor_id = u.id
+            LEFT JOIN courses c ON l.course_id = c.id
+            LEFT JOIN users u ON c.instructor_id = u.id
             WHERE l.id = ?
         ");
         $stmt->bind_param('i', $lessonId);
         $stmt->execute();
-        $lesson = $stmt->get_result()->fetch_assoc();
-
-        if (!$lesson) {
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows === 0) {
             return null;
         }
+        
+        $lesson = $result->fetch_assoc();
 
         // Get instructor notes
         $lesson['notes'] = $this->getLessonNotes($lessonId);
@@ -280,20 +285,37 @@ class LessonContent
      */
     public function saveStudentNotes($lessonId, $userId, $title, $content)
     {
+        // Ensure student_notes table exists
+        $this->conn->query("CREATE TABLE IF NOT EXISTS student_notes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            lesson_id INT NOT NULL,
+            student_id INT NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            content TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_note (lesson_id, student_id),
+            INDEX idx_lesson_id (lesson_id),
+            INDEX idx_student_id (student_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
         $stmt = $this->conn->prepare("
             INSERT INTO student_notes (lesson_id, student_id, title, content)
             VALUES (?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE title = VALUES(title), content = VALUES(content), updated_at = CURRENT_TIMESTAMP
         ");
 
+        if ($stmt === false) {
+            error_log("Failed to prepare saveStudentNotes statement: " . $this->conn->error);
+            return false;
+        }
+
         $stmt->bind_param('iiss', $lessonId, $userId, $title, $content);
 
         if ($stmt->execute()) {
-            // Update lesson progress
-            // TODO: Fix updateLessonProgress method to handle boolean values properly
-            // $this->updateLessonProgress($lessonId, $userId, ['notes_viewed' => true]);
             return true;
         }
+        error_log("Failed to execute saveStudentNotes: " . $stmt->error);
         return false;
     }
 
