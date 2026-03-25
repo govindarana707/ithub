@@ -33,7 +33,7 @@ class SignatureService {
                 $settings[$row['setting_key']] = $row['setting_value'];
             }
             
-            $this->secretKey = $settings['esewa_secret_key'] ?? '8gBm/:&EnhH.1/q(';
+            $this->secretKey = $settings['esewa_secret_key'] ?? '8gBm/:&EnhH.1/q';
             $this->productCode = $settings['esewa_product_code'] ?? 'EPAYTEST';
             $this->testMode = ($settings['esewa_test_mode'] ?? 'true') === 'true';
             
@@ -42,7 +42,7 @@ class SignatureService {
             
         } catch (Exception $e) {
             // Fallback to default values
-            $this->secretKey = '8gBm/:&EnhH.1/q(';
+            $this->secretKey = '8gBm/:&EnhH.1/q';
             $this->productCode = 'EPAYTEST';
             $this->testMode = true;
             

@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             // Check if student is enrolled in the course
             $conn = connectDB();
-            $stmt = $conn->prepare("SELECT COUNT(*) as enrolled FROM enrollments WHERE student_id = ? AND course_id = ? AND status = 'active'");
+            $stmt = $conn->prepare("SELECT COUNT(*) as enrolled FROM enrollments_new WHERE user_id = ? AND course_id = ? AND status = 'active'");
             $stmt->bind_param("ii", $studentId, $courseId);
             $stmt->execute();
             $enrollment = $stmt->get_result()->fetch_assoc();

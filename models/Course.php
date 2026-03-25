@@ -65,7 +65,7 @@ class Course {
         $conn = $this->db->getConnection();
         
         // Check if course has enrollments
-        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE course_id = ?");
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments_new WHERE course_id = ?");
         $stmt->bind_param("i", $courseId);
         $stmt->execute();
         $enrollmentCount = ($stmt->get_result()->fetch_assoc()['count'] ?? 0);
@@ -356,13 +356,13 @@ class Course {
         }
         
         // Total enrollments
-        $result = $conn->query("SELECT COUNT(*) as enrollments FROM enrollments");
+        $result = $conn->query("SELECT COUNT(*) as enrollments FROM enrollments_new");
         if ($result && $row = $result->fetch_assoc()) {
             $stats['enrollments'] = $row['enrollments'];
         }
         
         // Completed courses
-        $result = $conn->query("SELECT COUNT(*) as completed FROM enrollments WHERE status = 'completed'");
+        $result = $conn->query("SELECT COUNT(*) as completed FROM enrollments_new WHERE status = 'completed'");
         if ($result && $row = $result->fetch_assoc()) {
             $stats['completed'] = $row['completed'];
         }
@@ -435,7 +435,7 @@ class Course {
             JOIN users u ON c.instructor_id = u.id
             WHERE c.status = 'published' 
             AND c.id NOT IN (
-                SELECT course_id FROM enrollments WHERE student_id = ?
+                SELECT course_id FROM enrollments_new WHERE user_id = ?
             )
             ORDER BY RAND()
             LIMIT ?
@@ -602,7 +602,7 @@ class Course {
     public function getEnrollment($studentId, $courseId) {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?");
+        $stmt = $conn->prepare("SELECT * FROM enrollments_new WHERE user_id = ? AND course_id = ?");
         $stmt->bind_param("ii", $studentId, $courseId);
         $stmt->execute();
         
@@ -660,8 +660,8 @@ class Course {
     public function getEnrolledCourses($studentId) {
         $conn = $this->db->getConnection();
         
-        // First check if enrollments table has any data for this student
-        $checkStmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE student_id = ?");
+        // First check if enrollments_new table has any data for this student
+        $checkStmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments_new WHERE user_id = ?");
         if ($checkStmt === false) {
             error_log("Failed to prepare enrollment check query: " . $conn->error);
             return [];
@@ -680,10 +680,10 @@ class Course {
             SELECT c.*, e.enrolled_at, e.progress_percentage, e.status as enrollment_status,
                    cat.name as category_name, u.full_name as instructor_name
             FROM courses_new c
-            JOIN enrollments e ON c.id = e.course_id
+            JOIN enrollments_new e ON c.id = e.course_id
             LEFT JOIN categories cat ON c.category_id = cat.id
             LEFT JOIN users u ON c.instructor_id = u.id
-            WHERE e.student_id = ? AND e.status = 'active'
+            WHERE e.user_id = ? AND e.status = 'active'
             ORDER BY e.enrolled_at DESC
         ");
         
@@ -840,7 +840,7 @@ class Course {
         $stats = [];
         
         // Total enrollments
-        $stmt = $conn->prepare("SELECT COUNT(*) as total FROM enrollments WHERE student_id = ? AND status = 'active'");
+        $stmt = $conn->prepare("SELECT COUNT(*) as total FROM enrollments_new WHERE user_id = ? AND status = 'active'");
         if ($stmt === false) {
             error_log("Failed to prepare total enrollments query: " . $conn->error);
             return ['total_enrollments' => 0, 'completed_courses' => 0, 'in_progress' => 0, 'completion_rate' => 0, 'total_study_hours' => 0];
@@ -850,7 +850,7 @@ class Course {
         $stats['total_enrollments'] = $stmt->get_result()->fetch_assoc()['total'];
         
         // Completed courses
-        $stmt = $conn->prepare("SELECT COUNT(*) as completed FROM enrollments WHERE student_id = ? AND status = 'completed'");
+        $stmt = $conn->prepare("SELECT COUNT(*) as completed FROM enrollments_new WHERE user_id = ? AND status = 'completed'");
         if ($stmt === false) {
             error_log("Failed to prepare completed courses query: " . $conn->error);
             return ['total_enrollments' => 0, 'completed_courses' => 0, 'in_progress' => 0, 'completion_rate' => 0, 'total_study_hours' => 0];
@@ -877,7 +877,7 @@ class Course {
         $conn = $this->db->getConnection();
         
         // Check if already enrolled
-        $stmt = $conn->prepare("SELECT id FROM enrollments WHERE student_id = ? AND course_id = ?");
+        $stmt = $conn->prepare("SELECT id FROM enrollments_new WHERE user_id = ? AND course_id = ? AND status = 'active'");
         $stmt->bind_param("ii", $studentId, $courseId);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -887,8 +887,8 @@ class Course {
         }
         
         // Enroll student
-        error_log("Attempting to insert enrollment: student_id=$studentId, course_id=$courseId");
-        $stmt = $conn->prepare("INSERT INTO enrollments (student_id, course_id, enrolled_at, progress_percentage, status) VALUES (?, ?, NOW(), 0, 'active')");
+        error_log("Attempting to insert enrollment: user_id=$studentId, course_id=$courseId");
+        $stmt = $conn->prepare("INSERT INTO enrollments_new (user_id, course_id, enrolled_at, progress_percentage, status, enrollment_type) VALUES (?, ?, NOW(), 0, 'active', 'paid')");
         $stmt->bind_param("ii", $studentId, $courseId);
 
         if ($stmt->execute()) {
@@ -906,7 +906,7 @@ class Course {
             SELECT u.id, u.username, u.email, u.full_name, u.profile_image,
                    e.enrolled_at, e.progress_percentage, e.status as enrollment_status
             FROM users_new u
-            JOIN enrollments e ON u.id = e.student_id
+            JOIN enrollments_new e ON u.id = e.user_id
             WHERE e.course_id = ?
             ORDER BY e.enrolled_at DESC
         ");
@@ -921,9 +921,9 @@ class Course {
         $conn = $this->db->getConnection();
         
         $stmt = $conn->prepare("
-            UPDATE enrollments 
+            UPDATE enrollments_new 
             SET progress_percentage = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE student_id = ? AND course_id = ?
+            WHERE user_id = ? AND course_id = ?
         ");
         $stmt->bind_param("dii", $progress, $studentId, $courseId);
         

@@ -15,7 +15,7 @@ $responseData = [
 ];
 
 if (empty($responseData['transaction_uuid'])) {
-    header('Location: ' . BASE_URL . 'student/courses.php?error=payment_cancelled');
+    header('Location: ' . BASE_URL . 'student/payment-failed.php?status=payment_cancelled');
     exit();
 }
 
@@ -41,12 +41,12 @@ try {
     }
 
     // Redirect with error message
-    header('Location: ' . BASE_URL . 'student/courses.php?error=payment_cancelled&course_id=' . $courseId);
+    header('Location: ' . BASE_URL . 'student/payment-failed.php?course_id=' . $courseId . '&status=payment_cancelled');
     exit();
     
 } catch (Exception $e) {
     error_log("eSewa failure callback error: " . $e->getMessage());
-    header('Location: ' . BASE_URL . 'student/courses.php?error=payment_processing_failed');
+    header('Location: ' . BASE_URL . 'student/payment-failed.php?status=payment_processing_failed');
     exit();
 }
 ?>

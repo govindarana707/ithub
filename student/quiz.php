@@ -35,7 +35,7 @@ $stmt->bind_param("i", $quizId);
 $stmt->execute();
 $quizCourse = $stmt->get_result()->fetch_assoc();
 
-$stmt = $conn->prepare("SELECT id FROM enrollments WHERE student_id = ? AND course_id = ?");
+$stmt = $conn->prepare("SELECT id FROM enrollments_new WHERE user_id = ? AND course_id = ? AND status = 'active'");
 $stmt->bind_param("ii", $userId, $quizCourse['course_id']);
 $stmt->execute();
 if ($stmt->get_result()->num_rows === 0) {
@@ -54,6 +54,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_quiz'])) {
     }
     
     $answers = $_POST['answers'] ?? [];
+    
+    // Debug: Log what answers we received
+    error_log('Quiz submission - Received answers: ' . json_encode($answers));
+    error_log('Quiz submission - POST data: ' . json_encode($_POST));
+    
     $result = $quiz->submitQuizAttempt($activeAttempt['id'], $answers);
     
     if ($result['success']) {
@@ -406,70 +411,9 @@ $conn->close();
             });
         });
         
-        // Form submission
+        // Form submission - just stop timer and let form submit naturally
         document.getElementById('quizForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            if (!confirm('Are you sure you want to submit your quiz? You cannot change your answers after submission.')) {
-                return;
-            }
-            
-            // Clear any existing hidden inputs first
-            document.querySelectorAll('#quizForm input[type="hidden"][name^="answers["]').forEach(input => input.remove());
-            
-            // Create a comprehensive answer object
-            const answers = {};
-            
-            // Collect all radio button answers (multiple choice & true/false)
-            document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
-                const name = radio.name;
-                // Extract question ID from name like "answers[15]"
-                const match = name.match(/answers\[(\d+)\]/);
-                if (match) {
-                    const questionId = match[1];
-                    const value = radio.value;
-                    answers[questionId] = value;
-                    
-                    // Create hidden input
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = 'answers[' + questionId + ']';
-                    input.value = value;
-                    this.appendChild(input);
-                }
-            });
-            
-            // Collect all textarea answers (short answer)
-            document.querySelectorAll('textarea[name^="answers["]').forEach(textarea => {
-                const name = textarea.name;
-                const value = textarea.value.trim();
-                // Extract question ID from name like "answers[15]"
-                const match = name.match(/answers\[(\d+)\]/);
-                if (match && value) {
-                    const questionId = match[1];
-                    answers[questionId] = value;
-                    
-                    // Create hidden input
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = 'answers[' + questionId + ']';
-                    input.value = value;
-                    this.appendChild(input);
-                }
-            });
-            
-            // Debug: Log collected answers
-            console.log('Collected answers:', answers);
-            console.log('Total answers collected:', Object.keys(answers).length);
-            
-            // Show warning if not all questions answered
-            const totalQuestions = <?php echo count($questions); ?>;
-            if (Object.keys(answers).length < totalQuestions) {
-                alert('Warning: You have only answered ' + Object.keys(answers).length + ' out of ' + totalQuestions + ' questions. Unanswered questions will be marked as incorrect.');
-            }
-            
             clearInterval(timerInterval);
-            this.submit();
         });
         
         // Keyboard navigation

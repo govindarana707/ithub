@@ -321,9 +321,11 @@ $(document).ready(function() {
         });
     }
     
-    // Check notifications every 30 seconds
-    setInterval(checkNotifications, 30000);
-    checkNotifications();
+    // Check notifications every 30 seconds - only if notification badge exists
+    if ($('.notification-badge').length > 0) {
+        setInterval(checkNotifications, 30000);
+        checkNotifications();
+    }
 
     // Chat functionality
     function sendMessage() {
@@ -356,6 +358,11 @@ $(document).ready(function() {
         var receiverId = $('#receiverId').val();
         var courseId = $('#courseId').val();
         
+        // Check if required elements exist
+        if (!receiverId || !courseId) {
+            return; // Not on messaging page
+        }
+        
         $.ajax({
             url: basePath + 'api/get_messages.php',
             type: 'GET',
@@ -364,15 +371,20 @@ $(document).ready(function() {
                 course_id: courseId
             },
             success: function(data) {
-                $('#chatMessages').html(data);
-                scrollToBottom();
+                var chatMessages = $('#chatMessages');
+                if (chatMessages.length > 0) {
+                    chatMessages.html(data);
+                    scrollToBottom();
+                }
             }
         });
     }
     
     function scrollToBottom() {
         var chatMessages = $('#chatMessages');
-        chatMessages.scrollTop(chatMessages[0].scrollHeight);
+        if (chatMessages.length > 0 && chatMessages[0]) {
+            chatMessages.scrollTop(chatMessages[0].scrollHeight);
+        }
     }
     
     // Send message on Enter key
@@ -383,8 +395,10 @@ $(document).ready(function() {
         }
     });
     
-    // Load messages every 5 seconds
-    setInterval(loadMessages, 5000);
+    // Load messages every 5 seconds - only on messaging pages
+    if ($('#chatMessages').length > 0) {
+        setInterval(loadMessages, 5000);
+    }
     
     // Scroll Reveal Animation
     function reveal() {

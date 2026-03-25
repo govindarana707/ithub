@@ -80,7 +80,7 @@ function validateCourseAccess(int $courseId): bool
     // Students must be enrolled
     if ($role === 'student') {
         $conn = connectDB();
-        $stmt = $conn->prepare("SELECT id FROM enrollments WHERE student_id = ? AND course_id = ?");
+        $stmt = $conn->prepare("SELECT id FROM enrollments_new WHERE user_id = ? AND course_id = ? AND status = 'active'");
         $stmt->bind_param("ii", $userId, $courseId);
         $stmt->execute();
         $hasAccess = $stmt->get_result()->num_rows > 0;

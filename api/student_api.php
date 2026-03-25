@@ -190,7 +190,7 @@ switch ($action) {
         }
         
         // Get enrollment status
-        $stmt = $conn->prepare("SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?");
+        $stmt = $conn->prepare("SELECT * FROM enrollments_new WHERE user_id = ? AND course_id = ? AND status = 'active'");
         $stmt->bind_param("ii", $userId, $courseId);
         $stmt->execute();
         $enrollment = $stmt->get_result()->fetch_assoc();
@@ -204,7 +204,7 @@ switch ($action) {
         $course['lesson_count'] = $stmt->get_result()->fetch_assoc()['lesson_count'];
         
         // Get enrollment count
-        $stmt = $conn->prepare("SELECT COUNT(*) as enrollment_count FROM enrollments WHERE course_id = ?");
+        $stmt = $conn->prepare("SELECT COUNT(*) as enrollment_count FROM enrollments_new WHERE course_id = ?");
         $stmt->bind_param("i", $courseId);
         $stmt->execute();
         $course['enrollment_count'] = $stmt->get_result()->fetch_assoc()['enrollment_count'];
@@ -291,7 +291,7 @@ switch ($action) {
         }
         
         // Check if already enrolled
-        $stmt = $conn->prepare("SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?");
+        $stmt = $conn->prepare("SELECT * FROM enrollments_new WHERE user_id = ? AND course_id = ? AND status = 'active'");
         $stmt->bind_param("ii", $userId, $courseId);
         $stmt->execute();
         
@@ -306,8 +306,8 @@ switch ($action) {
         
         // Create enrollment
         $stmt = $conn->prepare("
-            INSERT INTO enrollments (student_id, course_id, status, progress_percentage, enrolled_at)
-            VALUES (?, ?, 'active', 0, NOW())
+            INSERT INTO enrollments_new (user_id, course_id, status, progress_percentage, enrolled_at, enrollment_type)
+            VALUES (?, ?, 'active', 0, NOW(), 'free_trial')
         ");
         $stmt->bind_param("ii", $userId, $courseId);
         

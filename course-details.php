@@ -9,7 +9,13 @@ if (!isset($_GET['id'])) {
 
 $courseId = intval($_GET['id']);
 $course = new Course();
-$courseDetails = $course->getCourseById($courseId);
+
+try {
+    $courseDetails = $course->getCourseById($courseId);
+} catch (Exception $e) {
+    error_log("Course fetch error: " . $e->getMessage());
+    $courseDetails = null;
+}
 
 if (!$courseDetails) {
     $_SESSION['error_message'] = 'Course not found';
@@ -67,7 +73,7 @@ $isEnrolled = false;
 $enrollmentDate = null;
 if (isLoggedIn() && getUserRole() === 'student') {
     $studentId = $_SESSION['user_id'];
-    $stmt = $conn->prepare("SELECT id, enrolled_at FROM enrollments WHERE student_id = ? AND course_id = ?");
+    $stmt = $conn->prepare("SELECT id, enrolled_at FROM enrollments_new WHERE user_id = ? AND course_id = ? AND status = 'active'");
     if (!$stmt) {
         error_log("Enrollment check query prepare failed: " . $conn->error);
         $isEnrolled = false;
@@ -775,10 +781,10 @@ $conn->close();
                 return;
             <?php endif; ?>
             
-            // Handle enrollment - show payment options modal
+            // Handle enrollment - redirect to billing page
             $('.enroll-course-btn').click(function(e) {
                 e.preventDefault();
-                console.log('Enroll button clicked');
+                console.log('Enroll button clicked - redirecting to billing');
                 
                 var btn = $(this);
                 var courseId = btn.data('course-id');
@@ -791,18 +797,8 @@ $conn->close();
                 
                 console.log('Course ID:', courseId);
                 
-                // Store course ID for payment processing
-                $('#proceedPayment').data('course-id', courseId);
-                
-                // Show payment options modal
-                try {
-                    var modal = new bootstrap.Modal(document.getElementById('paymentOptionsModal'));
-                    modal.show();
-                    console.log('Payment modal shown');
-                } catch (error) {
-                    console.error('Error showing modal:', error);
-                    alert('Error opening payment options. Please try again.');
-                }
+                // Redirect to billing page with course ID
+                window.location.href = 'billing.php?course_id=' + courseId;
             });
             
             // Payment method selection function

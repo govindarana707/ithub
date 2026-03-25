@@ -43,7 +43,13 @@ class PaymentService {
                 'product_code' => 'EPAYTEST'
             ];
             
+            // Debug: Log the signature data
+            error_log("eSewa Signature Data: " . json_encode($signatureData));
+            
             $signature = $this->signatureService->generateSignature($signatureData);
+            
+            // Debug: Log the generated signature
+            error_log("eSewa Generated Signature: " . $signature);
             
             // Create payment record
             $query = "INSERT INTO payments (
@@ -124,7 +130,7 @@ class PaymentService {
      */
     public function checkEsewaStatus($transactionUuid, $totalAmount) {
         try {
-            $url = "https://rc.esewa.com.np/api/epay/transaction/status/?" . http_build_query([
+            $url = "https://rc-epay.esewa.com.np/api/epay/transaction/status/?" . http_build_query([
                 'product_code' => 'EPAYTEST',
                 'total_amount' => $totalAmount,
                 'transaction_uuid' => $transactionUuid
@@ -186,7 +192,9 @@ class PaymentService {
                 WHERE transaction_uuid = ? AND status = 'pending'";
             
             $stmt = $conn->prepare($query);
-            $stmt->bind_param("ss", json_encode($responseData), $responseData['transaction_uuid']);
+            $gatewayResponse = json_encode($responseData);
+            $transactionUuid = $responseData['transaction_uuid'];
+            $stmt->bind_param("ss", $gatewayResponse, $transactionUuid);
             
             if (!$stmt->execute()) {
                 throw new Exception("Failed to update payment status");
@@ -265,6 +273,107 @@ class PaymentService {
             
         } catch (Exception $e) {
             error_log("PaymentService: Failed to get pending payment - " . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Verify eSewa payment by checking status with eSewa API
+     * 
+     * @param array $responseData Response data from eSewa
+     * @return array Verification result
+     */
+    public function verifyEsewaPayment($responseData) {
+        try {
+            $transactionUuid = $responseData['transaction_uuid'] ?? '';
+            $totalAmount = $responseData['total_amount'] ?? '';
+            
+            if (empty($transactionUuid) || empty($totalAmount)) {
+                return ['success' => false, 'error' => 'Missing required parameters'];
+            }
+            
+            // Check payment status using eSewa API
+            $statusCheck = $this->checkEsewaStatus($transactionUuid, $totalAmount);
+            
+            if (!$statusCheck['success']) {
+                return ['success' => false, 'error' => $statusCheck['error']];
+            }
+            
+            // Verify the status is "complete"
+            if ($statusCheck['status'] !== 'Complete') {
+                return ['success' => false, 'error' => 'Payment not completed. Status: ' . $statusCheck['status']];
+            }
+            
+            // Update payment to completed
+            $updateResult = $this->processEsewaSuccess($responseData);
+            
+            return $updateResult;
+            
+        } catch (Exception $e) {
+            error_log("PaymentService: eSewa verification failed - " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Update payment status
+     * 
+     * @param int $paymentId Payment ID
+     * @param string $status New status
+     * @param string $failureReason Failure reason if applicable
+     * @param array $additionalData Additional data to update
+     * @return bool Success status
+     */
+    public function updatePaymentStatus($paymentId, $status, $failureReason = '', $additionalData = []) {
+        try {
+            $conn = $this->db->getConnection();
+            
+            $query = "UPDATE payments SET status = ?, failure_reason = ?, updated_at = NOW()";
+            $params = [$status, $failureReason];
+            $types = "ss";
+            
+            // Add additional fields if provided
+            if (isset($additionalData['gateway_response'])) {
+                $query .= ", gateway_response = ?";
+                $params[] = $additionalData['gateway_response'];
+                $types .= "s";
+            }
+            
+            $query .= " WHERE id = ?";
+            $params[] = $paymentId;
+            $types .= "i";
+            
+            $stmt = $conn->prepare($query);
+            $stmt->bind_param($types, ...$params);
+            
+            return $stmt->execute();
+            
+        } catch (Exception $e) {
+            error_log("PaymentService: Failed to update payment status - " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Get payment by ID
+     * 
+     * @param int $paymentId Payment ID
+     * @return array|null Payment record
+     */
+    public function getPaymentById($paymentId) {
+        try {
+            $conn = $this->db->getConnection();
+            
+            $query = "SELECT * FROM payments WHERE id = ?";
+            $stmt = $conn->prepare($query);
+            $stmt->bind_param("i", $paymentId);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            return $result->fetch_assoc();
+            
+        } catch (Exception $e) {
+            error_log("PaymentService: Failed to get payment by ID - " . $e->getMessage());
             return null;
         }
     }
