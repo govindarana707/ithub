@@ -108,6 +108,7 @@ $csrfToken = generateCSRFToken();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="assets/css/style.css" rel="stylesheet">
+    <link href="student/css/student-theme.css" rel="stylesheet">
     <style>
         .billing-container {
             max-width: 900px;
@@ -116,38 +117,41 @@ $csrfToken = generateCSRFToken();
         }
         
         .billing-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--gradient-primary);
             color: white;
             padding: 30px;
-            border-radius: 15px;
+            border-radius: var(--radius-md);
             margin-bottom: 30px;
         }
         
         .course-summary {
-            background: white;
-            border-radius: 10px;
+            background: var(--bg-primary);
+            border-radius: var(--radius-md);
             padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow);
             margin-bottom: 30px;
+            border: 1px solid var(--border-color);
         }
         
         .payment-option {
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius);
             padding: 20px;
             margin-bottom: 15px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: var(--transition);
+            background: var(--bg-primary);
         }
         
         .payment-option:hover {
-            border-color: #667eea;
+            border-color: var(--primary-color);
             transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
         }
         
         .payment-option.selected {
-            border-color: #667eea;
-            background: #f8f9ff;
+            border-color: var(--primary-color);
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
         }
         
         .payment-option input[type="radio"] {
@@ -160,8 +164,8 @@ $csrfToken = generateCSRFToken();
             top: 50%;
             transform: translateY(-50%);
             opacity: 0;
-            color: #667eea;
-            transition: opacity 0.3s ease;
+            color: var(--primary-color);
+            transition: var(--transition);
         }
         
         .payment-option.selected .check-icon {
@@ -170,35 +174,37 @@ $csrfToken = generateCSRFToken();
         
         .payment-icon {
             font-size: 32px;
-            width: 50px;
+            width: 60px;
             height: 50px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 10px;
+            border-radius: var(--radius);
             margin-right: 15px;
         }
         
-        .esewa-icon { background: #60a917; color: white; }
-        .khalti-icon { background: #7733e6; color: white; }
-        .trial-icon { background: #3498db; color: white; }
+        .esewa-icon { background: var(--gradient-success); color: white; }
+        .khalti-icon { background: var(--gradient-info); color: white; }
+        .trial-icon { background: var(--gradient-warning); color: white; }
         
         .proceed-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--gradient-primary);
             border: none;
             padding: 15px 30px;
             font-size: 18px;
-            border-radius: 10px;
-            transition: all 0.3s ease;
+            border-radius: var(--radius);
+            transition: var(--transition);
+            font-weight: var(--font-weight-medium);
+            color: white;
         }
         
         .proceed-btn:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: var(--shadow-primary);
         }
         
         .proceed-btn:disabled {
-            background: #ccc;
+            background: var(--gray-color);
             cursor: not-allowed;
         }
         
@@ -218,11 +224,12 @@ $csrfToken = generateCSRFToken();
         }
         
         .back-link {
-            color: #667eea;
+            color: var(--primary-color);
             text-decoration: none;
             display: inline-flex;
             align-items: center;
             margin-bottom: 20px;
+            font-weight: var(--font-weight-medium);
         }
         
         .back-link:hover {
@@ -231,22 +238,22 @@ $csrfToken = generateCSRFToken();
         
         .price-tag {
             font-size: 28px;
-            font-weight: bold;
-            color: #667eea;
+            font-weight: var(--font-weight-bold);
+            color: var(--primary-color);
         }
         
         .original-price {
             text-decoration: line-through;
-            color: #999;
+            color: var(--gray-color);
             font-size: 18px;
         }
         
         .free-tag {
-            background: #27ae60;
+            background: var(--gradient-success);
             color: white;
             padding: 5px 15px;
-            border-radius: 20px;
-            font-weight: bold;
+            border-radius: var(--radius-lg);
+            font-weight: var(--font-weight-bold);
         }
         
         /* Khalti Payment Modal Styles */
