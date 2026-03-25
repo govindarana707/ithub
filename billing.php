@@ -331,7 +331,7 @@ $csrfToken = generateCSRFToken();
                     <input type="radio" name="payment_method" value="esewa">
                     <div class="d-flex align-items-center">
                         <div class="payment-icon esewa-icon">
-                            <i class="fas fa-wallet"></i>
+                            <img src="assets/images/esewa.png" alt="eSewa" style="height: 40px; width: auto; object-fit: contain;">
                         </div>
                         <div>
                             <h5 class="mb-1">Pay with eSewa</h5>
