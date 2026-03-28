@@ -44,28 +44,20 @@ $instructorStats = $instructor->getInstructorAnalytics($instructorId);
 $conn->close();
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Courses - Instructor Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
-    <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <style>
+<?php require_once '../includes/universal_header.php'; ?>
+
+<!-- Enhanced Courses Page Styles -->
+<style>
         :root {
-            --primary-color: #6366f1;
-            --primary-dark: #4f46e5;
-            --secondary-color: #8b5cf6;
+            --primary-color: #667eea;
+            --primary-dark: #5a67d8;
+            --secondary-color: #764ba2;
             --success-color: #10b981;
             --warning-color: #f59e0b;
             --danger-color: #ef4444;
-            --info-color: #06b6d4;
-            --dark-color: #1f2937;
-            --light-color: #f9fafb;
+            --info-color: #3b82f6;
+            --dark-color: #1e293b;
+            --light-color: #f8fafc;
             --border-color: #e5e7eb;
             --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -81,7 +73,7 @@ $conn->close();
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
             min-height: 100vh;
             color: var(--dark-color);
         }
@@ -168,7 +160,7 @@ $conn->close();
         }
 
         .sidebar-modern .list-group-item:hover {
-            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
             transform: translateX(8px);
             border-left-color: var(--primary-color);
         }
@@ -229,7 +221,7 @@ $conn->close();
 
         .stat-icon.primary { background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; }
         .stat-icon.success { background: linear-gradient(135deg, var(--success-color), #059669); color: white; }
-        .stat-icon.info { background: linear-gradient(135deg, var(--info-color), #0891b2); color: white; }
+        .stat-icon.info { background: linear-gradient(135deg, var(--info-color), #1d4ed8); color: white; }
         .stat-icon.warning { background: linear-gradient(135deg, var(--warning-color), #d97706); color: white; }
 
         /* Course Cards */
@@ -543,7 +535,7 @@ $conn->close();
             border-radius: 0 0 16px 16px;
         }
 
-        /* Animations */
+        /* Enhanced animations */
         @keyframes fadeInUp {
             from {
                 opacity: 0;
@@ -559,42 +551,64 @@ $conn->close();
             animation: fadeInUp 0.6s ease-out;
         }
 
-        /* Course card animation for dynamic addition */
-        .course-card-new {
-            animation: slideIn 0.5s ease-out;
+        /* Dashboard Header Styles (matching dashboard.php) */
+        .dashboard-header {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            margin-bottom: 2rem;
+            border: 1px solid #e5e7eb;
         }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .header-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
         }
 
-        /* Button loading state */
-        .btn-loading {
-            pointer-events: none;
-            opacity: 0.7;
+        .header-subtitle {
+            color: #64748b;
+            font-size: 1.1rem;
+            margin: 0;
         }
 
-        .btn-loading::after {
-            content: '';
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border: 2px solid #fff;
-            border-top-color: transparent;
-            border-radius: 50%;
-            margin-left: 8px;
-            animation: spin 0.8s linear infinite;
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        /* Responsive */
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        /* Responsive Design */
         @media (max-width: 768px) {
+            .header-title {
+                font-size: 1.75rem;
+            }
+            
+            .dashboard-header {
+                padding: 1.5rem;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            
+            .header-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
             .course-stats {
                 grid-template-columns: 1fr;
             }
@@ -615,33 +629,12 @@ $conn->close();
         <div class="loading-spinner"></div>
     </div>
 
-    <nav class="navbar navbar-expand-lg">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="dashboard.php">
-                    <i class="fas fa-tachometer-alt me-1"></i> Dashboard
-                </a>
-                <a class="nav-link active" href="courses.php">
-                    <i class="fas fa-chalkboard-teacher me-1"></i> My Courses
-                </a>
-                <a class="nav-link" href="students.php">
-                    <i class="fas fa-users me-1"></i> Students
-                </a>
-                <a class="nav-link" href="../logout.php">
-                    <i class="fas fa-sign-out-alt me-1"></i> Logout
-                </a>
-            </div>
-        </div>
-    </nav>
-
+    <!-- Main Content -->
     <div class="container-fluid py-4">
         <div class="row">
+            <!-- Sidebar -->
             <div class="col-md-3">
-                <div class="sidebar-modern list-group">
+                <div class="list-group">
                     <a href="dashboard.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-tachometer-alt me-2"></i> Dashboard
                     </a>
@@ -654,17 +647,14 @@ $conn->close();
                     <a href="students.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-users me-2"></i> Students
                     </a>
-                    <a href="quizzes.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-question-circle me-2"></i> Quizzes
-                    </a>
-                    <a href="discussions.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-comments me-2"></i> Discussions
-                    </a>
                     <a href="earnings.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-rupee-sign me-2"></i> Earnings
                     </a>
                     <a href="profile.php" class="list-group-item list-group-item-action">
                         <i class="fas fa-user me-2"></i> Profile
+                    </a>
+                    <a href="../logout.php" class="list-group-item list-group-item-action">
+                        <i class="fas fa-sign-out-alt me-2"></i> Logout
                     </a>
                 </div>
                 
@@ -686,16 +676,23 @@ $conn->close();
                 </div>
             </div>
             
+            <!-- Main Content -->
             <div class="col-md-9">
                 <!-- Header -->
-                <div class="d-flex justify-content-between align-items-center mb-4 animate-fade-in-up">
-                    <div>
-                        <h1 class="mb-2 fw-bold">My Courses</h1>
-                        <p class="text-muted mb-0">Manage and monitor your educational content</p>
+                <div class="dashboard-header mb-4">
+                    <div class="header-content">
+                        <div class="header-left">
+                            <h1 class="header-title">My Courses</h1>
+                            <p class="header-subtitle">Manage and monitor your educational content</p>
+                        </div>
+                        <div class="header-right">
+                            <div class="header-actions">
+                                <button type="button" class="btn btn-primary btn-lg" id="btnCreateCourse">
+                                    <i class="fas fa-plus me-2"></i>Create New Course
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <button type="button" class="btn btn-primary btn-lg" id="btnCreateCourse">
-                        <i class="fas fa-plus me-2"></i>Create New Course
-                    </button>
                 </div>
 
                 <!-- Stats Overview -->

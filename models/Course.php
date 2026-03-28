@@ -695,15 +695,21 @@ class Course {
         $stmt->bind_param("i", $studentId);
         $stmt->execute();
         $result = $stmt->get_result();
+        $courses = $result->fetch_all(MYSQLI_ASSOC);
         
-        return $result->fetch_all(MYSQLI_ASSOC);
+        // Recalculate progress for each course to ensure accuracy
+        foreach ($courses as &$course) {
+            $course['progress_percentage'] = $this->calculateCourseProgress($studentId, $course['id']);
+        }
+        
+        return $courses;
     }
     
     public function calculateCourseProgress($studentId, $courseId) {
         $conn = $this->db->getConnection();
         
         // Get total lessons for the course
-        $lessonStmt = $conn->prepare("SELECT COUNT(*) as total_lessons FROM lessons WHERE course_id = ?");
+        $lessonStmt = $conn->prepare("SELECT COUNT(*) as total_lessons FROM lessons WHERE course_id = ? AND is_published = 1");
         if ($lessonStmt === false) {
             error_log("Failed to prepare lesson count query: " . $conn->error);
             return 0;
@@ -723,12 +729,12 @@ class Course {
             return 0;
         }
         
-        // Get completed lessons for the student
+        // Get completed lessons for the student using the correct field
         $completedStmt = $conn->prepare("
             SELECT COUNT(*) as completed_lessons 
             FROM lesson_progress lp 
             JOIN lessons l ON lp.lesson_id = l.id 
-            WHERE lp.student_id = ? AND l.course_id = ? AND lp.status = 'completed'
+            WHERE lp.student_id = ? AND l.course_id = ? AND lp.completed = 1 AND l.is_published = 1
         ");
         if ($completedStmt === false) {
             error_log("Failed to prepare completed lessons query: " . $conn->error);

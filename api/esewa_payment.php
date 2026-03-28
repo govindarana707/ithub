@@ -1,6 +1,8 @@
 <?php
-require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../services/PaymentService.php';
+require_once '../includes/session_helper.php';
+require_once '../config/config.php';
+require_once '../models/User.php';
+require_once '../includes/AuthEnhancements.php';
 require_once __DIR__ . '/../services/EnrollmentServiceNew.php';
 
 header('Content-Type: application/json');

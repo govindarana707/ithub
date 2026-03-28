@@ -71,6 +71,7 @@ try {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="css/student-theme.css" rel="stylesheet">
     <style>
         :root {
             --primary: #6366f1;
@@ -123,29 +124,7 @@ try {
     </style>
 </head>
 <body>
-    <!-- Universal Header -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            <div class="navbar-nav ms-auto">
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="studentDropdown" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user me-1"></i> Student
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="dashboard.php">Dashboard</a></li>
-                        <li><a class="dropdown-item active" href="my-courses.php">My Courses</a></li>
-                        <li><a class="dropdown-item" href="certificates.php">Certificates</a></li>
-                        <li><a class="dropdown-item" href="profile.php">Profile</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <?php include 'includes/navigation.php'; ?>
 
     <div class="container-fluid py-4">
         <div class="row">

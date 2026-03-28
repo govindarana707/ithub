@@ -67,19 +67,6 @@ $similarStmt = $conn->prepare("
 $similarStmt->bind_param("ii", $courseDetails['category_id'], $courseId);
 $similarStmt->execute();
 $similarCourses = $similarStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-
-// Handle enrollment
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enroll'])) {
-    $enrollmentResult = $course->enrollStudent($studentId, $courseId);
-    
-    if ($enrollmentResult['success']) {
-        $_SESSION['success_message'] = 'Successfully enrolled in course!';
-        header("Location: my-courses.php");
-        exit;
-    } else {
-        $_SESSION['error_message'] = $enrollmentResult['error'] ?? 'Enrollment failed';
-    }
-}
 ?>
 
 <!DOCTYPE html>
@@ -449,11 +436,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enroll'])) {
                                             <p class="text-muted">Enroll now and start learning</p>
                                         </div>
                                         
-                                        <form method="POST">
-                                            <button type="submit" name="enroll" class="btn btn-enroll w-100">
-                                                <i class="fas fa-plus-circle me-2"></i>Enroll Now
-                                            </button>
-                                        </form>
+                                        <a href="../billing.php?course_id=<?php echo $courseId; ?>" class="btn btn-enroll w-100">
+                                            <i class="fas fa-plus-circle me-2"></i>Enroll Now
+                                        </a>
                                     <?php endif; ?>
                                 </div>
 

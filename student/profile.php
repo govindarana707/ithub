@@ -93,6 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="css/student-theme.css" rel="stylesheet">
     <style>
         .profile-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -158,34 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="dashboard.php">
-                    <i class="fas fa-tachometer-alt me-1"></i> Dashboard
-                </a>
-                <a class="nav-link" href="courses.php">
-                    <i class="fas fa-book me-1"></i> Courses
-                </a>
-                <a class="nav-link" href="my-courses.php">
-                    <i class="fas fa-book-open me-1"></i> My Courses
-                </a>
-                <a class="nav-link" href="certificates.php">
-                    <i class="fas fa-certificate me-1"></i> Certificates
-                </a>
-                <a class="nav-link active" href="profile.php">
-                    <i class="fas fa-user me-1"></i> Profile
-                </a>
-                <a class="nav-link" href="../logout.php">
-                    <i class="fas fa-sign-out-alt me-1"></i> Logout
-                </a>
-            </div>
-        </div>
-    </nav>
+    <?php include 'includes/navigation.php'; ?>
 
     <div class="container-fluid py-4">
         <div class="row">

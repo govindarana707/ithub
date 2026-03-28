@@ -1,4 +1,5 @@
 <?php
+require_once '../includes/session_helper.php';
 require_once '../config/config.php';
 require_once '../models/User.php';
 
