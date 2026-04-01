@@ -95,8 +95,44 @@ $conn->close();
     <title><?php echo htmlspecialchars($quizData['title']); ?> - IT HUB</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="../assets/css/theme.css" rel="stylesheet">
+    <link href="css/student-theme.css" rel="stylesheet">
     <style>
+        /* Force Royal Blue Colors */
+        :root {
+            --primary-color: #4169E1 !important;
+            --secondary-color: #2563EB !important;
+            --gradient-primary: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        /* Force Royal Blue for Sidebar */
+        .sidebar-nav {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        /* Force Royal Blue for Universal Header */
+        .universal-header {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        /* Force Royal Blue for any remaining elements */
+        .btn-primary {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+            border: none !important;
+        }
+        
+        .bg-primary {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        .text-primary {
+            color: #4169E1 !important;
+        }
+        
+        .border-primary {
+            border-color: #4169E1 !important;
+        }
+        
         .quiz-container {
             max-width: 800px;
             margin: 0 auto;
@@ -108,25 +144,25 @@ $conn->close();
             margin-bottom: 2rem;
         }
         .option-card {
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius);
             padding: 1rem;
             margin-bottom: 1rem;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: var(--transition);
         }
         .option-card:hover {
-            border-color: #007bff;
-            background-color: #f8f9fa;
+            border-color: var(--primary-color);
+            background-color: var(--bg-secondary);
         }
         .option-card.selected {
-            border-color: #007bff;
-            background-color: #e7f3ff;
+            border-color: var(--primary-color);
+            background-color: rgba(102, 126, 234, 0.1);
         }
         .timer {
             font-size: 1.5rem;
             font-weight: bold;
-            color: #dc3545;
+            color: var(--danger-color);
         }
         .progress-indicator {
             display: flex;
@@ -138,40 +174,20 @@ $conn->close();
             width: 12px;
             height: 12px;
             border-radius: 50%;
-            background-color: #e9ecef;
-            transition: all 0.3s ease;
+            background-color: var(--border-color);
+            transition: var(--transition);
         }
         .progress-dot.active {
-            background-color: #007bff;
+            background-color: var(--primary-color);
             transform: scale(1.2);
         }
         .progress-dot.answered {
-            background-color: #28a745;
+            background-color: var(--success-color);
         }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-circle me-1"></i><?php echo htmlspecialchars($_SESSION['full_name']); ?>
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="dashboard.php"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
-                        <li><a class="dropdown-item" href="my-courses.php"><i class="fas fa-graduation-cap me-2"></i>My Courses</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="../logout.php"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <?php require_once '../includes/universal_header.php'; ?>
 
     <div class="container-fluid py-4">
         <div class="quiz-container">
@@ -309,7 +325,7 @@ $conn->close();
             
             // Change color when time is running out
             if (timeRemaining <= 300) { // 5 minutes
-                document.getElementById('quizTimer').style.color = '#dc3545';
+                document.getElementById('quizTimer').style.color = 'var(--danger-color)';
             }
         }, 1000);
         
@@ -360,28 +376,20 @@ $conn->close();
             // Add selected class
             element.classList.add('selected');
             
-            // Check the radio button
+            // Check the radio button - THIS is the primary way answers are submitted
             const radio = element.querySelector('input[type="radio"]');
             if (radio) {
                 radio.checked = true;
+                // Ensure the radio button value is set correctly
+                radio.value = value;
             }
             
             // Update progress dot
             const questionIndex = parseInt(element.closest('.question-container').dataset.questionIndex);
             document.querySelectorAll('.progress-dot')[questionIndex].classList.add('answered');
             
-            // Store answer in both the variable AND ensure it's in the form
+            // Store in answers object for progress tracking only (not submission)
             answers[questionId] = value;
-            
-            // Also set a hidden input directly so it's always submitted
-            let hiddenInput = document.querySelector('input[name="answers[' + questionId + ']"]');
-            if (!hiddenInput) {
-                hiddenInput = document.createElement('input');
-                hiddenInput.type = 'hidden';
-                hiddenInput.name = 'answers[' + questionId + ']';
-                document.getElementById('quizForm').appendChild(hiddenInput);
-            }
-            hiddenInput.value = value;
         }
         
         // Handle textarea changes

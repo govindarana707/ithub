@@ -13,7 +13,7 @@ $token = sanitize($_GET['token']);
 
 // Verify token
 $conn = connectDB();
-$stmt = $conn->prepare("SELECT id, email FROM users WHERE reset_token = ? AND reset_token_expiry > NOW()");
+$stmt = $conn->prepare("SELECT id, email FROM users_newWHERE reset_token = ? AND reset_token_expiry > NOW()");
 $stmt->bind_param("s", $token);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $hashedPassword = hashPassword($password);
     
     // Update password and clear reset token
-    $stmt = $conn->prepare("UPDATE users SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE reset_token = ?");
+    $stmt = $conn->prepare("UPDATE users_newSET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE reset_token = ?");
     $stmt->bind_param("ss", $hashedPassword, $token);
     
     if ($stmt->execute()) {

@@ -29,10 +29,16 @@ class LessonContent
                    COALESCE(u.full_name, 'Unknown') as instructor_name, 
                    COALESCE(u.email, '') as instructor_email
             FROM lessons l
-            LEFT JOIN courses c ON l.course_id = c.id
-            LEFT JOIN users u ON c.instructor_id = u.id
+            LEFT JOIN courses_new c ON l.course_id = c.id
+            LEFT JOIN users_new u ON c.instructor_id = u.id
             WHERE l.id = ?
         ");
+        
+        if ($stmt === false) {
+            error_log("Failed to prepare lesson content query: " . $this->conn->error);
+            return null;
+        }
+        
         $stmt->bind_param('i', $lessonId);
         $stmt->execute();
         $result = $stmt->get_result();

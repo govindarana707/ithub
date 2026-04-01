@@ -64,9 +64,14 @@ $similarStmt = $conn->prepare("
     WHERE category_id = ? AND id != ? AND status = 'published' 
     LIMIT 4
 ");
-$similarStmt->bind_param("ii", $courseDetails['category_id'], $courseId);
-$similarStmt->execute();
-$similarCourses = $similarStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+if ($similarStmt === false) {
+    error_log("Failed to prepare similar courses query: " . $conn->error);
+    $similarCourses = [];
+} else {
+    $similarStmt->bind_param("ii", $courseDetails['category_id'], $courseId);
+    $similarStmt->execute();
+    $similarCourses = $similarStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+}
 ?>
 
 <!DOCTYPE html>
@@ -78,6 +83,8 @@ $similarCourses = $similarStmt->get_result()->fetch_all(MYSQLI_ASSOC);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="../assets/css/theme.css" rel="stylesheet">
+    <link href="css/student-theme.css" rel="stylesheet">
     <style>
         .dashboard-container {
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -255,30 +262,7 @@ $similarCourses = $similarStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 </head>
 <body>
     <div class="dashboard-container">
-        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-            <div class="container-fluid">
-                <a class="navbar-brand" href="dashboard.php">
-                    <i class="fas fa-graduation-cap me-2"></i>IT HUB
-                </a>
-                
-                <div class="navbar-nav ms-auto">
-                    <div class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="studentDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user me-1"></i> Student
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="dashboard.php">Dashboard</a></li>
-                            <li><a class="dropdown-item" href="my-courses.php">My Courses</a></li>
-                            <li><a class="dropdown-item" href="courses.php">Course Catalog</a></li>
-                            <li><a class="dropdown-item" href="certificates.php">Certificates</a></li>
-                            <li><a class="dropdown-item" href="profile.php">Profile</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </nav>
+        <?php require_once '../includes/universal_header.php'; ?>
 
         <div class="container-fluid py-4">
             <div class="row">

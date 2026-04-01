@@ -17,9 +17,9 @@ $stmt = $conn->prepare("
            co.title as course_title, co.description as course_description,
            ins.full_name as instructor_name
     FROM certificates c
-    JOIN users u ON c.student_id = u.id
-    JOIN courses co ON c.course_id = co.id
-    JOIN users ins ON co.instructor_id = ins.id
+    JOIN users_new u ON c.student_id = u.id
+    JOIN courses_new co ON c.course_id = co.id
+    LEFT JOIN users_new ins ON co.instructor_id = ins.id
     WHERE c.certificate_code = ?
 ");
 $stmt->bind_param("s", $certificateCode);

@@ -87,8 +87,40 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST') 
 // Get all categories
 $db = new Database();
 $conn = $db->getConnection();
-$stmt = $conn->query("SELECT c.*, COUNT(co.id) as course_count FROM categories c LEFT JOIN courses co ON c.id = co.category_id GROUP BY c.id ORDER BY c.name");
-$categories = $stmt->fetch_all(MYSQLI_ASSOC);
+
+// Check if categories table exists and get categories
+$categories = [];
+try {
+    // Try the main query with courses join
+    $stmt = $conn->query("SELECT c.*, COUNT(co.id) as course_count FROM categories c LEFT JOIN courses co ON c.id = co.category_id GROUP BY c.id ORDER BY c.name");
+    if ($stmt) {
+        $categories = $stmt->fetch_all(MYSQLI_ASSOC);
+    } else {
+        // Try simpler query if the join fails
+        $stmt = $conn->query("SELECT * FROM categories ORDER BY name");
+        if ($stmt) {
+            $categories = $stmt->fetch_all(MYSQLI_ASSOC);
+            // Add course count as 0 for all categories
+            foreach ($categories as &$category) {
+                $category['course_count'] = 0;
+            }
+        } else {
+            // Try categories_new table if categories doesn't exist
+            $stmt = $conn->query("SELECT * FROM categories_new ORDER BY name");
+            if ($stmt) {
+                $categories = $stmt->fetch_all(MYSQLI_ASSOC);
+                // Add course count as 0 for all categories
+                foreach ($categories as &$category) {
+                    $category['course_count'] = 0;
+                }
+            }
+        }
+    }
+} catch (Exception $e) {
+    // If all queries fail, categories will remain empty
+    $categories = [];
+}
+
 $conn->close();
 ?>
 

@@ -56,95 +56,12 @@ if ($editId > 0) {
     }
 }
 ?>
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quizzes - Instructor Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <style>
-        .card-soft {
-            background: #fff;
-            border-radius: 10px;
-            padding: 1rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
-        }
-        .quiz-meta {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-        .quiz-card {
-            transition: transform 0.2s, box-shadow 0.2s;
-            cursor: pointer;
-        }
-        .quiz-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        .loading-spinner {
-            display: inline-block;
-            width: 1rem;
-            height: 1rem;
-            border: 2px solid #fff;
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="dashboard.php"><i class="fas fa-tachometer-alt me-1"></i> Dashboard</a>
-                <a class="nav-link" href="courses.php"><i class="fas fa-chalkboard-teacher me-1"></i> My Courses</a>
-                <a class="nav-link" href="students.php"><i class="fas fa-users me-1"></i> Students</a>
-                <a class="nav-link active" href="quizzes.php"><i class="fas fa-question-circle me-1"></i> Quizzes</a>
-                <a class="nav-link" href="../logout.php"><i class="fas fa-sign-out-alt me-1"></i> Logout</a>
-            </div>
-        </div>
-    </nav>
+<?php require_once '../includes/universal_header.php'; ?>
 
     <div class="container-fluid py-4">
         <div class="row">
             <div class="col-md-3">
-                <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chalkboard-teacher me-2"></i> My Courses
-                    </a>
-                    <a href="create-course.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-plus me-2"></i> Create Course
-                    </a>
-                    <a href="students.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-users me-2"></i> Students
-                    </a>
-                    <a href="quizzes.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-question-circle me-2"></i> Quizzes
-                    </a>
-                    <a href="earnings.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-rupee-sign me-2"></i> Earnings
-                    </a>
-                    <a href="profile.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-user me-2"></i> Profile
-                    </a>
-                </div>
+                <?php require_once '../includes/instructor_sidebar.php'; ?>
             </div>
 
             <div class="col-md-9">

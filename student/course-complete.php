@@ -40,6 +40,9 @@ if ($progress < 100) {
 require_once '../includes/universal_header.php';
 ?>
 
+<link href="../assets/css/theme.css" rel="stylesheet">
+<link href="css/student-theme.css" rel="stylesheet">
+
 <style>
     .completion-container {
         min-height: 80vh;
@@ -136,11 +139,10 @@ require_once '../includes/universal_header.php';
                             </a>
                         </div>
                         <div class="col-sm-6 col-md-5">
-                            <a href="certificate.php?course_id=<?php echo $courseId; ?>"
-                                class="btn btn-success btn-action w-100 text-white"
+                            <button onclick="generateCertificate()" class="btn btn-success btn-action w-100 text-white"
                                 style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border: none;">
                                 <i class="fas fa-certificate me-2"></i>Get Certificate
-                            </a>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -158,6 +160,70 @@ require_once '../includes/universal_header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
 <script>
+    // Certificate generation function
+    function generateCertificate() {
+        const courseId = <?php echo $courseId; ?>;
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        
+        // Show loading state
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating...';
+        
+        // Generate certificate via API
+        fetch('../api/generate_certificates.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'action=generate_single&course_id=' + courseId
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message with redirect indication
+                btn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Generated! Redirecting...';
+                btn.disabled = true;
+                
+                // Add success message below the button
+                const successMsg = document.createElement('div');
+                successMsg.className = 'alert alert-success mt-3';
+                successMsg.innerHTML = '<i class="fas fa-check-circle me-2"></i>Certificate generated successfully! Redirecting to certificates page...';
+                btn.parentElement.appendChild(successMsg);
+                
+                // Redirect to certificates page after 1.5 seconds
+                setTimeout(() => {
+                    window.location.href = 'certificates.php';
+                }, 1500);
+            } else {
+                // Show error
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Try Again';
+                
+                alert('Error generating certificate: ' + (data.message || 'Unknown error'));
+                
+                // Reset button after 3 seconds
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }, 3000);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Try Again';
+            
+            alert('Error generating certificate. Please try again.');
+            
+            // Reset button after 3 seconds
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }, 3000);
+        });
+    }
+    
     // Simple confetti effect
     document.addEventListener('DOMContentLoaded', function () {
         if (typeof confetti !== 'undefined') {

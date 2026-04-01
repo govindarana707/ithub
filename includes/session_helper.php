@@ -85,6 +85,20 @@ function isSessionExpired() {
 }
 
 /**
+ * Check if session is valid for a given user ID
+ */
+function isValidSession($studentId = null) {
+    if ($studentId === null) {
+        $studentId = getCurrentUserId();
+    }
+    
+    return isUserLoggedIn() && 
+           !empty($studentId) && 
+           $studentId > 0 && 
+           !isSessionExpired();
+}
+
+/**
  * Update session activity timestamp
  */
 function updateSessionActivity() {

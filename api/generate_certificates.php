@@ -126,7 +126,7 @@ function verifyCertificate($conn, $certificateId) {
         FROM certificates c
         JOIN courses_new co ON c.course_id = co.id
         JOIN users_new u ON c.student_id = u.id
-        JOIN users_new ins ON co.instructor_id = ins.id
+        LEFT JOIN users_new ins ON co.instructor_id = ins.id
         WHERE c.certificate_id = ? AND c.status = 'issued'
     ");
     
@@ -176,10 +176,10 @@ function generateMissingCertificates($conn, $progress, $studentId = null) {
     // If studentId is provided, generate only for that student
     if ($studentId) {
         $stmt = $conn->prepare("
-            SELECT DISTINCT e.student_id, e.course_id
-            FROM enrollments e
-            LEFT JOIN certificates c ON e.student_id = c.student_id AND e.course_id = c.course_id
-            WHERE e.student_id = ?
+            SELECT DISTINCT e.user_id as student_id, e.course_id
+            FROM enrollments_new e
+            LEFT JOIN certificates c ON e.user_id = c.student_id AND e.course_id = c.course_id
+            WHERE e.user_id = ?
             AND e.progress_percentage >= 100 
             AND c.id IS NULL
             AND e.status = 'completed'
@@ -188,9 +188,9 @@ function generateMissingCertificates($conn, $progress, $studentId = null) {
     } else {
         // Get all students with 100% course completion but no certificate
         $stmt = $conn->prepare("
-            SELECT DISTINCT e.student_id, e.course_id
-            FROM enrollments e
-            LEFT JOIN certificates c ON e.student_id = c.student_id AND e.course_id = c.course_id
+            SELECT DISTINCT e.user_id as student_id, e.course_id
+            FROM enrollments_new e
+            LEFT JOIN certificates c ON e.user_id = c.student_id AND e.course_id = c.course_id
             WHERE e.progress_percentage >= 100 
             AND c.id IS NULL
             AND e.status = 'completed'

@@ -37,7 +37,12 @@ $totalCourses = $stmt->get_result()->fetch_assoc()['total'];
 $totalPages = ceil($totalCourses / $limit);
 
 // Get categories
-$categories = $conn->query("SELECT id, name FROM categories_new ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+$categoriesResult = $conn->query("SELECT id, name FROM categories_new ORDER BY name");
+if ($categoriesResult === false) {
+    $categories = [];
+} else {
+    $categories = $categoriesResult->fetch_all(MYSQLI_ASSOC);
+}
 
 // Get instructor statistics
 $instructorStats = $instructor->getInstructorAnalytics($instructorId);
@@ -634,46 +639,7 @@ $conn->close();
         <div class="row">
             <!-- Sidebar -->
             <div class="col-md-3">
-                <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="courses.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-chalkboard-teacher me-2"></i> My Courses
-                    </a>
-                    <a href="create-course.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-plus me-2"></i> Create Course
-                    </a>
-                    <a href="students.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-users me-2"></i> Students
-                    </a>
-                    <a href="earnings.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-rupee-sign me-2"></i> Earnings
-                    </a>
-                    <a href="profile.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-user me-2"></i> Profile
-                    </a>
-                    <a href="../logout.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-sign-out-alt me-2"></i> Logout
-                    </a>
-                </div>
-                
-                <!-- Quick Stats -->
-                <div class="stat-card">
-                    <h6 class="mb-3 fw-bold">Quick Overview</h6>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-muted">Total Courses</span>
-                        <span class="fw-bold" id="statTotalCourses"><?php echo $instructorStats['overview']['total_courses'] ?? 0; ?></span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-muted">Published</span>
-                        <span class="fw-bold text-success" id="statPublishedCourses"><?php echo $instructorStats['overview']['published_courses'] ?? 0; ?></span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted">Total Students</span>
-                        <span class="fw-bold text-info" id="statTotalStudents"><?php echo $instructorStats['overview']['total_students'] ?? 0; ?></span>
-                    </div>
-                </div>
+                <?php require_once '../includes/instructor_sidebar.php'; ?>
             </div>
             
             <!-- Main Content -->

@@ -38,6 +38,11 @@ try {
         $courseData['last_accessed'] = $enrollment['last_accessed'] ?? $enrollment['enrolled_at'] ?? date('Y-m-d H:i:s');
         
         $lessons = $course->getCourseLessons($cid, $studentId);
+        
+        // Debug lesson counting
+        error_log("Debug: Course ID $cid, Lessons found: " . count($lessons));
+        error_log("Debug: Student ID: $studentId");
+        
         $nextLesson = null;
         foreach ($lessons as $lesson) {
             if (empty($lesson['is_completed'])) {
@@ -50,8 +55,20 @@ try {
         $courseData['completed_lessons'] = count(array_filter($lessons, fn($l) => !empty($l['is_completed'])));
     }
     
-    $data['ongoingCourses'] = array_values(array_filter($data['allCourses'], fn($c) => ($c['progress_percentage'] ?? 0) < 100));
-    $data['completedCourses'] = array_values(array_filter($data['allCourses'], fn($c) => ($c['progress_percentage'] ?? 0) >= 100));
+    // Categorize courses based on actual progress
+    $data['ongoingCourses'] = [];
+    $data['completedCourses'] = [];
+    
+    foreach ($data['allCourses'] as $courseItem) {
+        $progress = $courseItem['progress_percentage'] ?? 0;
+        
+        if ($progress >= 100) {
+            $data['completedCourses'][] = $courseItem;
+        } else {
+            $data['ongoingCourses'][] = $courseItem;
+        }
+    }
+    
     $data['recommendations'] = $course->getRecommendedCourses($studentId, 4);
     
 } catch (Exception $e) {
@@ -70,26 +87,61 @@ try {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="../assets/css/theme.css" rel="stylesheet">
     <link href="css/student-theme.css" rel="stylesheet">
     <style>
+        /* Force Royal Blue Colors */
         :root {
-            --primary: #6366f1;
-            --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            --primary-color: #4169E1 !important;
+            --secondary-color: #2563EB !important;
+            --gradient-primary: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
         }
-        body { background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%); min-height: 100vh; }
-        .stat-card { background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.05); transition: all 0.3s ease; }
-        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 12px 40px rgba(99, 102, 241, 0.15); }
-        .stat-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem; }
-        .stat-icon.primary { background: rgba(99, 102, 241, 0.1); color: var(--primary); }
-        .stat-icon.success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-        .stat-icon.warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
-        .stat-icon.info { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
-        .stat-value { font-size: 2rem; font-weight: 800; color: #1e293b; }
+        
+        /* Force Royal Blue for Sidebar */
+        .sidebar-nav {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        /* Force Royal Blue for Universal Header */
+        .universal-header {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        /* Force Royal Blue for any remaining elements */
+        .btn-primary {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+            border: none !important;
+        }
+        
+        .btn-primary-gradient {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+            border: none !important;
+        }
+        
+        .bg-primary {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        .text-primary {
+            color: #4169E1 !important;
+        }
+        
+        .border-primary {
+            border-color: #4169E1 !important;
+        }
+        
+        body { background: var(--bg-body); min-height: 100vh; }
+        .stat-card { background: var(--bg-primary); border-radius: var(--radius-md); padding: 1.5rem; box-shadow: var(--shadow); transition: var(--transition-bounce); }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-primary); }
+        .stat-icon { width: 50px; height: 50px; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem; }
+        .stat-icon.primary { background: rgba(65, 105, 225, 0.1); color: #4169E1; }
+        .stat-icon.success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); }
+        .stat-icon.warning { background: rgba(245, 158, 11, 0.1); color: var(--warning-color); }
+        .stat-icon.info { background: rgba(59, 130, 246, 0.1); color: var(--info-color); }
+        .stat-value { font-size: 2rem; font-weight: 800; color: var(--dark-color); }
         .stat-label { color: #64748b; font-size: 0.875rem; }
         .course-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05); transition: all 0.3s ease; height: 100%; position: relative; z-index: 1; }
-        .course-card:hover { transform: translateY(-8px); box-shadow: 0 20px 60px rgba(99, 102, 241, 0.15); z-index: 10; }
+        .course-card:hover { transform: translateY(-8px); box-shadow: 0 20px 60px rgba(65, 105, 225, 0.15); z-index: 10; }
         .course-content { padding: 1.5rem; position: relative; z-index: 5; }
         .course-content .btn { position: relative; z-index: 20; cursor: pointer; pointer-events: auto; }
         .course-content .btn:hover { transform: translateY(-2px); }
@@ -99,7 +151,7 @@ try {
         .course-thumbnail-placeholder { width: 100%; height: 160px; background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); display: flex; align-items: center; justify-content: center; }
         .course-badge { position: absolute; top: 12px; right: 12px; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
         .course-badge.completed { background: var(--gradient-success); color: white; }
-        .course-badge.in-progress { background: white; color: var(--primary); }
+        .course-badge.in-progress { background: white; color: #4169E1; }
         .course-content { padding: 1.5rem; }
         .course-category { display: inline-block; padding: 4px 10px; background: rgba(99, 102, 241, 0.1); color: var(--primary); border-radius: 20px; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.75rem; }
         .course-title { font-size: 1.1rem; font-weight: 700; color: #1e293b; margin-bottom: 0.5rem; }
@@ -109,6 +161,29 @@ try {
         .progress-bar.completed { background: var(--gradient-success); }
         .btn-primary-gradient { background: var(--gradient-primary); border: none; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 600; transition: all 0.3s ease; }
         .btn-primary-gradient:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3); color: white; }
+        
+        /* Enhanced Continue Learning button for completed courses */
+        .btn-continue-learning {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+            border: none !important;
+            color: white !important;
+            padding: 0.75rem 1.5rem !important;
+            border-radius: 10px !important;
+            font-weight: 600 !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 4px 15px rgba(65, 105, 225, 0.2) !important;
+        }
+        
+        .btn-continue-learning:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 8px 25px rgba(65, 105, 225, 0.4) !important;
+            background: linear-gradient(135deg, #2563EB 0%, #1e4bb8 100%) !important;
+        }
+        
+        .btn-continue-learning:active {
+            transform: translateY(0) !important;
+            box-shadow: 0 4px 15px rgba(65, 105, 225, 0.3) !important;
+        }
         .search-box { position: relative; }
         .search-box input { padding: 0.75rem 1rem 0.75rem 2.5rem; border-radius: 12px; border: 2px solid rgba(0,0,0,0.05); }
         .search-box i { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; }
@@ -124,46 +199,13 @@ try {
     </style>
 </head>
 <body>
-    <?php include 'includes/navigation.php'; ?>
+    <?php require_once '../includes/universal_header.php'; ?>
 
     <div class="container-fluid py-4">
         <div class="row">
             <!-- Universal Sidebar -->
             <div class="col-md-3">
-                <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-book me-2"></i> Browse Courses
-                    </a>
-                    <a href="my-courses.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-book-open me-2"></i> My Courses
-                    </a>
-                    <a href="certificates.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-certificate me-2"></i> Certificates
-                    </a>
-                    <a href="quiz-results.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-bar me-2"></i> Quiz Results
-                    </a>
-                    <a href="discussions.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-comments me-2"></i> Discussions
-                    </a>
-                    <a href="notifications.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-bell me-2"></i> Notifications
-                    </a>
-                    <a href="profile.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-user me-2"></i> Profile
-                    </a>
-                    <a href="settings.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-cog me-2"></i> Settings
-                    </a>
-                    <div class="mt-3 p-2">
-                        <a href="../logout.php" class="btn btn-outline-danger w-100">
-                            <i class="fas fa-sign-out-alt me-2"></i> Logout
-                        </a>
-                    </div>
-                </div>
+                <?php require_once 'includes/sidebar.php'; ?>
             </div>
             
             <!-- Main Content -->
@@ -289,14 +331,21 @@ try {
                                                 <h5 class="course-title"><?php echo htmlspecialchars($course['title']); ?></h5>
                                                 <div class="course-instructor"><i class="fas fa-user-tie me-1"></i><?php echo htmlspecialchars($course['instructor_name']); ?></div>
                                                 <div class="progress mb-2">
-                                                    <div class="progress-bar <?php echo $course['progress_percentage'] >= 100 ? 'completed' : ''; ?>" style="width: <?php echo $course['progress_percentage']; ?>"></div>
+                                                    <div class="progress-bar <?php echo $course['progress_percentage'] >= 100 ? 'completed' : ''; ?>" style="width: <?php echo $course['progress_percentage']; ?>%"></div>
                                                 </div>
                                                 <small class="text-muted d-block mb-3"><?php echo $course['completed_lessons']; ?>/<?php echo $course['total_lessons']; ?> lessons</small>
                                                 <div class="d-grid gap-2">
                                                     <?php if ($course['progress_percentage'] < 100): ?>
-                                                        <a href="lesson.php?course_id=<?php echo $course['id']; ?>" class="btn btn-primary-gradient btn-sm" onclick="trackStudyStart(<?php echo $course['id']; ?>)"><i class="fas fa-play me-1"></i>Continue</a>
-                                                    <?php elseif ($course['has_certificate']): ?>
-                                                        <a href="certificate.php?course_id=<?php echo $course['id']; ?>" class="btn btn-success btn-sm"><i class="fas fa-download me-1"></i>Certificate</a>
+                                                        <?php if ($course['next_lesson']): ?>
+                                                            <a href="lesson.php?course_id=<?php echo $course['id']; ?>&lesson_id=<?php echo $course['next_lesson']['id']; ?>" class="btn btn-primary-gradient btn-sm" onclick="trackStudyStart(<?php echo $course['id']; ?>)"><i class="fas fa-play me-1"></i>Resume</a>
+                                                        <?php else: ?>
+                                                            <a href="lesson.php?course_id=<?php echo $course['id']; ?>" class="btn btn-primary-gradient btn-sm" onclick="trackStudyStart(<?php echo $course['id']; ?>)"><i class="fas fa-play me-1"></i>Start</a>
+                                                        <?php endif; ?>
+                                                    <?php else: ?>
+                                                        <?php if ($course['has_certificate']): ?>
+                                                            <a href="certificate.php?course_id=<?php echo $course['id']; ?>" class="btn btn-success btn-sm"><i class="fas fa-download me-1"></i>Certificate</a>
+                                                        <?php endif; ?>
+                                                        <a href="lesson.php?course_id=<?php echo $course['id']; ?>&lesson_id=1" class="btn btn-outline-primary btn-sm" onclick="trackStudyStart(<?php echo $course['id']; ?>)"><i class="fas fa-redo me-1"></i>Revise</a>
                                                     <?php endif; ?>
                                                     <a href="course-details.php?id=<?php echo $course['id']; ?>" class="btn btn-outline-secondary btn-sm"><i class="fas fa-info-circle me-1"></i>Details</a>
                                                 </div>
@@ -337,7 +386,11 @@ try {
                                                     <div class="alert alert-info py-2 mb-2"><small><i class="fas fa-forward me-1"></i><?php echo htmlspecialchars($course['next_lesson']['title']); ?></small></div>
                                                 <?php endif; ?>
                                                 <div class="progress mb-2"><div class="progress-bar" style="width: <?php echo $course['progress_percentage']; ?>"></div></div>
-                                                <a href="lesson.php?course_id=<?php echo $course['id']; ?>" class="btn btn-primary-gradient w-100 btn-sm" onclick="trackStudyStart(<?php echo $course['id']; ?>)"><i class="fas fa-play me-1"></i>Continue Learning</a>
+                                                <?php if ($course['next_lesson']): ?>
+                                                    <a href="lesson.php?course_id=<?php echo $course['id']; ?>&lesson_id=<?php echo $course['next_lesson']['id']; ?>" class="btn btn-primary-gradient w-100 btn-sm" onclick="trackStudyStart(<?php echo $course['id']; ?>)"><i class="fas fa-play me-1"></i>Resume Learning</a>
+                                                <?php else: ?>
+                                                    <a href="lesson.php?course_id=<?php echo $course['id']; ?>" class="btn btn-primary-gradient w-100 btn-sm" onclick="trackStudyStart(<?php echo $course['id']; ?>)"><i class="fas fa-play me-1"></i>Start Course</a>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                     </div>
@@ -358,7 +411,12 @@ try {
                         <div class="row" id="completedCoursesGrid">
                             <?php if (!empty($data['completedCourses'])): ?>
                                 <?php foreach ($data['completedCourses'] as $course): ?>
-                                    <div class="col-lg-4 col-md-6 mb-4 course-item">
+                                    <div class="col-lg-4 col-md-6 mb-4 course-item" 
+                                         data-title="<?php echo htmlspecialchars(strtolower($course['title'])); ?>"
+                                         data-instructor="<?php echo htmlspecialchars(strtolower($course['instructor_name'])); ?>"
+                                         data-category="<?php echo htmlspecialchars(strtolower($course['category_name'] ?? '')); ?>"
+                                         data-progress="<?php echo $course['progress_percentage']; ?>"
+                                         data-date="<?php echo $course['last_accessed']; ?>">
                                         <div class="course-card">
                                             <div class="course-thumbnail">
                                                 <?php if (!empty($course['thumbnail'])): ?>
@@ -377,7 +435,8 @@ try {
                                                     <?php if ($course['has_certificate']): ?>
                                                         <a href="certificate.php?course_id=<?php echo $course['id']; ?>" class="btn btn-success btn-sm"><i class="fas fa-download me-1"></i>Certificate</a>
                                                     <?php endif; ?>
-                                                    <a href="course-details.php?id=<?php echo $course['id']; ?>" class="btn btn-outline-secondary btn-sm">Review</a>
+                                                    <a href="lesson.php?course_id=<?php echo $course['id']; ?>&lesson_id=1" class="btn btn-outline-primary btn-sm" onclick="trackStudyStart(<?php echo $course['id']; ?>)"><i class="fas fa-redo me-1"></i>Revise Course</a>
+                                                    <a href="course-details.php?id=<?php echo $course['id']; ?>" class="btn btn-outline-secondary btn-sm"><i class="fas fa-info-circle me-1"></i>Course Details</a>
                                                 </div>
                                             </div>
                                         </div>
@@ -520,11 +579,34 @@ try {
                 if (!data.success) {
                     console.warn('Study tracking failed:', data.message);
                 }
+                // Allow the link to work normally
             })
             .catch(error => {
                 console.error('Study tracking error:', error);
-                // Silent fail - don't interrupt user flow
+                // Allow the link to work normally even if tracking fails
             });
+        }
+        
+        function trackStudyStartAndRedirect(courseId) {
+            fetch('../api/track_study_time.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `course_id=${courseId}&action=start`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    console.warn('Study tracking failed:', data.message);
+                }
+                // Redirect to lesson page after tracking
+                window.location.href = `lesson.php?course_id=${courseId}`;
+            })
+            .catch(error => {
+                console.error('Study tracking error:', error);
+                // Redirect even if tracking fails
+                window.location.href = `lesson.php?course_id=${courseId}`;
+            });
+            return false; // Prevent default link behavior
         }
         
         function refreshData() {

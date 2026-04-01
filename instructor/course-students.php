@@ -15,7 +15,7 @@ if ($courseId <= 0) {
 $conn = connectDB();
 
 // Verify course ownership
-$stmt = $conn->prepare("SELECT id, title, status FROM courses WHERE id = ? AND instructor_id = ?");
+$stmt = $conn->prepare("SELECT id, title, status FROM courses_new WHERE id = ? AND instructor_id = ?");
 $stmt->bind_param('ii', $courseId, $instructorId);
 $stmt->execute();
 $course = $stmt->get_result()->fetch_assoc();

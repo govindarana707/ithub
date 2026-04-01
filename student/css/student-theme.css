@@ -1,12 +1,12 @@
-/* IT HUB Student Portal - Unified Color Scheme */
+/* IT HUB Student Portal - Royal Blue Color Scheme */
 :root {
-    /* Primary Brand Colors */
-    --primary-color: #667eea;
-    --primary-dark: #5a67d8;
-    --primary-light: #7c8ff9;
-    --secondary-color: #764ba2;
-    --secondary-dark: #6b3f8f;
-    --secondary-light: #8a5bb3;
+    /* Primary Brand Colors - Royal Blue Theme */
+    --primary-color: #4169E1;
+    --primary-dark: #1E3A8A;
+    --primary-light: #6085E6;
+    --secondary-color: #2563EB;
+    --secondary-dark: #1D4ED8;
+    --secondary-light: #3B82F6;
     
     /* Gradient Definitions */
     --gradient-primary: linear-gradient(135deg, var(--primary-color), var(--secondary-color));

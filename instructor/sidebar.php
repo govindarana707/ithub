@@ -17,20 +17,31 @@ $stmt = $conn->prepare("
     JOIN courses c ON d.course_id = c.id 
     WHERE c.instructor_id = ? AND d.created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
 ");
-$stmt->bind_param("i", $instructorId);
-$stmt->execute();
-$unreadCount = $stmt->get_result()->fetch_assoc()['count'];
+if ($stmt === false) {
+    $unreadCount = 0;
+} else {
+    $stmt->bind_param("i", $instructorId);
+    $stmt->execute();
+    $unreadCount = $stmt->get_result()->fetch_assoc()['count'];
+    $stmt->close();
+}
 
-// Get pending replies count
+// Get pending replies count (unresolved discussions)
 $stmt = $conn->prepare("
     SELECT COUNT(*) as count 
     FROM discussions d 
     JOIN courses c ON d.course_id = c.id 
-    WHERE c.instructor_id = ? AND d.is_resolved = FALSE AND d.parent_id IS NULL
+    WHERE c.instructor_id = ? AND d.parent_id IS NULL
 ");
-$stmt->bind_param("i", $instructorId);
-$stmt->execute();
-$pendingCount = $stmt->get_result()->fetch_assoc()['count'];
+if ($stmt === false) {
+    $pendingCount = 0;
+} else {
+    $stmt->bind_param("i", $instructorId);
+    $stmt->execute();
+    $pendingCount = $stmt->get_result()->fetch_assoc()['count'];
+    $stmt->close();
+}
+$conn->close();
 ?>
 
 <div class="list-group sidebar-modern">

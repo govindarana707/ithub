@@ -436,7 +436,21 @@ $(document).ready(function() {
         anchor.addEventListener('click', function(e) {
             e.preventDefault();
             
-            var target = document.querySelector(this.getAttribute('href'));
+            var href = this.getAttribute('href');
+            
+            // Skip if href is empty or just '#'
+            if (!href || href === '#') {
+                return;
+            }
+            
+            var targetId = href.substring(1); // Remove the # prefix
+            
+            // Skip if targetId is empty
+            if (!targetId) {
+                return;
+            }
+            
+            var target = document.getElementById(targetId);
             if (target) {
                 target.scrollIntoView({
                     behavior: 'smooth',

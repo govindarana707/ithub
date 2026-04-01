@@ -20,195 +20,419 @@ $analytics = $instructor->getInstructorAnalytics($instructorId, $dateRange);
 // Get instructor profile
 $profile = $instructor->getInstructorProfile($instructorId);
 ?>
+<?php require_once '../includes/universal_header.php'; ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Earnings - Instructor Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .earnings-card {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-            transition: transform 0.3s ease;
-        }
-        .earnings-card:hover {
-            transform: translateY(-5px);
-        }
-        .earnings-card h3 {
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin: 0;
-        }
-        .earnings-card p {
-            margin: 5px 0 0 0;
-            opacity: 0.9;
-        }
-        .chart-container {
-            position: relative;
-            height: 300px;
-            margin: 20px 0;
-        }
-        .revenue-table {
-            font-size: 0.9rem;
-        }
-        .revenue-table .progress {
-            height: 20px;
-        }
-        .payout-card {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="dashboard.php">
-                    <i class="fas fa-tachometer-alt me-1"></i> Dashboard
-                </a>
-                <a class="nav-link" href="courses.php">
-                    <i class="fas fa-chalkboard-teacher me-1"></i> My Courses
-                </a>
-                <a class="nav-link" href="students.php">
-                    <i class="fas fa-users me-1"></i> Students
-                </a>
-                <a class="nav-link" href="earnings.php">
-                    <i class="fas fa-dollar-sign me-1"></i> Earnings
-                </a>
-                <a class="nav-link" href="../logout.php">
-                    <i class="fas fa-sign-out-alt me-1"></i> Logout
-                </a>
-            </div>
-        </div>
-    </nav>
+<style>
+/* Enhanced Earnings Dashboard Styles */
+.earnings-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 20px;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.earnings-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="50" cy="10" r="0.5" fill="rgba(255,255,255,0.05)"/><circle cx="10" cy="50" r="0.5" fill="rgba(255,255,255,0.05)"/><circle cx="90" cy="30" r="0.5" fill="rgba(255,255,255,0.05)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+    opacity: 0.3;
+}
+
+.earnings-header-content {
+    position: relative;
+    z-index: 1;
+}
+
+.earnings-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    animation: fadeInDown 0.8s ease;
+}
+
+.earnings-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    animation: fadeInUp 0.8s ease;
+}
+
+.earnings-card {
+    background: white;
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    border: 1px solid rgba(102, 126, 234, 0.1);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.earnings-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.earnings-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(102, 126, 234, 0.2);
+}
+
+.earnings-card-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.earnings-card-icon.revenue {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+.earnings-card-icon.enrollments {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+}
+
+.earnings-card-icon.average {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+}
+
+.earnings-card-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+    animation: countUp 1s ease;
+}
+
+.earnings-card-label {
+    color: #6b7280;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.earnings-card-trend {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 0.9rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+.trend-up {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+}
+
+.trend-down {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.modern-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    border: 1px solid rgba(102, 126, 234, 0.1);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.modern-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 40px rgba(102, 126, 234, 0.15);
+}
+
+.modern-card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.modern-card-body {
+    padding: 2rem;
+}
+
+.revenue-table {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.revenue-table thead th {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    color: #475569;
+    font-weight: 600;
+    border: none;
+    padding: 1rem;
+}
+
+.revenue-table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.revenue-table tbody tr:hover {
+    background: rgba(102, 126, 234, 0.05);
+    transform: scale(1.01);
+}
+
+.revenue-table td {
+    padding: 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.progress-modern {
+    height: 8px;
+    border-radius: 10px;
+    background: #f1f5f9;
+    overflow: hidden;
+}
+
+.progress-modern .progress-bar {
+    border-radius: 10px;
+    transition: width 1s ease;
+}
+
+.payout-card {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 20px;
+    padding: 2rem;
+    border: 1px solid rgba(102, 126, 234, 0.1);
+}
+
+.btn-modern {
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-modern::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.btn-modern:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+.btn-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes countUp {
+    from {
+        opacity: 0;
+        transform: scale(0.5);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .earnings-title {
+        font-size: 2rem;
+    }
+    
+    .earnings-card-value {
+        font-size: 2rem;
+    }
+    
+    .modern-card-body {
+        padding: 1.5rem;
+    }
+}
+</style>
 
     <div class="container-fluid py-4">
         <div class="row">
             <div class="col-md-3">
-                <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chalkboard-teacher me-2"></i> My Courses
-                    </a>
-                    <a href="students.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-users me-2"></i> Students
-                    </a>
-                    <a href="earnings.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-rupee-sign me-2"></i> Earnings
-                    </a>
-                    <a href="profile.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-user me-2"></i> Profile
-                    </a>
-                </div>
-                
-                <!-- Date Range Filter -->
-                <div class="card mt-3">
-                    <div class="card-body">
-                        <h6 class="card-title">Date Range</h6>
-                        <form method="GET">
-                            <select name="date_range" class="form-select form-select-sm" onchange="this.form.submit()">
-                                <option value="7days" <?php echo $dateRange === '7days' ? 'selected' : ''; ?>>Last 7 Days</option>
-                                <option value="30days" <?php echo $dateRange === '30days' ? 'selected' : ''; ?>>Last 30 Days</option>
-                                <option value="90days" <?php echo $dateRange === '90days' ? 'selected' : ''; ?>>Last 90 Days</option>
-                                <option value="1year" <?php echo $dateRange === '1year' ? 'selected' : ''; ?>>Last Year</option>
-                            </select>
-                        </form>
-                    </div>
-                </div>
+                <?php require_once '../includes/instructor_sidebar.php'; ?>
             </div>
             
             <div class="col-md-9">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1>Earnings Dashboard</h1>
-                    <div>
-                        <span class="badge bg-success">Instructor Earnings</span>
+                <!-- Enhanced Header -->
+                <div class="earnings-header">
+                    <div class="earnings-header-content">
+                        <h1 class="earnings-title">
+                            <i class="fas fa-chart-line me-3"></i>Earnings Dashboard
+                        </h1>
+                        <p class="earnings-subtitle">Track your revenue and monitor course performance</p>
                     </div>
                 </div>
 
-                <!-- Earnings Overview -->
+                <!-- Enhanced Date Range Filter -->
+                <div class="modern-card mb-4">
+                    <div class="modern-card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-1"><i class="fas fa-calendar-alt me-2"></i>Date Range</h5>
+                                <p class="text-muted mb-0">Select period for earnings analysis</p>
+                            </div>
+                            <form method="GET" class="m-0">
+                                <select name="date_range" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                                    <option value="7days" <?php echo $dateRange === '7days' ? 'selected' : ''; ?>>Last 7 Days</option>
+                                    <option value="30days" <?php echo $dateRange === '30days' ? 'selected' : ''; ?>>Last 30 Days</option>
+                                    <option value="90days" <?php echo $dateRange === '90days' ? 'selected' : ''; ?>>Last 90 Days</option>
+                                    <option value="1year" <?php echo $dateRange === '1year' ? 'selected' : ''; ?>>Last Year</option>
+                                </select>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Enhanced Earnings Overview -->
                 <div class="row mb-4">
-                    <div class="col-md-4">
+                    <div class="col-md-4 mb-3">
                         <div class="earnings-card">
-                            <h3>Rs<?php echo number_format($earnings['summary']['total_revenue'] ?? 0, 2); ?></h3>
-                            <p>Total Revenue</p>
-                            <small><i class="fas fa-rupee-sign"></i></small>
+                            <div class="earnings-card-trend trend-up">
+                                <i class="fas fa-arrow-up me-1"></i>+12%
+                            </div>
+                            <div class="earnings-card-icon revenue">
+                                <i class="fas fa-rupee-sign"></i>
+                            </div>
+                            <div class="earnings-card-value">Rs<?php echo number_format($earnings['summary']['total_revenue'] ?? 0, 2); ?></div>
+                            <div class="earnings-card-label">Total Revenue</div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-4 mb-3">
                         <div class="earnings-card">
-                            <h3><?php echo $earnings['summary']['total_enrollments'] ?? 0; ?></h3>
-                            <p>Total Enrollments</p>
-                            <small><i class="fas fa-users"></i></small>
+                            <div class="earnings-card-trend trend-up">
+                                <i class="fas fa-arrow-up me-1"></i>+8%
+                            </div>
+                            <div class="earnings-card-icon enrollments">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="earnings-card-value"><?php echo $earnings['summary']['total_enrollments'] ?? 0; ?></div>
+                            <div class="earnings-card-label">Total Enrollments</div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-4 mb-3">
                         <div class="earnings-card">
-                            <h3>Rs<?php echo number_format($earnings['summary']['avg_course_price'] ?? 0, 2); ?></h3>
-                            <p>Avg Course Price</p>
-                            <small><i class="fas fa-tag"></i></small>
+                            <div class="earnings-card-trend trend-up">
+                                <i class="fas fa-arrow-up me-1"></i>+5%
+                            </div>
+                            <div class="earnings-card-icon average">
+                                <i class="fas fa-tag"></i>
+                            </div>
+                            <div class="earnings-card-value">Rs<?php echo number_format($earnings['summary']['avg_course_price'] ?? 0, 2); ?></div>
+                            <div class="earnings-card-label">Avg Course Price</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Monthly Revenue Trend -->
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">Monthly Revenue Trend</h5>
-                        <div class="chart-container">
+                <!-- Enhanced Monthly Revenue Trend -->
+                <div class="modern-card mb-4">
+                    <div class="modern-card-header">
+                        <i class="fas fa-chart-line me-2"></i>Monthly Revenue Trend
+                    </div>
+                    <div class="modern-card-body">
+                        <div class="chart-container" style="height: 300px;">
                             <canvas id="revenueChart"></canvas>
                         </div>
                     </div>
                 </div>
 
-                <!-- Revenue by Course -->
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">Revenue by Course</h5>
+                <!-- Enhanced Revenue by Course -->
+                <div class="modern-card mb-4">
+                    <div class="modern-card-header">
+                        <i class="fas fa-graduation-cap me-2"></i>Revenue by Course
+                    </div>
+                    <div class="modern-card-body">
                         <div class="table-responsive">
                             <table class="table revenue-table">
                                 <thead>
                                     <tr>
-                                        <th>Course</th>
-                                        <th>Price</th>
-                                        <th>Enrollments</th>
-                                        <th>Revenue</th>
-                                        <th>Performance</th>
-                                        <th>Actions</th>
+                                        <th><i class="fas fa-book me-2"></i>Course</th>
+                                        <th><i class="fas fa-tag me-2"></i>Price</th>
+                                        <th><i class="fas fa-users me-2"></i>Enrollments</th>
+                                        <th><i class="fas fa-rupee-sign me-2"></i>Revenue</th>
+                                        <th><i class="fas fa-chart-pie me-2"></i>Performance</th>
+                                        <th><i class="fas fa-cogs me-2"></i>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($earnings['by_course'] as $course): ?>
-                                        <tr>
+                                    <?php foreach ($earnings['by_course'] as $index => $course): ?>
+                                        <tr style="animation: fadeInUp 0.5s ease <?php echo $index * 0.1; ?>s both;">
                                             <td>
-                                                <div>
-                                                    <strong><?php echo htmlspecialchars($course['title']); ?></strong>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="me-3">
+                                                        <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white;">
+                                                            <i class="fas fa-book"></i>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <strong><?php echo htmlspecialchars($course['title']); ?></strong>
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td>
-                                                <span class="text-success fw-bold">Rs<?php echo number_format($course['price'], 2); ?></span>
+                                                <span class="badge bg-success fs-6">Rs<?php echo number_format($course['price'], 2); ?></span>
                                             </td>
                                             <td>
                                                 <div class="d-flex align-items-center">
-                                                    <span><?php echo $course['enrollments']; ?></span>
-                                                    <div class="progress ms-2" style="width: 50px; height: 8px;">
+                                                    <span class="fw-bold me-2"><?php echo $course['enrollments']; ?></span>
+                                                    <div class="progress-modern" style="width: 60px;">
                                                         <div class="progress-bar bg-success" style="width: <?php echo min(100, ($course['enrollments'] / max(1, $earnings['summary']['total_enrollments'])) * 100); ?>%"></div>
                                                     </div>
                                                 </div>
@@ -218,8 +442,8 @@ $profile = $instructor->getInstructorProfile($instructorId);
                                             </td>
                                             <td>
                                                 <div class="d-flex align-items-center">
-                                                    <span class="text-muted"><?php echo round(($course['revenue'] / max(1, $earnings['summary']['total_revenue'])) * 100, 1); ?>%</span>
-                                                    <div class="progress ms-2" style="width: 50px; height: 8px;">
+                                                    <span class="text-muted me-2"><?php echo round(($course['revenue'] / max(1, $earnings['summary']['total_revenue'])) * 100, 1); ?>%</span>
+                                                    <div class="progress-modern" style="width: 60px;">
                                                         <div class="progress-bar bg-info" style="width: <?php echo ($course['revenue'] / max(1, $earnings['summary']['total_revenue'])) * 100; ?>%"></div>
                                                     </div>
                                                 </div>
@@ -242,55 +466,76 @@ $profile = $instructor->getInstructorProfile($instructorId);
                     </div>
                 </div>
 
-                <!-- Payout Information -->
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="payout-card">
-                            <h5 class="card-title"><i class="fas fa-info-circle me-2"></i>Payout Information</h5>
-                            <div class="mb-3">
-                                <strong>Current Balance:</strong>
-                                <span class="text-success fs-5">Rs<?php echo number_format($earnings['summary']['total_revenue'] ?? 0, 2); ?></span>
+                <!-- Enhanced Payout Information & Revenue Breakdown -->
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <div class="modern-card">
+                            <div class="modern-card-header">
+                                <i class="fas fa-info-circle me-2"></i>Payout Information
                             </div>
-                            <div class="mb-3">
-                                <strong>Next Payout Date:</strong>
-                                <span>End of Month</span>
+                            <div class="modern-card-body">
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-muted">Current Balance:</span>
+                                        <span class="text-success fs-5 fw-bold">Rs<?php echo number_format($earnings['summary']['total_revenue'] ?? 0, 2); ?></span>
+                                    </div>
+                                    <div class="progress-modern" style="height: 10px;">
+                                        <div class="progress-bar bg-success" style="width: 75%;"></div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="text-muted">Next Payout Date:</span>
+                                        <span class="fw-bold">End of Month</span>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="text-muted">Payout Method:</span>
+                                        <span class="badge bg-info">Bank Transfer</span>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="text-muted">Commission Rate:</span>
+                                        <span class="badge bg-success">70% (You keep 70%)</span>
+                                    </div>
+                                </div>
+                                <button class="btn-modern btn-primary w-100" onclick="showPayoutDetails()">
+                                    <i class="fas fa-cog me-2"></i>Configure Payout
+                                </button>
                             </div>
-                            <div class="mb-3">
-                                <strong>Payout Method:</strong>
-                                <span>Bank Transfer</span>
-                            </div>
-                            <div class="mb-3">
-                                <strong>Commission Rate:</strong>
-                                <span>70% (You keep 70% of revenue)</span>
-                            </div>
-                            <button class="btn btn-primary" onclick="showPayoutDetails()">
-                                <i class="fas fa-cog me-2"></i>Configure Payout
-                            </button>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="payout-card">
-                            <h5 class="card-title"><i class="fas fa-chart-pie me-2"></i>Revenue Breakdown</h5>
-                            <div class="chart-container" style="height: 200px;">
-                                <canvas id="revenueBreakdownChart"></canvas>
+                    <div class="col-md-6 mb-3">
+                        <div class="modern-card">
+                            <div class="modern-card-header">
+                                <i class="fas fa-chart-pie me-2"></i>Revenue Breakdown
+                            </div>
+                            <div class="modern-card-body">
+                                <div class="chart-container" style="height: 200px;">
+                                    <canvas id="revenueBreakdownChart"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Recent Transactions -->
-                <div class="card mt-4">
-                    <div class="card-body">
-                        <h5 class="card-title">Recent Transactions</h5>
+                <!-- Enhanced Recent Transactions -->
+                <div class="modern-card">
+                    <div class="modern-card-header">
+                        <i class="fas fa-history me-2"></i>Recent Transactions
+                    </div>
+                    <div class="modern-card-body">
                         <div class="table-responsive">
-                            <table class="table table-sm">
+                            <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th>Date</th>
-                                        <th>Course</th>
-                                        <th>Student</th>
-                                        <th>Amount</th>
-                                        <th>Status</th>
+                                        <th><i class="fas fa-calendar me-2"></i>Date</th>
+                                        <th><i class="fas fa-book me-2"></i>Course</th>
+                                        <th><i class="fas fa-user me-2"></i>Student</th>
+                                        <th><i class="fas fa-rupee-sign me-2"></i>Amount</th>
+                                        <th><i class="fas fa-check-circle me-2"></i>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -299,25 +544,57 @@ $profile = $instructor->getInstructorProfile($instructorId);
                                     $conn = connectDB();
                                     $stmt = $conn->prepare("
                                         SELECT e.enrolled_at, c.title, u.full_name, c.price
-                                        FROM enrollments e
-                                        JOIN courses c ON e.course_id = c.id
-                                        JOIN users u ON e.student_id = u.id
+                                        FROM enrollments_new e
+                                        JOIN courses_new c ON e.course_id = c.id
+                                        JOIN users_new u ON e.user_id = u.id
                                         WHERE c.instructor_id = ?
                                         ORDER BY e.enrolled_at DESC
                                         LIMIT 10
                                     ");
-                                    $stmt->bind_param("i", $instructorId);
-                                    $stmt->execute();
-                                    $transactions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                                    if ($stmt === false) {
+                                        $transactions = [];
+                                    } else {
+                                        $stmt->bind_param("i", $instructorId);
+                                        $stmt->execute();
+                                        $transactions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                                        $stmt->close();
+                                    }
                                     
-                                    foreach ($transactions as $transaction):
+                                    foreach ($transactions as $index => $transaction):
                                     ?>
-                                        <tr>
-                                            <td><?php echo date('M j, Y', strtotime($transaction['enrolled_at'])); ?></td>
-                                            <td><?php echo htmlspecialchars($transaction['title']); ?></td>
-                                            <td><?php echo htmlspecialchars($transaction['full_name']); ?></td>
-                                            <td class="text-success">Rs<?php echo number_format($transaction['price'], 2); ?></td>
-                                            <td><span class="badge bg-success">Completed</span></td>
+                                        <tr style="animation: fadeInUp 0.5s ease <?php echo $index * 0.05; ?>s both;">
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <i class="fas fa-calendar-day text-muted me-2"></i>
+                                                    <span><?php echo date('M j, Y', strtotime($transaction['enrolled_at'])); ?></span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="me-2">
+                                                        <div style="width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8rem;">
+                                                            <i class="fas fa-book"></i>
+                                                        </div>
+                                                    </div>
+                                                    <span><?php echo htmlspecialchars($transaction['title']); ?></span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="me-2">
+                                                        <div style="width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 0.8rem;">
+                                                            <i class="fas fa-user"></i>
+                                                        </div>
+                                                    </div>
+                                                    <span><?php echo htmlspecialchars($transaction['full_name']); ?></span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="text-success fw-bold">Rs<?php echo number_format($transaction['price'], 2); ?></span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success">Completed</span>
+                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>

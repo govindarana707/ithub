@@ -11,7 +11,7 @@ class User {
     public function register($data) {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("INSERT INTO users (username, email, password, full_name, role, phone) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt = $conn->prepare("INSERT INTO users_new (username, email, password, full_name, role, phone) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->bind_param("ssssss", $data['username'], $data['email'], $data['password'], $data['full_name'], $data['role'], $data['phone']);
         
         if ($stmt->execute()) {
@@ -26,7 +26,7 @@ class User {
 
         error_log("DEBUG: Login attempt for email: " . $email);
 
-        $stmt = $conn->prepare("SELECT id, username, email, password, full_name, role, status, email_verified FROM users WHERE email = ?");
+        $stmt = $conn->prepare("SELECT id, username, email, password, full_name, role, status FROM users_new WHERE email = ?");
         if (!$stmt) {
             error_log("DEBUG: Prepare failed: " . $conn->error);
             return ['success' => false, 'error' => 'Database query preparation failed'];
@@ -58,7 +58,7 @@ class User {
     public function getUserById($id) {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("SELECT id, username, email, full_name, role, profile_image, bio, phone, status, created_at FROM users WHERE id = ?");
+        $stmt = $conn->prepare("SELECT id, username, email, full_name, role, profile_image, bio, phone, status, created_at FROM users_new WHERE id = ?");
         $stmt->bind_param("i", $id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -69,7 +69,7 @@ class User {
     public function getAllUsers($role = null, $status = null, $limit = 50, $offset = 0, $search = '') {
         $conn = $this->db->getConnection();
         
-        $sql = "SELECT id, username, email, full_name, role, profile_image, phone, status, created_at FROM users WHERE 1=1";
+        $sql = "SELECT id, username, email, full_name, role, profile_image, phone, status, created_at FROM users_new WHERE 1=1";
         $params = [];
         $types = "";
         
@@ -110,7 +110,7 @@ class User {
     public function updateUser($id, $data) {
         $conn = $this->db->getConnection();
         
-        $sql = "UPDATE users SET ";
+        $sql = "UPDATE users_new SET ";
         $params = [];
         $types = "";
         
@@ -136,7 +136,7 @@ class User {
     public function deleteUser($id) {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
+        $stmt = $conn->prepare("DELETE FROM users_new WHERE id = ?");
         $stmt->bind_param("i", $id);
         
         return $stmt->execute();
@@ -147,7 +147,7 @@ class User {
         
         $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
         
-        $stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+        $stmt = $conn->prepare("UPDATE users_new SET password = ? WHERE id = ?");
         $stmt->bind_param("si", $hashedPassword, $id);
         
         return $stmt->execute();
@@ -156,7 +156,7 @@ class User {
     public function emailExists($email) {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt = $conn->prepare("SELECT id FROM users_new WHERE email = ?");
         $stmt->bind_param("s", $email);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -167,7 +167,7 @@ class User {
     public function usernameExists($username) {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("SELECT id FROM users WHERE username = ?");
+        $stmt = $conn->prepare("SELECT id FROM users_new WHERE username = ?");
         $stmt->bind_param("s", $username);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -178,7 +178,7 @@ class User {
     public function getInstructors() {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("SELECT id, username, email, full_name, bio, profile_image FROM users WHERE role = 'instructor' AND status = 'active' ORDER BY full_name");
+        $stmt = $conn->prepare("SELECT id, username, email, full_name, bio, profile_image FROM users_new WHERE role = 'instructor' AND status = 'active' ORDER BY full_name");
         $stmt->execute();
         $result = $stmt->get_result();
         
@@ -188,7 +188,7 @@ class User {
     public function getUserByEmail($email) {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt = $conn->prepare("SELECT * FROM users_new WHERE email = ?");
         $stmt->bind_param("s", $email);
         $stmt->execute();
         
@@ -201,8 +201,8 @@ class User {
         if ($courseId) {
             $stmt = $conn->prepare("
                 SELECT u.id, u.username, u.email, u.full_name, u.profile_image, e.enrolled_at, e.progress_percentage
-                FROM users u
-                JOIN enrollments e ON u.id = e.student_id
+                FROM users_new u
+                JOIN enrollments_new e ON u.id = e.user_id
                 WHERE e.course_id = ? AND u.role = 'student'
                 ORDER BY e.enrolled_at DESC
             ");
@@ -210,7 +210,7 @@ class User {
         } else {
             $stmt = $conn->prepare("
                 SELECT id, username, email, full_name, profile_image, created_at
-                FROM users
+                FROM users_new
                 WHERE role = 'student'
                 ORDER BY created_at DESC
             ");
@@ -228,27 +228,27 @@ class User {
         $stats = [];
         
         // Total users
-        $result = $conn->query("SELECT COUNT(*) as total FROM users");
+        $result = $conn->query("SELECT COUNT(*) as total FROM users_new");
         $stats['total'] = $result->fetch_assoc()['total'];
         
         // Students
-        $result = $conn->query("SELECT COUNT(*) as students FROM users WHERE role = 'student'");
+        $result = $conn->query("SELECT COUNT(*) as students FROM users_new WHERE role = 'student'");
         $stats['students'] = $result->fetch_assoc()['students'];
         
         // Instructors
-        $result = $conn->query("SELECT COUNT(*) as instructors FROM users WHERE role = 'instructor'");
+        $result = $conn->query("SELECT COUNT(*) as instructors FROM users_new WHERE role = 'instructor'");
         $stats['instructors'] = $result->fetch_assoc()['instructors'];
         
         // Admins
-        $result = $conn->query("SELECT COUNT(*) as admins FROM users WHERE role = 'admin'");
+        $result = $conn->query("SELECT COUNT(*) as admins FROM users_new WHERE role = 'admin'");
         $stats['admins'] = $result->fetch_assoc()['admins'];
         
         // Active users
-        $result = $conn->query("SELECT COUNT(*) as active FROM users WHERE status = 'active'");
+        $result = $conn->query("SELECT COUNT(*) as active FROM users_new WHERE status = 'active'");
         $stats['active'] = $result->fetch_assoc()['active'];
         
         // Blocked users
-        $result = $conn->query("SELECT COUNT(*) as blocked FROM users WHERE status = 'blocked'");
+        $result = $conn->query("SELECT COUNT(*) as blocked FROM users_new WHERE status = 'blocked'");
         $stats['blocked'] = $result->fetch_assoc()['blocked'];
         
         return $stats;

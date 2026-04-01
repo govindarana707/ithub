@@ -14,9 +14,17 @@ try {
         $email = sanitize($_POST['email']);
         $password = $_POST['password'];
         
-        // Check rate limiting
-        if (!$auth->checkRateLimit($ipAddress, $email, 'login', 5, 300)) {
-            sendJSON(['success' => false, 'message' => 'Too many login attempts. Please try again later.']);
+        // Check rate limiting (increased to 10 attempts in 15 minutes for better user experience)
+        if (!$auth->checkRateLimit($ipAddress, $email, 'login', 10, 900)) {
+            // Show remaining time if locked
+            $remainingTime = $auth->getRateLimitRemainingTime($ipAddress, $email, 'login');
+            $minutes = ceil($remainingTime / 60);
+            sendJSON([
+                'success' => false, 
+                'message' => "Too many login attempts. Please try again in {$minutes} minutes.",
+                'locked' => true,
+                'remaining_minutes' => $minutes
+            ]);
         }
         
         // Check if IP is locked
@@ -42,7 +50,7 @@ try {
             }
             
             // Check if email is verified (handle missing field)
-            $emailVerified = isset($result['user']['email_verified']) ? $result['user']['email_verified'] : 1;
+            $emailVerified = 1; // Default to verified since field doesn't exist
             if (!$emailVerified) {
                 $auth->logAttempt($ipAddress, $email, 'login', false);
                 sendJSON([
@@ -64,6 +72,7 @@ try {
             $_SESSION['full_name'] = $result['user']['full_name'];
             $_SESSION['user_role'] = $result['user']['role'];
             $_SESSION['email_verified'] = $emailVerified;
+            $_SESSION['logged_in'] = true;
             
             // Generate CSRF token
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -90,13 +99,13 @@ try {
             // Log failed login attempt
             $auth->logAttempt($ipAddress, $email, 'login', false);
             
-            // Check if we should lock the account/IP
-            $failedAttempts = $auth->getRecentFailedAttempts($ipAddress, $email, 300); // Last 5 minutes
+            // Check if we should lock the account/IP (increased threshold for better UX)
+            $failedAttempts = $auth->getRecentFailedAttempts($ipAddress, $email, 900); // Last 15 minutes
             
-            if ($failedAttempts >= 5) {
-                // Lock for 15 minutes
+            if ($failedAttempts >= 10) {
+                // Lock for 10 minutes instead of 15
                 $auth->lockAccount(null, $ipAddress, 'Too many failed login attempts');
-                sendJSON(['success' => false, 'message' => 'Too many failed attempts. Account locked for 15 minutes.']);
+                sendJSON(['success' => false, 'message' => 'Too many failed attempts. Account locked for 10 minutes.']);
             }
             
             sendJSON(['success' => false, 'message' => $result['error']]);

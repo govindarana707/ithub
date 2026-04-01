@@ -1,10 +1,14 @@
 <?php
 require_once '../config/config.php';
 require_once '../includes/auth.php';
+require_once '../includes/session_helper.php';
 require_once '../models/Discussion.php';
 require_once '../models/Course.php';
 
-if (!isLoggedIn()) {
+// Initialize session
+initializeSession();
+
+if (!isUserLoggedIn()) {
     redirect('../login.php');
 }
 
@@ -220,96 +224,360 @@ if ($courseFilter && $searchQuery) {
 $stats = $discussion->getDiscussionStats();
 ?>
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discussions - IT HUB</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="../assets/css/theme.css" rel="stylesheet">
+    <link href="css/student-theme.css" rel="stylesheet">
     <style>
+        /* Modern Dashboard Color Scheme */
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            --success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+            --warning-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+            --info-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            --border-radius-modern: 20px;
+        }
+        
+        /* Modern Dashboard Header */
+        .dashboard-header {
+            background: var(--primary-gradient);
+            border-radius: var(--border-radius-modern);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            color: white;
+            box-shadow: var(--card-shadow);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .dashboard-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 60%;
+            height: 200%;
+            background: rgba(255, 255, 255, 0.05);
+            transform: rotate(35deg);
+            pointer-events: none;
+        }
+        
+        .dashboard-header h1 {
+            color: white !important;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dashboard-header p {
+            color: rgba(255, 255, 255, 0.9) !important;
+            font-size: 1.1rem;
+            margin: 0;
+        }
+        
+        /* Modern Content Cards */
+        .modern-card {
+            background: white;
+            border-radius: var(--border-radius-modern);
+            border: none;
+            box-shadow: var(--card-shadow);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+        
+        .modern-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .modern-card .card-header {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-bottom: 1px solid #e2e8f0;
+            padding: 1.5rem;
+            border-radius: var(--border-radius-modern) var(--border-radius-modern) 0 0;
+        }
+        
+        .modern-card .card-title {
+            color: #2d3748;
+            font-weight: 700;
+            font-size: 1.3rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .modern-card .card-body {
+            padding: 2rem;
+        }
+        
+        /* Enhanced Discussion Cards */
         .discussion-card {
-            transition: all 0.3s ease;
-            border-left: 4px solid #007bff;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border-left: 4px solid #667eea;
+            border-radius: var(--border-radius-modern);
+            overflow: hidden;
         }
         
         .discussion-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
         }
         
         .discussion-card.border-warning {
-            border-left-color: #ffc107;
+            border-left-color: #f59e0b;
         }
         
-        .border-2 {
-            border-left-width: 4px !important;
+        .discussion-card.border-warning:hover {
+            border-left-color: #d97706;
         }
         
         .discussion-content {
             line-height: 1.6;
         }
         
-        .modal-header.bg-primary {
-            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important;
-        }
-        
-        .btn-lg {
-            padding: 0.75rem 2rem;
+        /* Modern Buttons */
+        .btn-modern {
+            border-radius: 25px;
+            padding: 0.6rem 1.5rem;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: none;
+            position: relative;
+            overflow: hidden;
         }
         
-        .dashboard-card.shadow-sm {
-            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+        .btn-modern::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .btn-modern:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .btn-primary-modern {
+            background: var(--primary-gradient);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary-modern:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        /* Override buttons to use modern styling */
+        .btn-primary {
+            background: var(--primary-gradient) !important;
+            border: none !important;
+            border-radius: 25px !important;
+            font-weight: 600 !important;
+            transition: all 0.4s ease !important;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4) !important;
+        }
+        
+        .btn-outline-primary {
+            border-color: #667eea !important;
+            color: #667eea !important;
+            border-radius: 25px !important;
+            font-weight: 600 !important;
+            transition: all 0.4s ease !important;
+        }
+        
+        .btn-outline-primary:hover {
+            background: var(--primary-gradient) !important;
+            border-color: transparent !important;
+            color: white !important;
+            transform: translateY(-2px) !important;
+        }
+        
+        .btn-outline-secondary {
+            border-color: #6b7280 !important;
+            color: #6b7280 !important;
+            border-radius: 25px !important;
+            font-weight: 600 !important;
+            transition: all 0.4s ease !important;
+        }
+        
+        .btn-outline-secondary:hover {
+            background: #6b7280 !important;
+            border-color: transparent !important;
+            color: white !important;
+            transform: translateY(-2px) !important;
+        }
+        
+        /* Modal Enhancements */
+        .modal-header.bg-primary {
+            background: var(--primary-gradient) !important;
+        }
+        
+        .modal-content {
+            border-radius: var(--border-radius-modern);
+            border: none;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        /* Form Enhancements */
+        .form-control, .form-select {
+            border-radius: 12px;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
         }
         
         .form-label.fw-semibold {
             font-weight: 600;
-            color: #495057;
+            color: #4a5568;
+            margin-bottom: 0.5rem;
         }
         
-        .invalid-feedback {
-            display: block;
-            width: 100%;
-            margin-top: 0.25rem;
-            font-size: 0.875em;
-            color: #dc3545;
-        }
-        
-        .is-invalid {
-            border-color: #dc3545;
-        }
-        
+        /* Pagination Enhancements */
         .pagination .page-link {
-            color: #007bff;
-            border-color: #dee2e6;
+            border-radius: 8px;
+            margin: 0 2px;
+            color: #667eea;
+            border: none;
+            background: #f8fafc;
+            transition: all 0.3s ease;
         }
         
         .pagination .page-item.active .page-link {
-            background-color: #007bff;
-            border-color: #007bff;
+            background: var(--primary-gradient);
+            color: white;
         }
         
         .pagination .page-link:hover {
-            color: #0056b3;
-            background-color: #e9ecef;
-            border-color: #dee2e6;
+            background: var(--primary-gradient);
+            color: white;
+            transform: translateY(-1px);
         }
         
-        .fade.show {
-            opacity: 1;
-        }
-        
+        /* Alert Enhancements */
         .alert {
             border: none;
-            border-radius: 0.5rem;
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
         }
         
         .alert-success {
-            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-            color: #155724;
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            color: #065f46;
         }
         
         .alert-danger {
-            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
-            color: #721c24;
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            color: #991b1b;
+        }
+        
+        /* Badge Enhancements */
+        .badge {
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+        
+        /* Staggered Animation for Discussion Cards */
+        .discussion-card {
+            animation: fadeInUp 0.6s ease both;
+        }
+        
+        .discussion-card:nth-child(1) { animation-delay: 0.1s; }
+        .discussion-card:nth-child(2) { animation-delay: 0.2s; }
+        .discussion-card:nth-child(3) { animation-delay: 0.3s; }
+        .discussion-card:nth-child(4) { animation-delay: 0.4s; }
+        .discussion-card:nth-child(5) { animation-delay: 0.5s; }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .dashboard-header {
+                padding: 1.5rem;
+            }
+            
+            .dashboard-header h1 {
+                font-size: 2rem;
+            }
+            
+            .modern-card .card-body {
+                padding: 1.5rem;
+            }
         }
     </style>
-    
+</head>
+<body>
+    <?php require_once '../includes/universal_header.php'; ?>
+
     <div class="container-fluid py-4">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3">
+                <?php require_once 'includes/sidebar.php'; ?>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="col-md-9">
+                <!-- Modern Dashboard Header -->
+                <div class="dashboard-header">
+                    <div class="position-relative">
+                        <h1 class="mb-3">Course Discussions 💬</h1>
+                        <p class="mb-0">Connect with peers and engage in meaningful conversations</p>
+                    </div>
+                    <div class="position-absolute top-0 end-0">
+                        <span class="badge bg-white text-primary px-3 py-2">Student</span>
+                    </div>
+                </div>
+
         <?php if (isset($_SESSION['success_message'])): ?>
             <div class="alert alert-success alert-dismissible fade show" role="alert">
                 <i class="fas fa-check-circle me-2"></i>
@@ -331,56 +599,22 @@ $stats = $discussion->getDiscussionStats();
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         <?php endif; ?>
-        
-        <div class="row">
-            <div class="col-md-3">
-                <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="my-courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-graduation-cap me-2"></i> My Courses
-                        <span class="badge bg-primary float-end">0</span>
-                    </a>
-                    <a href="quizzes.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-brain me-2"></i> Quizzes
-                        <span class="badge bg-info float-end">0</span>
-                    </a>
-                    <a href="quiz-results.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-bar me-2"></i> Quiz Results
-                    </a>
-                    <a href="discussions.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-comments me-2"></i> Discussions
-                    </a>
-                    <a href="certificates.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-certificate me-2"></i> Certificates
-                    </a>
-                    <a href="profile.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-user me-2"></i> Profile
-                    </a>
-                    <a href="../logout.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-sign-out-alt me-2"></i> Logout
-                    </a>
-                </div>
-            </div>
-            
-            <div class="col-md-9">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1>Course Discussions</h1>
-                    <div>
-                        <span class="badge bg-success">Student</span>
-                    </div>
-                </div>
-
+                
                 <!-- Create Discussion Button -->
                 <div class="mb-4">
-                    <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#createDiscussionModal">
+                    <button class="btn btn-primary btn-modern btn-lg" data-bs-toggle="modal" data-bs-target="#createDiscussionModal">
                         <i class="fas fa-plus me-2"></i>Start New Discussion
                     </button>
                 </div>
 
-                <!-- Filters -->
-                <div class="card mb-4 shadow-sm">
+                <!-- Enhanced Filters -->
+                <div class="modern-card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-filter me-2 text-primary"></i>
+                            Filter Discussions
+                        </h5>
+                    </div>
                     <div class="card-body">
                         <form method="GET" class="row g-3">
                             <div class="col-md-4">
@@ -406,10 +640,10 @@ $stats = $discussion->getDiscussionStats();
                             <div class="col-md-2">
                                 <label class="form-label">&nbsp;</label>
                                 <div class="d-grid gap-2">
-                                    <button type="submit" class="btn btn-primary">
+                                    <button type="submit" class="btn btn-primary btn-modern">
                                         <i class="fas fa-filter me-1"></i>Filter
                                     </button>
-                                    <a href="discussions.php" class="btn btn-outline-secondary">
+                                    <a href="discussions.php" class="btn btn-outline-secondary btn-modern">
                                         <i class="fas fa-times me-1"></i>Clear
                                     </a>
                                 </div>
@@ -418,23 +652,29 @@ $stats = $discussion->getDiscussionStats();
                     </div>
                 </div>
 
-                <!-- Discussions List -->
-                <div class="dashboard-card shadow-sm">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h3 class="mb-0">
-                            <i class="fas fa-comments me-2 text-primary"></i>Discussions
-                        </h3>
-                        <span class="badge bg-primary rounded-pill">
-                            <?php echo count($discussions); ?> discussions
-                        </span>
+                <!-- Enhanced Discussions List -->
+                <div class="modern-card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-comments me-2 text-primary"></i>
+                                Discussions
+                            </h5>
+                            <span class="badge bg-primary rounded-pill">
+                                <?php echo count($discussions); ?> discussions
+                            </span>
+                        </div>
                     </div>
+                    <div class="card-body">
                     
                     <?php if (empty($discussions)): ?>
                         <div class="text-center py-5">
-                            <i class="fas fa-comments fa-4x text-muted mb-3"></i>
-                            <h5 class="text-muted">No discussions found</h5>
-                            <p class="text-muted">Be the first to start a discussion in your courses!</p>
-                            <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#createDiscussionModal">
+                            <div class="mb-4">
+                                <i class="fas fa-comments fa-4x text-muted" style="opacity: 0.4;"></i>
+                            </div>
+                            <h5 class="fw-bold text-muted mb-3">No discussions found</h5>
+                            <p class="text-muted mb-4">Be the first to start a discussion in your courses!</p>
+                            <button class="btn btn-primary-modern btn-modern btn-lg" data-bs-toggle="modal" data-bs-target="#createDiscussionModal">
                                 <i class="fas fa-plus me-2"></i>Start Discussion
                             </button>
                         </div>
@@ -480,7 +720,7 @@ $stats = $discussion->getDiscussionStats();
                                                         <span class="ms-3"><i class="fas fa-comment me-1"></i><?php echo $discussion['replies_count']; ?> replies</span>
                                                     <?php endif; ?>
                                                 </div>
-                                                <button class="btn btn-primary" onclick="viewDiscussion(<?php echo $discussion['id']; ?>)">
+                                                <button class="btn btn-primary btn-modern" onclick="viewDiscussion(<?php echo $discussion['id']; ?>)">
                                                     <i class="fas fa-eye me-1"></i>View Discussion
                                                 </button>
                                             </div>
@@ -494,7 +734,7 @@ $stats = $discussion->getDiscussionStats();
                             <?php endforeach; ?>
                         </div>
                         
-                        <!-- Pagination -->
+                        <!-- Enhanced Pagination -->
                         <?php if (count($discussions) >= $limit): ?>
                         <div class="d-flex justify-content-center mt-4">
                             <nav>
@@ -514,6 +754,7 @@ $stats = $discussion->getDiscussionStats();
                         </div>
                         <?php endif; ?>
                     <?php endif; ?>
+                    </div>
                 </div>
             </div>
         </div>
@@ -595,6 +836,51 @@ $stats = $discussion->getDiscussionStats();
     <script src="../assets/js/main.js"></script>
     <script>
         $(document).ready(function() {
+            // Enhanced animations for discussion cards
+            $('.discussion-card').each(function(index) {
+                $(this).css('opacity', '0');
+                $(this).css('transform', 'translateY(30px)');
+                setTimeout(() => {
+                    $(this).animate({
+                        opacity: 1,
+                        transform: 'translateY(0)'
+                    }, 600, 'easeOutCubic');
+                }, 100 * index);
+            });
+            
+            // Hover effects for discussion cards
+            $('.discussion-card').on('mouseenter', function() {
+                $(this).css('transform', 'translateY(-5px) scale(1.02)');
+            }).on('mouseleave', function() {
+                $(this).css('transform', 'translateY(0) scale(1)');
+            });
+            
+            // Button ripple effect
+            $('.btn-modern').on('click', function(e) {
+                const button = $(this);
+                const ripple = $('<span class="ripple"></span>');
+                
+                button.append(ripple);
+                
+                const x = e.pageX - button.offset().left;
+                const y = e.pageY - button.offset().top;
+                
+                ripple.css({
+                    left: x,
+                    top: y
+                });
+                
+                setTimeout(() => {
+                    ripple.remove();
+                }, 600);
+            });
+            
+            // Parallax effect for dashboard header
+            $(window).on('scroll', function() {
+                const scrolled = $(window).scrollTop();
+                $('.dashboard-header').css('transform', `translateY(${scrolled * 0.3}px)`);
+            });
+            
             // Handle AJAX form submissions
             $('.ajax-form').on('submit', function(e) {
                 e.preventDefault();
@@ -767,3 +1053,22 @@ $stats = $discussion->getDiscussionStats();
             });
         });
     </script>
+    
+    <!-- Add CSS for ripple effect -->
+    <style>
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.6);
+            transform: scale(0);
+            animation: ripple-animation 0.6s ease-out;
+            pointer-events: none;
+        }
+        
+        @keyframes ripple-animation {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+    </style>

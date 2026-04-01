@@ -256,7 +256,7 @@ class Progress {
         
         // Update enrollment
         $stmt = $this->db->prepare("
-            UPDATE enrollments SET
+            UPDATE enrollments_new SET
             progress_percentage = ?,
             lessons_completed = ?,
             lessons_total = ?,
@@ -323,27 +323,28 @@ class Progress {
      */
     public function getStudentOverallProgress($studentId) {
         // Use a simpler query that works with existing table structure
-        $stmt = $this->db->prepare("
+        $conn = $this->db->getConnection();
+        $stmt = $conn->prepare("
             SELECT c.id, c.title, e.progress_percentage, 
                    CASE WHEN e.progress_percentage >= 100 THEN 'completed'
                         WHEN e.progress_percentage > 0 THEN 'in_progress'
                         ELSE 'not_started' END as status,
                    e.enrolled_at
-            FROM enrollments e
+            FROM enrollments_new e
             JOIN courses_new c ON e.course_id = c.id
-            WHERE e.student_id = ?
+            WHERE e.user_id = ?
             ORDER BY e.enrolled_at DESC
         ");
         
         if ($stmt === false) {
             // Fallback query if the main one fails
-            $stmt = $this->db->prepare("
+            $stmt = $conn->prepare("
                 SELECT c.id, c.title, 0 as progress_percentage,
                        'not_started' as status,
                        e.enrolled_at
-                FROM enrollments e
+                FROM enrollments_new e
                 JOIN courses_new c ON e.course_id = c.id
-                WHERE e.student_id = ?
+                WHERE e.user_id = ?
                 ORDER BY e.enrolled_at DESC
             ");
         }
@@ -412,7 +413,7 @@ class Progress {
                    SUM(CASE WHEN progress_percentage >= 100 THEN 1 ELSE 0 END) as completed_courses,
                    SUM(CASE WHEN progress_percentage > 0 AND progress_percentage < 100 THEN 1 ELSE 0 END) as in_progress_courses,
                    COALESCE(AVG(progress_percentage), 0) as average_progress
-            FROM enrollments e
+            FROM enrollments_new e
             WHERE e.student_id = ?
         ");
         
@@ -437,7 +438,7 @@ class Progress {
         // Recent activity - simplified
         $stmt = $this->db->prepare("
             SELECT c.title as course_title, e.progress_percentage, e.enrolled_at as last_activity_at
-            FROM enrollments e
+            FROM enrollments_new e
             JOIN courses_new c ON e.course_id = c.id
             WHERE e.student_id = ?
             ORDER BY e.enrolled_at DESC
@@ -467,7 +468,7 @@ class Progress {
         // Simplified study streak calculation using enrollments table
         $stmt = $this->db->prepare("
             SELECT DISTINCT DATE(enrolled_at) as activity_date
-            FROM enrollments
+            FROM enrollments_new
             WHERE student_id = ? AND enrolled_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
             ORDER BY activity_date DESC
         ");
@@ -510,7 +511,7 @@ class Progress {
                        COUNT(e.course_id) as enrolled_courses,
                        COALESCE(AVG(e.progress_percentage), 0) as avg_progress
                 FROM users_new u
-                JOIN enrollments e ON u.id = e.student_id
+                JOIN enrollments_new e ON u.id = e.student_id
                 WHERE u.role = 'student'";
         
         if ($courseId) {

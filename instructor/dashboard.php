@@ -178,7 +178,7 @@ if (!empty($instructorCourses)) {
 // Calculate average progress
 $avgProgress = $totalCoursesWithProgress > 0 ? round($totalProgressSum / $totalCoursesWithProgress, 1) : 0;
 
-// Use real data from courses, fallback to analytics if needed
+// Use real data FROM courses_new, fallback to analytics if needed
 $totalStudents = $totalStudentsFromCourses > 0 ? $totalStudentsFromCourses : ($analytics['overview']['total_students'] ?? 0);
 $completedStudents = $analytics['overview']['completed_students'] ?? 0;
 $totalRevenue = $totalRevenueFromCourses > 0 ? $totalRevenueFromCourses : ($earnings['summary']['total_revenue'] ?? 0);
@@ -300,7 +300,7 @@ function calculateAverage($trend) {
 .header-title {
     font-size: 2.5rem;
     font-weight: 800;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -334,7 +334,7 @@ function calculateAverage($trend) {
 .quick-stat:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    border-color: #667eea;
+    border-color: #4169E1;
 }
 
 .quick-stat-icon {
@@ -393,10 +393,10 @@ function calculateAverage($trend) {
     left: 0;
     right: 0;
     height: 4px;
-    background: linear-gradient(90deg, #667eea, #764ba2);
+    background: linear-gradient(90deg, #4169E1, #2563EB);
 }
 
-.overview-stat-card.primary::before { background: linear-gradient(90deg, #667eea, #764ba2); }
+.overview-stat-card.primary::before { background: linear-gradient(90deg, #4169E1, #2563EB); }
 .overview-stat-card.success::before { background: linear-gradient(90deg, #10b981, #059669); }
 .overview-stat-card.info::before { background: linear-gradient(90deg, #3b82f6, #1d4ed8); }
 .overview-stat-card.warning::before { background: linear-gradient(90deg, #f59e0b, #d97706); }
@@ -432,7 +432,7 @@ function calculateAverage($trend) {
     border-radius: 50%;
 }
 
-.stat-icon.primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.stat-icon.primary { background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%); }
 .stat-icon.success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
 .stat-icon.info { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
 .stat-icon.warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
@@ -522,29 +522,7 @@ function calculateAverage($trend) {
     <div class="row">
         <!-- Sidebar -->
         <div class="col-md-3">
-            <div class="list-group">
-                <a href="dashboard.php" class="list-group-item list-group-item-action active">
-                    <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                </a>
-                <a href="courses.php" class="list-group-item list-group-item-action">
-                    <i class="fas fa-chalkboard-teacher me-2"></i> My Courses
-                </a>
-                <a href="create-course.php" class="list-group-item list-group-item-action">
-                    <i class="fas fa-plus me-2"></i> Create Course
-                </a>
-                <a href="students.php" class="list-group-item list-group-item-action">
-                    <i class="fas fa-users me-2"></i> Students
-                </a>
-                <a href="earnings.php" class="list-group-item list-group-item-action">
-                    <i class="fas fa-rupee-sign me-2"></i> Earnings
-                </a>
-                <a href="profile.php" class="list-group-item list-group-item-action">
-                    <i class="fas fa-user me-2"></i> Profile
-                </a>
-                <a href="../logout.php" class="list-group-item list-group-item-action">
-                    <i class="fas fa-sign-out-alt me-2"></i> Logout
-                </a>
-            </div>
+            <?php require_once '../includes/instructor_sidebar.php'; ?>
         </div>
         
         <!-- Main Content -->
@@ -715,7 +693,7 @@ function calculateAverage($trend) {
                                  (int)($engagement['in_progress_students'] ?? 0) + 
                                  (int)($engagement['not_started_students'] ?? 0);
                         
-                        // If no engagement data but we have students from courses, use that
+                        // If no engagement data but we have students FROM courses_new, use that
                         if ($total === 0 && $totalStudents > 0) {
                             $engagement = [
                                 'active_students' => max(1, (int)($totalStudents * 0.4)),

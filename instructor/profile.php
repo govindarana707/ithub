@@ -16,7 +16,7 @@ if (!$conn) {
 }
 
 // Load current user data
-$stmt = $conn->prepare("SELECT id, username, email, full_name, profile_image, bio, phone FROM users WHERE id = ?");
+$stmt = $conn->prepare("SELECT id, username, email, full_name, profile_image, bio, phone FROM users_new WHERE id = ?");
 $stmt->bind_param('i', $instructorId);
 $stmt->execute();
 $user = $stmt->get_result()->fetch_assoc();
@@ -89,8 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $avatarPath = $upload['filename'];
     }
 
-    // Update users table
-    $stmt = $conn->prepare("UPDATE users SET full_name = ?, email = ?, phone = ?, bio = ?, profile_image = ?, updated_at = NOW() WHERE id = ?");
+    // UPDATE users_newtable
+    $stmt = $conn->prepare("UPDATE users_newSET full_name = ?, email = ?, phone = ?, bio = ?, profile_image = ?, updated_at = NOW() WHERE id = ?");
     $stmt->bind_param('sssssi', $fullName, $email, $phone, $bio, $avatarPath, $instructorId);
     $ok = $stmt->execute();
     $stmt->close();
@@ -138,91 +138,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $conn->close();
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profile - Instructor Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
-    <style>
-        .avatar-preview {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 4px solid #fff;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        .card-soft {
-            background: #fff;
-            border-radius: 10px;
-            padding: 1.5rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
-        }
-        .tag-input {
-            display: inline-block;
-            margin: 0.25rem;
-            padding: 0.25rem 0.5rem;
-            background: #e9ecef;
-            border-radius: 0.25rem;
-            font-size: 0.9rem;
-        }
-        .tag-input button {
-            background: none;
-            border: none;
-            margin-left: 0.5rem;
-            cursor: pointer;
-            color: #6c757d;
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="dashboard.php"><i class="fas fa-tachometer-alt me-1"></i> Dashboard</a>
-                <a class="nav-link" href="courses.php"><i class="fas fa-chalkboard-teacher me-1"></i> My Courses</a>
-                <a class="nav-link" href="students.php"><i class="fas fa-users me-1"></i> Students</a>
-                <a class="nav-link" href="quizzes.php"><i class="fas fa-question-circle me-1"></i> Quizzes</a>
-                <a class="nav-link" href="earnings.php"><i class="fas fa-rupee-sign me-1"></i> Earnings</a>
-                <a class="nav-link active" href="profile.php"><i class="fas fa-user me-1"></i> Profile</a>
-                <a class="nav-link" href="../logout.php"><i class="fas fa-sign-out-alt me-1"></i> Logout</a>
-            </div>
-        </div>
-    </nav>
+<?php require_once '../includes/universal_header.php'; ?>
 
     <div class="container-fluid py-4">
         <div class="row">
             <div class="col-md-3">
-                <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chalkboard-teacher me-2"></i> My Courses
-                    </a>
-                    <a href="create-course.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-plus me-2"></i> Create Course
-                    </a>
-                    <a href="students.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-users me-2"></i> Students
-                    </a>
-                    <a href="quizzes.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-question-circle me-2"></i> Quizzes
-                    </a>
-                    <a href="earnings.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-rupee-sign me-2"></i> Earnings
-                    </a>
-                    <a href="profile.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-user me-2"></i> Profile
-                    </a>
-                </div>
+                <?php require_once '../includes/instructor_sidebar.php'; ?>
             </div>
 
             <div class="col-md-9">

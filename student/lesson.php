@@ -1,9 +1,14 @@
 <?php
 require_once '../config/config.php';
 require_once '../includes/auth.php';
+require_once '../includes/session_helper.php';
 require_once '../models/Course.php';
 require_once '../models/LessonContent.php';
 require_once '../includes/VideoProcessor.php';
+require_once '../models/Database.php';
+
+// Initialize session
+initializeSession();
 
 // Allow students, admins, and instructors (for preview) to access
 $role = getUserRole();
@@ -17,6 +22,10 @@ $lessonContent = new LessonContent();
 $userId = $_SESSION['user_id'];
 $courseId = intval($_GET['course_id'] ?? 0);
 $isPreview = isset($_GET['preview']);
+
+// Establish database connection
+$database = new Database();
+$conn = $database->getConnection();
 
 if ($courseId <= 0) {
     $_SESSION['error_message'] = 'Invalid course ID';
@@ -112,17 +121,69 @@ if (!$currentLesson && !empty($lessons)) {
 // Handle completion logic (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'complete_lesson') {
     $lessonId = intval($_POST['lesson_id']);
+    
+    error_log("Mark lesson complete attempt: student_id=$userId, lesson_id=$lessonId, course_id=$courseId");
+    
     if ($lessonId > 0) {
-        $course->markLessonComplete($userId, $lessonId);
-        $course->updateCourseProgress($userId, $courseId);
-
-        $nextIdx = $currentLessonIndex + 1;
-        if (isset($lessons[$nextIdx])) {
-            header("Location: lesson.php?course_id=$courseId&lesson_id=" . $lessons[$nextIdx]['id'] . ($isInstructorPreview ? '&preview=1' : ''));
-        } else {
-            header("Location: course-complete.php?course_id=$courseId");
+        try {
+            // Mark lesson as complete
+            $result = $course->markLessonComplete($userId, $lessonId);
+            
+            if ($result) {
+                error_log("Lesson marked as complete successfully");
+                
+                // Update course progress
+                $progressResult = $course->updateCourseProgress($userId, $courseId);
+                error_log("Course progress update result: " . ($progressResult ? 'success' : 'failed'));
+                
+                // Set success message
+                $_SESSION['success_message'] = 'Lesson marked as complete successfully!';
+                
+                // Redirect to next lesson or course completion
+                $nextIdx = $currentLessonIndex + 1;
+                if (isset($lessons[$nextIdx])) {
+                    $nextLessonId = $lessons[$nextIdx]['id'];
+                    $redirectUrl = "lesson.php?course_id=$courseId&lesson_id=$nextLessonId" . ($isInstructorPreview ? '&preview=1' : '');
+                    error_log("Redirecting to next lesson: $redirectUrl");
+                    header("Location: $redirectUrl");
+                } else {
+                    $redirectUrl = "course-complete.php?course_id=$courseId";
+                    error_log("Redirecting to course completion: $redirectUrl");
+                    header("Location: $redirectUrl");
+                }
+                exit;
+            } else {
+                error_log("Failed to mark lesson as complete");
+                $_SESSION['error_message'] = 'Failed to mark lesson as complete. Please try again.';
+                
+                // If this is an AJAX request, return JSON response
+                if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'message' => 'Failed to mark lesson as complete']);
+                    exit;
+                }
+            }
+        } catch (Exception $e) {
+            error_log("Exception in lesson completion: " . $e->getMessage());
+            $_SESSION['error_message'] = 'An error occurred while marking the lesson as complete.';
+            
+            // If this is an AJAX request, return JSON response
+            if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'An error occurred while marking the lesson as complete']);
+                exit;
+            }
         }
-        exit;
+    } else {
+        error_log("Invalid lesson ID: $lessonId");
+        $_SESSION['error_message'] = 'Invalid lesson ID.';
+        
+        // If this is an AJAX request, return JSON response
+        if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Invalid lesson ID']);
+            exit;
+        }
     }
 }
 
@@ -233,6 +294,7 @@ require_once '../includes/universal_header.php';
         box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
     }
 </style>
+<link rel="stylesheet" href="../assets/css/theme-colors.css">
 
 <?php if ($isInstructorPreview): ?>
 <div class="alert alert-warning alert-dismissible fade show mx-3 mt-3" role="alert">
@@ -251,6 +313,26 @@ require_once '../includes/universal_header.php';
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
 <?php endif; ?>
+
+<?php if (isset($_SESSION['error_message'])): ?>
+<div class="alert alert-danger alert-dismissible fade show mx-3 mt-3" role="alert">
+    <div class="d-flex align-items-center">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <div><?php echo htmlspecialchars($_SESSION['error_message']); ?></div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php unset($_SESSION['error_message']); endif; ?>
+
+<?php if (isset($_SESSION['success_message'])): ?>
+<div class="alert alert-success alert-dismissible fade show mx-3 mt-3" role="alert">
+    <div class="d-flex align-items-center">
+        <i class="fas fa-check-circle me-2"></i>
+        <div><?php echo htmlspecialchars($_SESSION['success_message']); ?></div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php unset($_SESSION['success_message']); endif; ?>
 
 <div class="container-fluid py-4">
     <div class="row g-4">
@@ -372,11 +454,11 @@ require_once '../includes/universal_header.php';
                                 <?php endif; ?>
                             </small>
                         </div>
-                        <form method="POST">
+                        <form method="POST" id="completionForm">
                             <input type="hidden" name="action" value="complete_lesson">
                             <input type="hidden" name="lesson_id" value="<?php echo $currentLesson['id']; ?>">
                             <?php if (!$currentLesson['is_completed']): ?>
-                                <button type="submit" class="btn completion-btn text-white">
+                                <button type="submit" class="btn completion-btn text-white" id="completeBtn">
                                     <i class="fas fa-check-circle me-2"></i>Mark Complete
                                 </button>
                             <?php else: ?>
@@ -389,35 +471,113 @@ require_once '../includes/universal_header.php';
                 </div>
             </div>
 
+            <!-- Course Completion Certificate Section -->
+            <?php if ($progressPercent == 100): ?>
+            <div class="card border-0 shadow-sm mb-4 bg-success bg-opacity-10">
+                <div class="card-body">
+                    <div class="text-center">
+                        <i class="fas fa-trophy fa-3x text-warning mb-3"></i>
+                        <h4 class="text-success mb-3">🎉 Congratulations! Course Completed!</h4>
+                        <p class="text-muted mb-4">You have successfully completed all lessons in this course. You can still review any lesson below and access your certificate.</p>
+                        
+                        <!-- Check if certificate already exists -->
+                        <?php
+                        try {
+                            // Create a new database connection for certificate check
+                            $certDatabase = new Database();
+                            $certConn = $certDatabase->getConnection();
+                            
+                            if ($certConn) {
+                                $stmt = $certConn->prepare("SELECT COUNT(*) as count FROM certificates WHERE student_id = ? AND course_id = ? AND status = 'issued'");
+                                if ($stmt) {
+                                    $stmt->bind_param("ii", $userId, $courseId);
+                                    $stmt->execute();
+                                    $certCount = $stmt->get_result()->fetch_assoc()['count'];
+                                    $stmt->close();
+                                } else {
+                                    $certCount = 0;
+                                }
+                                $certConn->close();
+                            } else {
+                                $certCount = 0;
+                            }
+                        } catch (Exception $e) {
+                            $certCount = 0;
+                            error_log('Certificate check error: ' . $e->getMessage());
+                        }
+                        ?>
+                        
+                        <?php if ($certCount > 0): ?>
+                            <div class="alert alert-success">
+                                <i class="fas fa-certificate me-2"></i>
+                                <strong>Certificate Available!</strong><br>
+                                <small class="text-muted">Your certificate has been generated. You can view and download it from the Certificates page.</small>
+                            </div>
+                            <a href="certificates.php" class="btn btn-success btn-lg me-2">
+                                <i class="fas fa-certificate me-2"></i>View My Certificate
+                            </a>
+                            <button type="button" class="btn btn-primary btn-lg" onclick="showLessonSelector()">
+                                <i class="fas fa-list me-2"></i>Review Lessons
+                            </button>
+                        <?php else: ?>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Generate Your Certificate</strong><br>
+                                <small class="text-muted">Click the button below to generate your completion certificate.</small>
+                            </div>
+                            <button type="button" class="btn btn-success btn-lg me-2" onclick="generateCertificate()">
+                                <i class="fas fa-magic me-2"></i>Generate Certificate
+                            </button>
+                            <button type="button" class="btn btn-primary btn-lg" onclick="showLessonSelector()">
+                                <i class="fas fa-list me-2"></i>Review Lessons
+                            </button>
+                        <?php endif; ?>
+                        
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                <strong>All course content remains accessible below.</strong> You can review any lesson, access resources, and download materials anytime.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Content Tabs -->
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white border-0 pt-3">
-                    <ul class="nav content-tabs" id="lessonTabs" role="tablist">
-                        <li class="nav-item">
-                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#overview" role="tab">
-                                <i class="fas fa-align-left me-2"></i>Content
-                            </button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#notes" role="tab">
-                                <i class="fas fa-pen me-2"></i>My Notes
-                            </button>
-                        </li>
-                        <?php if (!empty($currentLesson['resources'])): ?>
-                        <li class="nav-item">
-                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#resources" role="tab">
-                                <i class="fas fa-download me-2"></i>Resources
-                            </button>
-                        </li>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <ul class="nav content-tabs" id="lessonTabs" role="tablist">
+                            <li class="nav-item">
+                                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#overview" role="tab">
+                                    <i class="fas fa-align-left me-2"></i>Content
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#notes" role="tab">
+                                    <i class="fas fa-pen me-2"></i>My Notes
+                                </button>
+                            </li>
+                            <?php if (!empty($currentLesson['resources'])): ?>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#resources" role="tab">
+                                    <i class="fas fa-download me-2"></i>Resources
+                                </button>
+                            </li>
+                            <?php endif; ?>
+                            <?php if (!empty($currentLesson['assignments'])): ?>
+                            <li class="nav-item">
+                                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#assignments" role="tab">
+                                    <i class="fas fa-tasks me-2"></i>Assignments
+                                </button>
+                            </li>
+                            <?php endif; ?>
+                        </ul>
+                        <?php if ($progressPercent == 100): ?>
+                            <small class="text-success"><i class="fas fa-info-circle me-1"></i>All content available for review</small>
                         <?php endif; ?>
-                        <?php if (!empty($currentLesson['assignments'])): ?>
-                        <li class="nav-item">
-                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#assignments" role="tab">
-                                <i class="fas fa-tasks me-2"></i>Assignments
-                            </button>
-                        </li>
-                        <?php endif; ?>
-                    </ul>
+                    </div>
                 </div>
                 <div class="card-body p-4">
                     <div class="tab-content">
@@ -575,7 +735,12 @@ require_once '../includes/universal_header.php';
             <!-- Course Content -->
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3">
-                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>Course Content</h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Course Content</h5>
+                        <?php if ($progressPercent == 100): ?>
+                            <small class="text-success"><i class="fas fa-check-circle me-1"></i>Course Completed - All Lessons Accessible</small>
+                        <?php endif; ?>
+                    </div>
                 </div>
                 <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
                     <?php foreach ($lessons as $index => $lesson): ?>
@@ -626,6 +791,86 @@ require_once '../includes/universal_header.php';
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Handle completion form submission
+    const completionForm = document.getElementById('completionForm');
+    if (completionForm) {
+        completionForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('completeBtn');
+            const originalText = submitBtn.innerHTML;
+            const originalDisabled = submitBtn.disabled;
+            
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+            
+            // Create form data
+            const formData = new FormData(completionForm);
+            
+            // Submit via fetch for better error handling
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => {
+                // Check if response is ok (status 200-299)
+                if (response.ok) {
+                    // Check content type to determine response format
+                    const contentType = response.headers.get('content-type');
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        // Handle JSON response (for errors)
+                        return response.json().then(data => {
+                            if (data.success) {
+                                // Success - reload page to show updated state
+                                window.location.reload();
+                            } else {
+                                throw new Error(data.message || 'Unknown error');
+                            }
+                        });
+                    } else if (response.redirected) {
+                        // Handle redirect response
+                        window.location.href = response.url;
+                        return;
+                    } else {
+                        // Handle HTML response (success case)
+                        return response.text().then(text => {
+                            console.log('Response text:', text);
+                            // If we get here, it means the form was processed but didn't redirect
+                            // Try to reload the page to show updated state
+                            window.location.reload();
+                        });
+                    }
+                } else {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+            })
+            .catch(error => {
+                console.error('Completion error:', error);
+                
+                // Show error state
+                submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Try Again';
+                submitBtn.classList.remove('completion-btn');
+                submitBtn.classList.add('btn-warning');
+                
+                // Reset after 3 seconds
+                setTimeout(() => {
+                    submitBtn.disabled = originalDisabled;
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.classList.remove('btn-warning');
+                    submitBtn.classList.add('completion-btn');
+                }, 3000);
+                
+                // Show error message
+                showAlert('Failed to mark lesson as complete. Please try again.', 'danger');
+            });
+        });
+    }
+    
     // Auto-save notes
     const notesArea = document.getElementById('studentNotesContent');
     if (notesArea && !notesArea.readOnly) {
@@ -659,9 +904,191 @@ document.addEventListener('DOMContentLoaded', function() {
     if (video) {
         video.addEventListener('ended', function() {
             // Could auto-submit completion form here if desired
+            const completeBtn = document.getElementById('completeBtn');
+            if (completeBtn && !completeBtn.disabled) {
+                completeBtn.classList.add('pulse-animation');
+                setTimeout(() => {
+                    completeBtn.classList.remove('pulse-animation');
+                }, 3000);
+            }
         });
     }
+    
+    // Certificate generation function
+    window.generateCertificate = function() {
+        const courseId = <?php echo $courseId; ?>;
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        
+        // Show loading state
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating...';
+        
+        // Generate certificate via API
+        fetch('../api/generate_certificates.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'action=generate_single&course_id=' + courseId
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message with redirect indication
+                btn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Generated! Redirecting...';
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-success');
+                btn.disabled = true;
+                
+                // Add redirect message below the button
+                const redirectMsg = document.createElement('div');
+                redirectMsg.className = 'alert alert-success mt-3';
+                redirectMsg.innerHTML = '<i class="fas fa-info-circle me-2"></i>Redirecting to your certificate...';
+                btn.parentElement.appendChild(redirectMsg);
+                
+                // Redirect to certificates page after 1.5 seconds to show the generated certificate
+                setTimeout(() => {
+                    window.location.href = 'certificates.php';
+                }, 1500);
+            } else {
+                // Show error
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Try Again';
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-warning');
+                
+                alert('Error generating certificate: ' + (data.message || 'Unknown error'));
+                
+                // Reset button after 3 seconds
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('btn-warning');
+                    btn.classList.add('btn-success');
+                }, 3000);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Try Again';
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-warning');
+            
+            alert('Error generating certificate. Please try again.');
+            
+            // Reset button after 3 seconds
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-success');
+            }, 3000);
+        });
+    };
+    
+    // Show lesson selector for completed courses
+    function showLessonSelector() {
+        const courseId = <?php echo $courseId; ?>;
+        
+        // Fetch all lessons for this course
+        fetch(`../api/get_course_lessons.php?course_id=${courseId}`)
+            .then(response => response.json())
+            .then(lessons => {
+                if (lessons.success && lessons.data.length > 0) {
+                    // Create lesson selector modal
+                    const modalHtml = `
+                        <div class="modal fade" id="lessonSelectorModal" tabindex="-1">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Select Lesson to Review</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="list-group">
+                                            ${lessons.data.map((lesson, index) => `
+                                                <a href="lesson.php?course_id=${courseId}&lesson_id=${lesson.id}" class="list-group-item list-group-item-action">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <div>
+                                                            <h6 class="mb-1">${lesson.title}</h6>
+                                                            <small class="text-muted">Lesson ${index + 1} of ${lessons.data.length}</small>
+                                                        </div>
+                                                        <div class="text-end">
+                                                            ${lesson.is_completed ? 
+                                                                '<span class="badge bg-success"><i class="fas fa-check me-1"></i>Completed</span>' : 
+                                                                '<span class="badge bg-secondary"><i class="fas fa-play me-1"></i>Not Started</span>'
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                </a>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add modal to page
+                    document.body.insertAdjacentHTML('beforeend', modalHtml);
+                    
+                    // Show modal
+                    const modal = new bootstrap.Modal(document.getElementById('lessonSelectorModal'));
+                    modal.show();
+                    
+                    // Remove modal from DOM when hidden
+                    document.getElementById('lessonSelectorModal').addEventListener('hidden.bs.modal', function() {
+                        this.remove();
+                    });
+                } else {
+                    showAlert('No lessons found for this course.', 'warning');
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching lessons:', error);
+                showAlert('Error loading lessons. Please try again.', 'danger');
+            });
+    }
+    
+    function showAlert(message, type) {
+        const alertHtml = `
+            <div class="alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3" style="z-index: 9999;">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('afterbegin', alertHtml);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            const alert = document.querySelector('.alert');
+            if (alert) {
+                alert.remove();
+            }
+        }, 3000);
+    }
 });
+
+// Add CSS for pulse animation
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    .pulse-animation {
+        animation: pulse 1.5s ease-in-out infinite;
+        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
+    }
+`;
+document.head.appendChild(style);
+
 </script>
 
 <?php require_once '../includes/footer.php'; ?>

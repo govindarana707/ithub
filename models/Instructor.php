@@ -17,7 +17,7 @@ class Instructor {
         // Get basic user info
         $stmt = $conn->prepare("
             SELECT id, username, email, full_name, bio, profile_image, phone, status, created_at
-            FROM users 
+            FROM users_new 
             WHERE id = ? AND role = 'instructor'
         ");
         $stmt->bind_param("i", $instructorId);
@@ -93,7 +93,7 @@ class Instructor {
             return ['success' => false, 'error' => 'No valid fields to update'];
         }
         
-        $sql = "UPDATE users SET ";
+        $sql = "UPDATE users_new SET ";
         $params = [];
         $types = "";
         
@@ -242,7 +242,7 @@ class Instructor {
                    AVG(e.progress_percentage) as avg_progress,
                    MAX(e.enrolled_at) as last_enrollment,
                    SUM(CASE WHEN e.progress_percentage = 100 THEN 1 ELSE 0 END) as completed_courses
-            FROM users u
+            FROM users_new u
             JOIN enrollments_new e ON u.id = e.user_id
             JOIN courses_new c ON e.course_id = c.id
             WHERE c.instructor_id = ? AND u.role = 'student'
@@ -792,7 +792,7 @@ class Instructor {
                    COUNT(DISTINCT c.id) as course_count,
                    COUNT(DISTINCT e.user_id) as student_count,
                    AVG(e.progress_percentage) as avg_progress
-            FROM users u
+            FROM users_new u
             LEFT JOIN courses_new c ON u.id = c.instructor_id
             LEFT JOIN enrollments_new e ON c.id = e.course_id
             WHERE u.role = 'instructor'

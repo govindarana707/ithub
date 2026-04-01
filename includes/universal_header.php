@@ -35,11 +35,88 @@ if (strpos($currentPath, '/admin/') !== false) {
     $showNotifications = true;
 } elseif (strpos($currentPath, '/student/') !== false) {
     $moduleName = 'student';
-    $pageTitle = 'Student Dashboard';
-    $breadcrumbItems = [
-        ['name' => 'Dashboard', 'url' => 'dashboard.php'],
-        ['name' => 'Student Portal', 'url' => '#']
-    ];
+    
+    // Determine specific student page
+    $currentPage = basename($currentPath, '.php');
+    
+    switch ($currentPage) {
+        case 'dashboard.php':
+            $pageTitle = 'Student Dashboard';
+            $breadcrumbItems = [
+                ['name' => 'Dashboard', 'url' => 'dashboard.php'],
+                ['name' => 'Student Portal', 'url' => '#']
+            ];
+            break;
+        case 'my-courses.php':
+            $pageTitle = 'My Courses';
+            $breadcrumbItems = [
+                ['name' => 'Dashboard', 'url' => 'dashboard.php'],
+                ['name' => 'My Courses', 'url' => '#']
+            ];
+            break;
+        case 'courses.php':
+            $pageTitle = 'Browse Courses';
+            $breadcrumbItems = [
+                ['name' => 'Dashboard', 'url' => 'dashboard.php'],
+                ['name' => 'Browse Courses', 'url' => '#']
+            ];
+            break;
+        case 'quizzes.php':
+            $pageTitle = 'Quizzes';
+            $breadcrumbItems = [
+                ['name' => 'Dashboard', 'url' => 'dashboard.php'],
+                ['name' => 'Quizzes', 'url' => '#']
+            ];
+            break;
+        case 'certificates.php':
+            $pageTitle = 'Certificates';
+            $breadcrumbItems = [
+                ['name' => 'Dashboard', 'url' => 'dashboard.php'],
+                ['name' => 'Certificates', 'url' => '#']
+            ];
+            break;
+        case 'quiz-results.php':
+            $pageTitle = 'Quiz Results';
+            $breadcrumbItems = [
+                ['name' => 'Dashboard', 'url' => 'dashboard.php'],
+                ['name' => 'Quiz Results', 'url' => '#']
+            ];
+            break;
+        case 'discussions.php':
+            $pageTitle = 'Discussions';
+            $breadcrumbItems = [
+                ['name' => 'Dashboard', 'url' => 'dashboard.php'],
+                ['name' => 'Discussions', 'url' => '#']
+            ];
+            break;
+        case 'notifications.php':
+            $pageTitle = 'Notifications';
+            $breadcrumbItems = [
+                ['name' => 'Dashboard', 'url' => 'dashboard.php'],
+                ['name' => 'Notifications', 'url' => '#']
+            ];
+            break;
+        case 'profile.php':
+            $pageTitle = 'Profile';
+            $breadcrumbItems = [
+                ['name' => 'Dashboard', 'url' => 'dashboard.php'],
+                ['name' => 'Profile', 'url' => '#']
+            ];
+            break;
+        case 'settings.php':
+            $pageTitle = 'Settings';
+            $breadcrumbItems = [
+                ['name' => 'Dashboard', 'url' => 'dashboard.php'],
+                ['name' => 'Settings', 'url' => '#']
+            ];
+            break;
+        default:
+            $pageTitle = 'Student Portal';
+            $breadcrumbItems = [
+                ['name' => 'Dashboard', 'url' => 'dashboard.php'],
+                ['name' => 'Student Portal', 'url' => '#']
+            ];
+    }
     $showNotifications = true;
 } else {
     // Root level pages
@@ -76,7 +153,7 @@ $userInfo = null;
 if (isLoggedIn()) {
     $conn = connectDB();
     // Add fatal error checking for user info query
-    $stmt = $conn->prepare("SELECT id, username, email, full_name, role, profile_image FROM users WHERE id = ?");
+    $stmt = $conn->prepare("SELECT id, username, email, full_name, role, profile_image FROM users_new WHERE id = ?");
     if (!$stmt) {
         die("Fatal Error: Could not prepare user query. MySQL Error: " . htmlspecialchars($conn->error));
     }
@@ -123,8 +200,8 @@ if ($userInfo && $showNotifications) {
 // Module-specific configurations
 $moduleConfig = [
     'admin' => [
-        'primary_color' => '#dc3545',
-        'secondary_color' => '#c82333',
+        'primary_color' => '#4169E1',
+        'secondary_color' => '#2563EB',
         'icon' => 'fas fa-shield-alt',
         'menu_items' => [
             ['name' => 'Dashboard', 'url' => 'dashboard.php', 'icon' => 'fas fa-tachometer-alt'],
@@ -135,8 +212,8 @@ $moduleConfig = [
         ]
     ],
     'instructor' => [
-        'primary_color' => '#667eea',
-        'secondary_color' => '#764ba2',
+        'primary_color' => '#4169E1',
+        'secondary_color' => '#2563EB',
         'icon' => 'fas fa-chalkboard-teacher',
         'menu_items' => [
             ['name' => 'Dashboard', 'url' => 'dashboard.php', 'icon' => 'fas fa-tachometer-alt'],
@@ -148,8 +225,8 @@ $moduleConfig = [
         ]
     ],
     'student' => [
-        'primary_color' => '#4f46e5',
-        'secondary_color' => '#7c3aed',
+        'primary_color' => '#4169E1',
+        'secondary_color' => '#2563EB',
         'icon' => 'fas fa-user-graduate',
         'menu_items' => [
             ['name' => 'Dashboard', 'url' => 'dashboard.php', 'icon' => 'fas fa-tachometer-alt'],
@@ -179,26 +256,39 @@ $secondaryColor = $currentConfig['secondary_color'];
 $moduleIcon = $currentConfig['icon'];
 $menuItems = $currentConfig['menu_items'];
 
-// Generate dynamic styles to match instructor courses page theme
+// Generate dynamic styles to match theme
 $dynamicStyles = "
 .universal-header {
-    background: #007bff !important;
+    background: var(--gradient-primary) !important;
+    padding: 0.75rem 0;
+    min-height: 70px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .universal-header .navbar-brand {
     color: white !important;
     font-weight: bold;
     font-size: 1.5rem;
+    padding: 0.5rem 0;
+    display: flex;
+    align-items: center;
+}
+
+.universal-header .navbar-nav {
+    padding: 0.5rem 0;
 }
 
 .universal-header .nav-link {
     color: rgba(255, 255, 255, 0.9) !important;
     font-weight: 500;
     transition: color 0.3s ease;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
 }
 
 .universal-header .nav-link:hover {
     color: white !important;
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .universal-header .dropdown-menu {
@@ -206,24 +296,25 @@ $dynamicStyles = "
     border: 1px solid rgba(0, 0, 0, 0.15);
     border-radius: 0.375rem;
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    margin-top: 0.5rem;
 }
 
 .universal-header .dropdown-item {
-    color: #212529;
+    color: var(--gray-color);
     padding: 0.5rem 1rem;
     transition: background-color 0.3s ease;
 }
 
 .universal-header .dropdown-item:hover {
-    background: #f8f9fa;
-    color: #212529;
+    background: var(--bg-secondary);
+    color: var(--gray-color);
 }
 
 .notification-badge {
     position: absolute;
     top: -5px;
     right: -5px;
-    background: #dc3545;
+    background: var(--danger-color);
     color: white;
     border-radius: 50%;
     width: 18px;
@@ -236,36 +327,36 @@ $dynamicStyles = "
 }
 
 .breadcrumb {
-    background: #f8f9fa;
-    border-radius: 0.375rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
     padding: 0.75rem 1rem;
     margin-bottom: 1rem;
 }
 
 .breadcrumb-item {
-    color: #6c757d;
+    color: var(--gray-color);
 }
 
 .breadcrumb-item.active {
-    color: #495057;
+    color: var(--dark-color);
 }
 
 .breadcrumb-item a {
-    color: #007bff;
+    color: var(--primary-color);
     text-decoration: none;
 }
 
 .breadcrumb-item a:hover {
-    color: #0056b3;
+    color: var(--primary-dark);
 }
 
 .search-box {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 0.375rem;
+    border-radius: var(--radius);
     padding: 0.375rem 0.75rem;
     color: white;
-    transition: all 0.3s ease;
+    transition: var(--transition);
 }
 
 .search-box:focus {
@@ -291,17 +382,50 @@ $dynamicStyles = "
     color: rgba(255, 255, 255, 0.8);
 }
 
-/* Dashboard card styles matching admin dashboard */
+/* Responsive Header Styles */
+@media (max-width: 768px) {
+    .universal-header {
+        min-height: 60px;
+        padding: 0.5rem 0;
+    }
+    
+    .universal-header .navbar-brand {
+        font-size: 1.25rem;
+        padding: 0.25rem 0;
+    }
+    
+    .universal-header .navbar-nav {
+        padding: 0.25rem 0;
+    }
+    
+    .universal-header .nav-link {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .universal-header {
+        min-height: 56px;
+        padding: 0.375rem 0;
+    }
+    
+    .universal-header .navbar-brand {
+        font-size: 1.1rem;
+    }
+    
+    .universal-header .nav-link {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.85rem;
+    }
+}
+
+/* Dashboard card styles matching student theme */
 .dashboard-card {
     background: white;
     border: none;
     border-radius: 0.375rem;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-}
-
-.dashboard-card h3 {
     color: #495057;
     font-size: 1.25rem;
     font-weight: 600;
@@ -1445,6 +1569,11 @@ function hex2rgb($hex)
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($pageTitle); ?></title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="<?php echo BASE_URL; ?>assets/favicon.png">
+    <link rel="shortcut icon" type="image/png" href="<?php echo BASE_URL; ?>assets/favicon.png">
+    <link rel="apple-touch-icon" type="image/png" href="<?php echo BASE_URL; ?>assets/favicon.png">
 
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -1454,6 +1583,7 @@ function hex2rgb($hex)
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
     <link href="<?php echo BASE_URL; ?>assets/css/style.css" rel="stylesheet">
+    <link href="<?php echo BASE_URL; ?>assets/css/theme.css" rel="stylesheet">
     <link href="<?php echo BASE_URL; ?>assets/css/ux_additions.css" rel="stylesheet">
     <!-- SweetAlert2 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
@@ -1473,34 +1603,57 @@ function hex2rgb($hex)
 
 <body>
     <!-- Universal Header -->
-    <header class="universal-header navbar navbar-expand-lg navbar-dark bg-primary">
+    <header class="universal-header navbar navbar-expand-lg navbar-dark" style="background: var(--gradient-primary);">
         <div class="container-fluid">
             <a class="navbar-brand" href="../dashboard.php">
                 <i class="fas fa-graduation-cap me-2"></i>IT HUB
             </a>
 
             <div class="navbar-nav ms-auto">
-                <!-- Module-specific menu items -->
-                <?php foreach ($menuItems as $item): ?>
-                    <a class="nav-link" href="<?php echo htmlspecialchars($item['url']); ?>">
-                        <i class="<?php echo $item['icon']; ?> me-1"></i>
-                        <?php echo htmlspecialchars($item['name']); ?>
-                    </a>
-                <?php endforeach; ?>
+                <!-- Notifications -->
+                <?php if ($userInfo && $showNotifications): ?>
+                    <div class="nav-item dropdown">
+                        <a class="nav-link" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-bell"></i>
+                            <?php if ($notificationCount > 0): ?>
+                                <span class="notification-badge"><?php echo $notificationCount; ?></span>
+                            <?php endif; ?>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Notifications</h6></li>
+                            <li><a class="dropdown-item" href="notifications.php">
+                                <i class="fas fa-list me-2"></i> View All Notifications
+                            </a></li>
+                            <?php if ($notificationCount > 0): ?>
+                                <li><a class="dropdown-item" href="../api/mark_notifications_read.php">
+                                    <i class="fas fa-check me-2"></i> Mark All as Read
+                                </a></li>
+                            <?php endif; ?>
+                        </ul>
+                    </div>
+                <?php endif; ?>
 
                 <!-- User Menu -->
                 <?php if ($userInfo): ?>
-                    <a class="nav-link" href="../logout.php">
-                        <i class="fas fa-sign-out-alt me-1"></i> Logout
-                    </a>
-                <?php else: ?>
-                    <!-- Login/Register buttons for guests -->
-                    <a class="nav-link" href="../login.php">
-                        <i class="fas fa-sign-in-alt me-1"></i>Login
-                    </a>
-                    <a class="nav-link" href="../register.php">
-                        <i class="fas fa-user-plus me-1"></i>Register
-                    </a>
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-1"></i>
+                            <?php echo htmlspecialchars($userInfo['full_name']); ?>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header"><?php echo ucfirst($moduleName); ?> Account</h6></li>
+                            <li><a class="dropdown-item" href="profile.php">
+                                <i class="fas fa-user-edit me-2"></i> Profile
+                            </a></li>
+                            <li><a class="dropdown-item" href="settings.php">
+                                <i class="fas fa-cog me-2"></i> Settings
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="../logout.php">
+                                <i class="fas fa-sign-out-alt me-2"></i> Logout
+                            </a></li>
+                        </ul>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -1508,19 +1661,19 @@ function hex2rgb($hex)
 
     <!-- Breadcrumb Navigation -->
     <?php if (count($breadcrumbItems) > 1): ?>
-        <nav class="universal-header"
-            style="background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.1), rgba(var(--secondary-rgb), 0.1));">
+        <nav class="breadcrumb-nav"
+            style="background: var(--bg-secondary); border-radius: var(--radius); border-left: 4px solid var(--primary-color);">
             <div class="container-fluid py-2">
                 <ol class="breadcrumb mb-0">
                     <?php foreach ($breadcrumbItems as $index => $item): ?>
                         <?php if ($index === count($breadcrumbItems) - 1): ?>
-                            <li class="breadcrumb-item active" aria-current="page">
+                            <li class="breadcrumb-item active" aria-current="page" style="color: var(--dark-color);">
                                 <i class="<?php echo $moduleIcon; ?> me-1"></i>
                                 <?php echo htmlspecialchars($item['name']); ?>
                             </li>
                         <?php else: ?>
                             <li class="breadcrumb-item">
-                                <a href="<?php echo htmlspecialchars($item['url']); ?>">
+                                <a href="<?php echo htmlspecialchars($item['url']); ?>" style="color: var(--primary-color);">
                                     <?php echo htmlspecialchars($item['name']); ?>
                                 </a>
                             </li>

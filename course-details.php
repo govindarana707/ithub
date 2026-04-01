@@ -36,7 +36,7 @@ if (!$stmt) {
 }
 
 // Get enrolled students count
-$stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE course_id = ?");
+$stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments_newWHERE course_id = ?");
 if (!$stmt) {
     error_log("Enrollment count query prepare failed: " . $conn->error);
     $enrolledCount = 0;
@@ -48,7 +48,7 @@ if (!$stmt) {
 
 // Get instructor details
 $instructorId = $courseDetails['instructor_id'];
-$stmt = $conn->prepare("SELECT id, username, email, full_name, bio, profile_image FROM users WHERE id = ? AND role = 'instructor'");
+$stmt = $conn->prepare("SELECT id, username, email, full_name, bio, profile_image FROM users_newWHERE id = ? AND role = 'instructor'");
 if (!$stmt) {
     error_log("Instructor query prepare failed: " . $conn->error);
     $instructor = null;
@@ -59,7 +59,7 @@ if (!$stmt) {
 }
 
 // Get instructor's courses count
-$stmt = $conn->prepare("SELECT COUNT(*) as count FROM courses WHERE instructor_id = ? AND status = 'published'");
+$stmt = $conn->prepare("SELECT COUNT(*) as count FROM courses_newWHERE instructor_id = ? AND status = 'published'");
 if (!$stmt) {
     error_log("Instructor courses count query prepare failed: " . $conn->error);
     $instructorCourseCount = 0;
@@ -350,7 +350,7 @@ $conn->close();
                                     // Check course capacity
                                     if (!empty($courseDetails['max_students']) && $courseDetails['max_students'] > 0) {
                                         $conn = connectDB();
-                                        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE course_id = ?");
+                                        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments_newWHERE course_id = ?");
                                         if (!$stmt) {
                                             error_log("Capacity check query prepare failed: " . $conn->error);
                                             $currentEnrollments = 0;
@@ -373,7 +373,7 @@ $conn->close();
                                     if (isset($courseDetails['prerequisites']) && !empty($courseDetails['prerequisites'])) {
                                         $prerequisites = json_decode($courseDetails['prerequisites'], true) ?: [];
                                         foreach ($prerequisites as $prereqId) {
-                                            $stmt = $conn->prepare("SELECT COUNT(*) as completed FROM enrollments WHERE student_id = ? AND course_id = ? AND status = 'completed'");
+                                            $stmt = $conn->prepare("SELECT COUNT(*) as completed FROM enrollments_newWHERE student_id = ? AND course_id = ? AND status = 'completed'");
                                             if (!$stmt) {
                                                 error_log("Prerequisite check query prepare failed: " . $conn->error);
                                                 $isCompleted = 0;

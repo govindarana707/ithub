@@ -1,8 +1,8 @@
 <?php
-require_once '../config/config.php';
-require_once '../includes/auth.php';
-require_once '../models/Course.php';
-require_once '../models/Quiz.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../models/Course.php';
+require_once __DIR__ . '/../models/Quiz.php';
 
 if (!isLoggedIn()) {
     redirect('../login.php');
@@ -54,12 +54,16 @@ $conn = connectDB();
 $stmt = $conn->prepare("
     SELECT COUNT(DISTINCT q.id) as total 
     FROM quizzes q 
-    JOIN enrollments e ON q.course_id = e.course_id 
+    JOIN enrollments_new e ON q.course_id = e.course_id 
     WHERE e.student_id = ?
 ");
-$stmt->bind_param("i", $studentId);
-$stmt->execute();
-$totalAvailableQuizzes = $stmt->get_result()->fetch_assoc()['total'];
+if ($stmt === false) {
+    $totalAvailableQuizzes = 0;
+} else {
+    $stmt->bind_param("i", $studentId);
+    $stmt->execute();
+    $totalAvailableQuizzes = $stmt->get_result()->fetch_assoc()['total'];
+}
 
 // Completed quizzes
 $stmt = $conn->prepare("
@@ -67,9 +71,13 @@ $stmt = $conn->prepare("
     FROM quiz_attempts qa 
     WHERE qa.student_id = ? AND qa.status = 'completed' AND qa.passed = TRUE
 ");
-$stmt->bind_param("i", $studentId);
-$stmt->execute();
-$completedQuizzes = $stmt->get_result()->fetch_assoc()['total'];
+if ($stmt === false) {
+    $completedQuizzes = 0;
+} else {
+    $stmt->bind_param("i", $studentId);
+    $stmt->execute();
+    $completedQuizzes = $stmt->get_result()->fetch_assoc()['total'];
+}
 
 // Average score
 $stmt = $conn->prepare("
@@ -92,52 +100,53 @@ $conn->close();
     <title>Quizzes - IT HUB</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="../assets/css/theme.css" rel="stylesheet">
+    <link href="css/student-theme.css" rel="stylesheet">
+    <style>
+        /* Force Royal Blue Colors */
+        :root {
+            --primary-color: #4169E1 !important;
+            --secondary-color: #2563EB !important;
+            --gradient-primary: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        /* Force Royal Blue for Sidebar */
+        .sidebar-nav {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        /* Force Royal Blue for Universal Header */
+        .universal-header {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        /* Force Royal Blue for any remaining elements */
+        .btn-primary {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+            border: none !important;
+        }
+        
+        .bg-primary {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        .text-primary {
+            color: #4169E1 !important;
+        }
+        
+        .border-primary {
+            border-color: #4169E1 !important;
+        }
+    </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="dashboard.php">
-                    <i class="fas fa-arrow-left me-1"></i> Dashboard
-                </a>
-                <a class="nav-link" href="../logout.php">
-                    <i class="fas fa-sign-out-alt me-1"></i> Logout
-                </a>
-            </div>
-        </div>
-    </nav>
+    <?php require_once '../includes/universal_header.php'; ?>
 
     <div class="container-fluid py-4">
         <div class="row">
+            <!-- Sidebar -->
             <div class="col-md-3">
-                <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="my-courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-graduation-cap me-2"></i> My Courses
-                    </a>
-                    <a href="quizzes.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-brain me-2"></i> Quizzes
-                    </a>
-                    <a href="quiz-results.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-bar me-2"></i> Quiz Results
-                    </a>
-                    <a href="discussions.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-comments me-2"></i> Discussions
-                    </a>
-                    <a href="certificates.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-certificate me-2"></i> Certificates
-                    </a>
-                    <a href="../profile.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-user me-2"></i> Profile
-                    </a>
-                </div>
+                <?php require_once 'includes/sidebar.php'; ?>
             </div>
             
             <div class="col-md-9">

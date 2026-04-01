@@ -32,9 +32,9 @@ $students = $instructor->getInstructorStudents($instructorId, $courseId > 0 ? $c
 $conn = connectDB();
 $countSql = "
     SELECT COUNT(DISTINCT u.id) as total
-    FROM users u
-    JOIN enrollments e ON u.id = e.student_id
-    JOIN courses c ON e.course_id = c.id
+    FROM users_new u
+    JOIN enrollments_new e ON u.id = e.student_id
+    JOIN courses_new c ON e.course_id = c.id
     WHERE c.instructor_id = ? AND u.role = 'student'
 ";
 $params = [$instructorId];
@@ -56,10 +56,14 @@ if ($search !== '') {
 }
 
 $stmt = $conn->prepare($countSql);
-$stmt->bind_param($types, ...$params);
-$stmt->execute();
-$totalStudents = (int)($stmt->get_result()->fetch_assoc()['total'] ?? 0);
-$stmt->close();
+if ($stmt === false) {
+    $totalStudents = 0;
+} else {
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $totalStudents = (int)($stmt->get_result()->fetch_assoc()['total'] ?? 0);
+    $stmt->close();
+}
 
 // If we have a search query, filter current page results in PHP for now
 // (Instructor::getInstructorStudents does not currently accept search)
@@ -84,9 +88,9 @@ if ($export) {
         SELECT u.id as student_id, u.full_name, u.email, u.username,
                c.title as course_title,
                e.progress_percentage, e.status as enrollment_status, e.enrolled_at
-        FROM enrollments e
-        JOIN users u ON u.id = e.student_id
-        JOIN courses c ON c.id = e.course_id
+        FROM enrollments_new e
+        JOIN users_new u ON u.id = e.student_id
+        JOIN courses_new c ON c.id = e.course_id
         WHERE c.instructor_id = ?
     ";
     $exportParams = [$instructorId];
@@ -110,11 +114,14 @@ if ($export) {
     $exportSql .= " ORDER BY e.enrolled_at DESC";
 
     $stmt = $conn->prepare($exportSql);
-    $stmt->bind_param($exportTypes, ...$exportParams);
-    $stmt->execute();
-    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-    $conn->close();
+    if ($stmt === false) {
+        $rows = [];
+    } else {
+        $stmt->bind_param($exportTypes, ...$exportParams);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+    }
 
     foreach ($rows as $row) {
         fputcsv($out, [
@@ -147,9 +154,9 @@ $statsSql = "
         COUNT(DISTINCT CASE WHEN e.status = 'active' THEN u.id END) as active_students,
         COUNT(DISTINCT CASE WHEN e.status = 'completed' OR e.progress_percentage = 100 THEN u.id END) as completed_students,
         AVG(e.progress_percentage) as avg_progress
-    FROM enrollments e
-    JOIN users u ON u.id = e.student_id
-    JOIN courses c ON c.id = e.course_id
+    FROM enrollments_new e
+    JOIN users_new u ON u.id = e.user_id
+    JOIN courses_new c ON c.id = e.course_id
     WHERE c.instructor_id = ?
 ";
 $statsParams = [$instructorId];
@@ -162,10 +169,14 @@ if ($courseId > 0) {
 }
 
 $stmt = $conn->prepare($statsSql);
-$stmt->bind_param($statsTypes, ...$statsParams);
-$stmt->execute();
-$row = $stmt->get_result()->fetch_assoc();
-$stmt->close();
+if ($stmt === false) {
+    $row = false;
+} else {
+    $stmt->bind_param($statsTypes, ...$statsParams);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+}
 $conn->close();
 
 if ($row) {
@@ -193,83 +204,12 @@ function buildStudentsUrl($overrides = []) {
     return 'students.php?' . http_build_query($q);
 }
 ?>
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Students - Instructor Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
-    <style>
-        .stat-card {
-            background: white;
-            border-radius: 10px;
-            padding: 1.25rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.08);
-            border-left: 4px solid #667eea;
-        }
-        .stat-card.success { border-left-color: #28a745; }
-        .stat-card.info { border-left-color: #17a2b8; }
-        .stat-card.warning { border-left-color: #ffc107; }
-        .avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-        }
-        .filter-card {
-            background: #fff;
-            border-radius: 10px;
-            padding: 1rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="dashboard.php"><i class="fas fa-tachometer-alt me-1"></i> Dashboard</a>
-                <a class="nav-link" href="courses.php"><i class="fas fa-chalkboard-teacher me-1"></i> My Courses</a>
-                <a class="nav-link" href="students.php"><i class="fas fa-users me-1"></i> Students</a>
-                <a class="nav-link" href="../logout.php"><i class="fas fa-sign-out-alt me-1"></i> Logout</a>
-            </div>
-        </div>
-    </nav>
+<?php require_once '../includes/universal_header.php'; ?>
 
     <div class="container-fluid py-4">
         <div class="row">
             <div class="col-md-3">
-                <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chalkboard-teacher me-2"></i> My Courses
-                    </a>
-                    <a href="create-course.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-plus me-2"></i> Create Course
-                    </a>
-                    <a href="students.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-users me-2"></i> Students
-                    </a>
-                    <a href="earnings.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-rupee-sign me-2"></i> Earnings
-                    </a>
-                    <a href="profile.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-user me-2"></i> Profile
-                    </a>
-                </div>
+                <?php require_once '../includes/instructor_sidebar.php'; ?>
             </div>
 
             <div class="col-md-9">

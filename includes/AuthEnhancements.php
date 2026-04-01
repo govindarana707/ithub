@@ -83,6 +83,40 @@ class AuthEnhancements {
     }
     
     /**
+     * Get remaining time for rate limit
+     */
+    public function getRateLimitRemainingTime($ipAddress, $email = null, $type = 'login', $timeWindow = 900) {
+        $stmt = $this->db->prepare("
+            SELECT created_at 
+            FROM login_attempts 
+            WHERE ip_address = ? 
+            AND attempt_type = ? 
+            AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)
+            " . ($email ? "AND email = ?" : "")
+            . " ORDER BY created_at ASC
+            LIMIT 1
+        ");
+        
+        if ($email) {
+            $stmt->bind_param("sssi", $ipAddress, $type, $timeWindow, $email);
+        } else {
+            $stmt->bind_param("ssi", $ipAddress, $type, $timeWindow);
+        }
+        
+        $stmt->execute();
+        $result = $stmt->get_result()->fetch_assoc();
+        
+        if ($result) {
+            $firstAttemptTime = strtotime($result['created_at']);
+            $windowEndTime = $firstAttemptTime + $timeWindow;
+            $remainingTime = $windowEndTime - time();
+            return max(0, $remainingTime);
+        }
+        
+        return 0;
+    }
+    
+    /**
      * Log login attempt
      */
     public function logAttempt($ipAddress, $email = null, $type = 'login', $success = false) {

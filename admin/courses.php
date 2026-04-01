@@ -121,11 +121,28 @@ $courses = $course->getAdminCourses($filters, $limit, $offset);
 // Get total count for pagination
 $db = new Database();
 $conn = $db->getConnection();
+
+// Check if categories table exists and get categories
+$categories = [];
+try {
+    $result = $conn->query("SELECT id, name FROM categories ORDER BY name");
+    if ($result) {
+        $categories = $result->fetch_all(MYSQLI_ASSOC);
+    } else {
+        // Try categories_new table if categories doesn't exist
+        $result = $conn->query("SELECT id, name FROM categories_new ORDER BY name");
+        if ($result) {
+            $categories = $result->fetch_all(MYSQLI_ASSOC);
+        }
+    }
+} catch (Exception $e) {
+    // If both queries fail, categories will remain empty
+    $categories = [];
+}
+
 $totalCourses = $course->countAdminCourses($filters);
 $totalPages = ceil($totalCourses / $limit);
 
-// Get categories and instructors
-$categories = $conn->query("SELECT id, name FROM categories ORDER BY name")->fetch_all(MYSQLI_ASSOC);
 $instructors = $user->getInstructors();
 
 // Get popular courses for sidebar

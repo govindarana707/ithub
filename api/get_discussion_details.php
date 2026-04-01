@@ -45,11 +45,15 @@ try {
     
     if ($userRole === 'student') {
         // Check if student is enrolled in the course
-        $stmt = $conn->prepare("SELECT COUNT(*) as enrolled FROM enrollments WHERE student_id = ? AND course_id = ?");
-        $stmt->bind_param("ii", $userId, $discussionDetails['course_id']);
-        $stmt->execute();
-        $result = $stmt->get_result()->fetch_assoc();
-        $hasAccess = $result['enrolled'] > 0;
+        $stmt = $conn->prepare("SELECT COUNT(*) as enrolled FROM enrollments_new WHERE user_id = ? AND course_id = ? AND status = 'active'");
+        if ($stmt === false) {
+            $hasAccess = false;
+        } else {
+            $stmt->bind_param("ii", $userId, $discussionDetails['course_id']);
+            $stmt->execute();
+            $result = $stmt->get_result()->fetch_assoc();
+            $hasAccess = $result['enrolled'] > 0;
+        }
     } elseif ($userRole === 'instructor') {
         // Check if instructor owns the course
         $stmt = $conn->prepare("SELECT COUNT(*) as owns FROM courses_new WHERE id = ? AND instructor_id = ?");

@@ -501,7 +501,7 @@ class Quiz {
             SELECT qa.*, u.full_name as student_name, u.email as student_email,
                    q.title as quiz_title, q.passing_score
             FROM quiz_attempts qa
-            JOIN users u ON qa.student_id = u.id
+            JOIN users_new u ON qa.student_id = u.id
             JOIN quizzes q ON qa.quiz_id = q.id
             WHERE qa.quiz_id = ?
             ORDER BY qa.completed_at DESC, qa.started_at DESC
@@ -537,7 +537,7 @@ class Quiz {
                    u.full_name as student_name, u.email as student_email
             FROM quiz_attempts qa
             JOIN quizzes q ON qa.quiz_id = q.id
-            JOIN users u ON qa.student_id = u.id
+            JOIN users_new u ON qa.student_id = u.id
             WHERE qa.id = ?
         ");
         $stmt->bind_param("i", $attemptId);
@@ -566,9 +566,6 @@ class Quiz {
             $questions[] = $row;
         }
         
-        error_log("submitQuizAttempt: Attempt ID=$attemptId, Quiz ID=$quizId, Questions count=" . count($questions));
-        error_log("submitQuizAttempt: Received answers: " . json_encode($answers));
-        
         try {
             mysqli_begin_transaction($conn);
             
@@ -584,8 +581,6 @@ class Quiz {
                 if (isset($answers[$questionId])) {
                     $answer = $answers[$questionId];
                     $answeredCount++;
-                    
-                    error_log("submitQuizAttempt: Processing Q$questionId (type: $questionType), answer: $answer");
                     
                     if ($questionType === 'multiple_choice') {
                         // Multiple choice - answer should be the option ID
@@ -609,7 +604,6 @@ class Quiz {
                     }
                 } else {
                     // Question not answered - record as unanswered
-                    error_log("submitQuizAttempt: Q$questionId NOT answered, recording as unanswered");
                     // Insert empty answer to mark as unanswered
                     $stmt = $conn->prepare("INSERT INTO quiz_answers (attempt_id, question_id, selected_option_id, answer_text, is_correct, points_earned) VALUES (?, ?, NULL, NULL, 0, 0)");
                     $stmt->bind_param("ii", $attemptId, $questionId);
@@ -620,10 +614,8 @@ class Quiz {
             }
             
             if (!empty($errors)) {
-                error_log("submitQuizAttempt errors: " . implode("; ", $errors));
+                // Log errors for debugging
             }
-            
-            error_log("submitQuizAttempt: Total answered: $answeredCount out of " . count($questions));
             
             // Complete attempt
             $completionResult = $this->completeQuizAttempt($attemptId);
@@ -637,7 +629,6 @@ class Quiz {
             }
         } catch (Exception $e) {
             mysqli_rollback($conn);
-            error_log("submitQuizAttempt exception: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
@@ -838,7 +829,6 @@ class Quiz {
         ");
         
         if ($stmt === false) {
-            error_log("SQL prepare failed in getCourseQuizStats: " . $conn->error);
             // Return default stats on error
             return [
                 'quizzes_attempted' => 0,

@@ -33,9 +33,13 @@ $quizStmt = $conn->prepare("
     FROM quiz_attempts 
     WHERE student_id = ?
 ");
-$quizStmt->bind_param('i', $userId);
-$quizStmt->execute();
-$quizStats = $quizStmt->get_result()->fetch_assoc();
+if ($quizStmt) {
+    $quizStmt->bind_param('i', $userId);
+    $quizStmt->execute();
+    $quizStats = $quizStmt->get_result()->fetch_assoc();
+} else {
+    $quizStats = ['total_quizzes' => 0, 'avg_score' => 0, 'passed_quizzes' => 0];
+}
 
 // Learning Streak
 $streakStmt = $conn->prepare("
@@ -44,10 +48,14 @@ $streakStmt = $conn->prepare("
     WHERE student_id = ? 
     AND last_accessed_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
 ");
-$streakStmt->bind_param('i', $userId);
-$streakStmt->execute();
-$streakData = $streakStmt->get_result()->fetch_assoc();
-$learningStreak = $streakData['streak_days'] ?? 0;
+if ($streakStmt) {
+    $streakStmt->bind_param('i', $userId);
+    $streakStmt->execute();
+    $streakData = $streakStmt->get_result()->fetch_assoc();
+    $learningStreak = $streakData['streak_days'] ?? 0;
+} else {
+    $learningStreak = 0;
+}
 
 // Total Study Time
 $timeStmt = $conn->prepare("
@@ -55,10 +63,14 @@ $timeStmt = $conn->prepare("
     FROM lesson_progress
     WHERE student_id = ?
 ");
-$timeStmt->bind_param('i', $userId);
-$timeStmt->execute();
-$timeData = $timeStmt->get_result()->fetch_assoc();
-$totalStudyHours = round(($timeData['total_minutes'] ?? 0) / 60, 1);
+if ($timeStmt) {
+    $timeStmt->bind_param('i', $userId);
+    $timeStmt->execute();
+    $timeData = $timeStmt->get_result()->fetch_assoc();
+    $totalStudyHours = round(($timeData['total_minutes'] ?? 0) / 60, 1);
+} else {
+    $totalStudyHours = 0;
+}
 
 // --- DAILY FOCUS LOGIC ---
 $dailyFocus = null;
@@ -73,11 +85,13 @@ $focusStmt = $conn->prepare("
     ORDER BY lp.last_accessed_at DESC
     LIMIT 1
 ");
-$focusStmt->bind_param('i', $userId);
-$focusStmt->execute();
-$dailyFocusResult = $focusStmt->get_result();
-if ($dailyFocusResult->num_rows > 0) {
-    $dailyFocus = $dailyFocusResult->fetch_assoc();
+if ($focusStmt) {
+    $focusStmt->bind_param('i', $userId);
+    $focusStmt->execute();
+    $dailyFocusResult = $focusStmt->get_result();
+    if ($dailyFocusResult && $dailyFocusResult->num_rows > 0) {
+        $dailyFocus = $dailyFocusResult->fetch_assoc();
+    }
 } else {
     // Fallback: Get first lesson of any enrolled course that starts
     // This is simple fallback logic for demo
@@ -110,9 +124,13 @@ $pendingQuizzesStmt = $conn->prepare("
     WHERE e.student_id = ? AND (qa.id IS NULL OR qa.score < 70)
     LIMIT 3
 ");
-$pendingQuizzesStmt->bind_param('ii', $userId, $userId);
-$pendingQuizzesStmt->execute();
-$pendingQuizzes = $pendingQuizzesStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+if ($pendingQuizzesStmt) {
+    $pendingQuizzesStmt->bind_param('ii', $userId, $userId);
+    $pendingQuizzesStmt->execute();
+    $pendingQuizzes = $pendingQuizzesStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+} else {
+    $pendingQuizzes = [];
+}
 
 foreach ($pendingQuizzes as $pq) {
     $pendingTasks[] = [

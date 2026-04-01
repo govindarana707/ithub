@@ -99,8 +99,8 @@ class Discussion {
         $stmt = $conn->prepare("
             SELECT d.*, u.full_name, u.profile_image, c.title as course_title
             FROM discussions d
-            JOIN users u ON d.student_id = u.id
-            JOIN courses c ON d.course_id = c.id
+            JOIN users_new u ON d.student_id = u.id
+            JOIN courses_new c ON d.course_id = c.id
             WHERE d.id = ?
         ");
         $stmt->bind_param("i", $id);
@@ -127,8 +127,8 @@ class Discussion {
         $sql = "
             SELECT d.*, u.full_name, u.profile_image, c.title as course_title
             FROM discussions d
-            JOIN users u ON d.student_id = u.id
-            LEFT JOIN courses c ON d.course_id = c.id
+            JOIN users_new u ON d.student_id = u.id
+            LEFT JOIN courses_new c ON d.course_id = c.id
             WHERE d.course_id = ? AND d.parent_id IS NULL
             ORDER BY d.pinned DESC, d.created_at DESC
             LIMIT ? OFFSET ?
@@ -157,7 +157,7 @@ class Discussion {
         $stmt = $conn->prepare("
             SELECT d.*, u.full_name, u.profile_image
             FROM discussions d
-            JOIN users u ON d.student_id = u.id
+            JOIN users_new u ON d.student_id = u.id
             WHERE d.parent_id = ?
             ORDER BY d.created_at ASC
         ");
@@ -183,7 +183,7 @@ class Discussion {
         $stmt = $conn->prepare("
             SELECT d.*, c.title as course_title
             FROM discussions d
-            JOIN courses c ON d.course_id = c.id
+            JOIN courses_new c ON d.course_id = c.id
             WHERE d.student_id = ?
             ORDER BY d.created_at DESC
             LIMIT ? OFFSET ?
@@ -199,12 +199,12 @@ class Discussion {
         $offset = ($page - 1) * $limit;
         
         $stmt = $conn->prepare("
-            SELECT d.*, c.title as course_title, u.full_name as student_name
+            SELECT d.*, c.title as course_title, u.full_name as student_name, u.profile_image
             FROM discussions d
-            JOIN courses c ON d.course_id = c.id
-            JOIN users u ON d.student_id = u.id
+            JOIN courses_new c ON d.course_id = c.id
+            JOIN users_new u ON d.student_id = u.id
             WHERE c.instructor_id = ?
-            ORDER BY d.created_at DESC
+            ORDER BY d.pinned DESC, d.created_at DESC
             LIMIT ? OFFSET ?
         ");
         $stmt->bind_param("iii", $instructorId, $limit, $offset);
@@ -216,7 +216,7 @@ class Discussion {
     public function togglePin($id, $isPinned) {
         $conn = $this->db->getConnection();
         
-        $stmt = $conn->prepare("UPDATE discussions SET is_pinned = ? WHERE id = ?");
+        $stmt = $conn->prepare("UPDATE discussions SET pinned = ? WHERE id = ?");
         $stmt->bind_param("ii", $isPinned, $id);
         
         return $stmt->execute();
@@ -305,8 +305,8 @@ class Discussion {
         $sql = "
             SELECT d.*, u.full_name, u.profile_image, c.title as course_title
             FROM discussions d
-            JOIN users u ON d.student_id = u.id
-            JOIN courses c ON d.course_id = c.id
+            JOIN users_new u ON d.student_id = u.id
+            JOIN courses_new c ON d.course_id = c.id
             WHERE d.course_id = ? 
             AND (d.title LIKE ? OR d.content LIKE ?)
             AND d.parent_id IS NULL

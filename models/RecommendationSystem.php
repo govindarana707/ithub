@@ -134,7 +134,7 @@ class RecommendationSystem {
             LEFT JOIN users_new u ON c.instructor_id = u.id";
         
         if ($hasEnrollments) {
-            $sql .= " LEFT JOIN enrollments e ON c.id = e.course_id";
+            $sql .= " LEFT JOIN enrollments_new e ON c.id = e.course_id";
         }
         
         if ($hasQuizzes) {
@@ -334,7 +334,7 @@ class RecommendationSystem {
             FROM courses_new c
             LEFT JOIN categories_new cat ON c.category_id = cat.id
             LEFT JOIN users_new u ON c.instructor_id = u.id
-            JOIN enrollments e ON c.id = e.course_id
+            JOIN enrollments_new e ON c.id = e.course_id
             JOIN (
                 SELECT ?, user_id, similarity as similarity FROM user_similarity_cache WHERE user_id_1 = ?
                 UNION ALL
@@ -342,7 +342,7 @@ class RecommendationSystem {
             ) s ON e.student_id = s.user_id
             WHERE c.status = 'published'
             AND e.student_id IN ($placeholders)
-            AND c.id NOT IN (SELECT course_id FROM enrollments WHERE student_id = ?)
+            AND c.id NOT IN (SELECT course_id FROM enrollments_new WHERE student_id = ?)
             GROUP BY c.id
             ORDER BY similarity_sum DESC, enrollment_count DESC
             LIMIT ?
@@ -617,7 +617,7 @@ class RecommendationSystem {
         // Get completed courses
         $stmt = $conn->prepare("
             SELECT c.*, cat.name as category_name
-            FROM enrollments e
+            FROM enrollments_new e
             JOIN courses_new c ON e.course_id = c.id
             LEFT JOIN categories_new cat ON c.category_id = cat.id
             WHERE e.student_id = ? AND e.status = 'completed'
@@ -645,7 +645,7 @@ class RecommendationSystem {
             FROM courses_new c
             LEFT JOIN categories_new cat ON c.category_id = cat.id
             WHERE c.status = 'published'
-            AND c.id NOT IN (SELECT course_id FROM enrollments WHERE student_id = ?)
+            AND c.id NOT IN (SELECT course_id FROM enrollments_new WHERE student_id = ?)
             ORDER BY c.difficulty_level, c.created_at
         ");
         

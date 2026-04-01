@@ -90,12 +90,12 @@ switch ($action) {
         
         $sql = "SELECT c.*, u.full_name as instructor_name, u.profile_image as instructor_image,
                        cat.name as category_name,
-                       (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) as enrollment_count
-                FROM courses c
-                LEFT JOIN users u ON c.instructor_id = u.id
-                LEFT JOIN categories cat ON c.category_id = cat.id
+                       (SELECT COUNT(*) FROM enrollments_new WHERE course_id = c.id) as enrollment_count
+                FROM courses_new c
+                LEFT JOIN users_new u ON c.instructor_id = u.id
+                LEFT JOIN categories_new cat ON c.category_id = cat.id
                 WHERE c.status = 'published'";
-        $countSql = "SELECT COUNT(*) as total FROM courses c WHERE c.status = 'published'";
+        $countSql = "SELECT COUNT(*) as total FROM courses_new c WHERE c.status = 'published'";
         $params = [];
         $types = '';
         
@@ -144,7 +144,7 @@ switch ($action) {
         
         // Check enrollment status for each course
         foreach ($courses as &$course) {
-            $stmt = $conn->prepare("SELECT id FROM enrollments WHERE student_id = ? AND course_id = ?");
+            $stmt = $conn->prepare("SELECT id FROM enrollments_new WHERE student_id = ? AND course_id = ?");
             $stmt->bind_param("ii", $userId, $course['id']);
             $stmt->execute();
             $course['is_enrolled'] = $stmt->get_result()->num_rows > 0;
@@ -176,9 +176,9 @@ switch ($action) {
         $stmt = $conn->prepare("
             SELECT c.*, u.full_name as instructor_name, u.profile_image as instructor_image, u.bio as instructor_bio,
                    cat.name as category_name
-            FROM courses c
-            LEFT JOIN users u ON c.instructor_id = u.id
-            LEFT JOIN categories cat ON c.category_id = cat.id
+            FROM courses_new c
+            LEFT JOIN users_new u ON c.instructor_id = u.id
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
             WHERE c.id = ? AND c.status = 'published'
         ");
         $stmt->bind_param("i", $courseId);
@@ -234,10 +234,10 @@ switch ($action) {
         $searchParam = "%{$query}%";
         $stmt = $conn->prepare("
             SELECT c.*, u.full_name as instructor_name, cat.name as category_name,
-                   (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) as enrollment_count
-            FROM courses c
-            LEFT JOIN users u ON c.instructor_id = u.id
-            LEFT JOIN categories cat ON c.category_id = cat.id
+                   (SELECT COUNT(*) FROM enrollments_new WHERE course_id = c.id) as enrollment_count
+            FROM courses_new c
+            LEFT JOIN users_new u ON c.instructor_id = u.id
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
             WHERE c.status = 'published' AND (c.title LIKE ? OR c.description LIKE ?)
             ORDER BY c.title ASC
             LIMIT 20
@@ -257,7 +257,7 @@ switch ($action) {
         /**
          * Get all course categories
          */
-        $stmt = $conn->query("SELECT * FROM categories ORDER BY name ASC");
+        $stmt = $conn->query("SELECT * FROM categories_new ORDER BY name ASC");
         $categories = $stmt->fetch_all(MYSQLI_ASSOC);
         sendResponse('success', 'Categories retrieved successfully', $categories);
         break;
@@ -281,7 +281,7 @@ switch ($action) {
         }
         
         // Verify course exists and is published
-        $stmt = $conn->prepare("SELECT * FROM courses WHERE id = ? AND status = 'published'");
+        $stmt = $conn->prepare("SELECT * FROM courses_new WHERE id = ? AND status = 'published'");
         $stmt->bind_param("i", $courseId);
         $stmt->execute();
         $course = $stmt->get_result()->fetch_assoc();
@@ -350,12 +350,12 @@ switch ($action) {
         $sql = "SELECT c.*, u.full_name as instructor_name, e.enrolled_at, e.progress_percentage,
                        e.status as enrollment_status, e.completed_at,
                        cat.name as category_name
-                FROM enrollments e
-                JOIN courses c ON e.course_id = c.id
-                LEFT JOIN users u ON c.instructor_id = u.id
-                LEFT JOIN categories cat ON c.category_id = cat.id
+                FROM enrollments_new e
+                JOIN courses_new c ON e.course_id = c.id
+                LEFT JOIN users_new u ON c.instructor_id = u.id
+                LEFT JOIN categories_new cat ON c.category_id = cat.id
                 WHERE e.student_id = ?";
-        $countSql = "SELECT COUNT(*) as total FROM enrollments WHERE student_id = ?";
+        $countSql = "SELECT COUNT(*) as total FROM enrollments_new WHERE student_id = ?";
         $params = [$userId];
         $types = 'i';
         
@@ -448,7 +448,7 @@ switch ($action) {
         }
         
         // Verify enrollment
-        $stmt = $conn->prepare("SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?");
+        $stmt = $conn->prepare("SELECT * FROM enrollments_new WHERE student_id = ? AND course_id = ?");
         $stmt->bind_param("ii", $userId, $courseId);
         $stmt->execute();
         
@@ -459,8 +459,8 @@ switch ($action) {
         // Get course info
         $stmt = $conn->prepare("
             SELECT c.*, u.full_name as instructor_name
-            FROM courses c
-            LEFT JOIN users u ON c.instructor_id = u.id
+            FROM courses_new c
+            LEFT JOIN users_new u ON c.instructor_id = u.id
             WHERE c.id = ?
         ");
         $stmt->bind_param("i", $courseId);
@@ -512,7 +512,7 @@ switch ($action) {
         $stmt = $conn->prepare("
             SELECT l.*, c.id as course_id, c.title as course_title
             FROM lessons l
-            JOIN courses c ON l.course_id = c.id
+            JOIN courses_new c ON l.course_id = c.id
             WHERE l.id = ?
         ");
         $stmt->bind_param("i", $lessonId);
@@ -524,7 +524,7 @@ switch ($action) {
         }
         
         // Verify enrollment
-        $stmt = $conn->prepare("SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?");
+        $stmt = $conn->prepare("SELECT * FROM enrollments_new WHERE student_id = ? AND course_id = ?");
         $stmt->bind_param("ii", $userId, $lesson['course_id']);
         $stmt->execute();
         
@@ -627,7 +627,7 @@ switch ($action) {
             sendResponse('error', 'Lesson not found', null, 404);
         }
         
-        $stmt = $conn->prepare("SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?");
+        $stmt = $conn->prepare("SELECT * FROM enrollments_new WHERE student_id = ? AND course_id = ?");
         $stmt->bind_param("ii", $userId, $lesson['course_id']);
         $stmt->execute();
         
@@ -668,7 +668,7 @@ switch ($action) {
         
         // Verify enrollment
         $stmt = $conn->prepare("
-            SELECT e.* FROM enrollments e
+            SELECT e.* FROM enrollments_new e
             JOIN lessons l ON e.course_id = l.course_id
             WHERE e.student_id = ? AND l.id = ?
         ");
@@ -738,7 +738,7 @@ switch ($action) {
             sendResponse('error', 'Assignment not found', null, 404);
         }
         
-        $stmt = $conn->prepare("SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?");
+        $stmt = $conn->prepare("SELECT * FROM enrollments_new WHERE student_id = ? AND course_id = ?");
         $stmt->bind_param("ii", $userId, $assignment['course_id']);
         $stmt->execute();
         
@@ -856,7 +856,7 @@ switch ($action) {
             FROM assignment_submissions s
             JOIN lesson_assignments la ON s.assignment_id = la.id
             JOIN lessons l ON la.lesson_id = l.id
-            JOIN courses c ON l.course_id = c.id
+            JOIN courses_new c ON l.course_id = c.id
             WHERE s.student_id = ?
         ";
         $params = [$userId];
@@ -892,9 +892,9 @@ switch ($action) {
         // Overall stats
         $stmt = $conn->prepare("
             SELECT 
-                (SELECT COUNT(*) FROM enrollments WHERE student_id = ?) as total_enrolled,
-                (SELECT COUNT(*) FROM enrollments WHERE student_id = ? AND status = 'completed') as total_completed,
-                (SELECT AVG(progress_percentage) FROM enrollments WHERE student_id = ? AND progress_percentage > 0) as avg_progress
+                (SELECT COUNT(*) FROM enrollments_new WHERE student_id = ?) as total_enrolled,
+                (SELECT COUNT(*) FROM enrollments_new WHERE student_id = ? AND status = 'completed') as total_completed,
+                (SELECT AVG(progress_percentage) FROM enrollments_new WHERE student_id = ? AND progress_percentage > 0) as avg_progress
         ");
         $stmt->bind_param("iii", $userId, $userId, $userId);
         $stmt->execute();
@@ -909,7 +909,7 @@ switch ($action) {
                        (SELECT COUNT(*) FROM lesson_progress lp 
                         JOIN lessons l ON lp.lesson_id = l.id 
                         WHERE l.course_id = e.course_id AND lp.student_id = ? AND lp.completed = 1) as completed_lessons
-                FROM enrollments e
+                FROM enrollments_new e
                 WHERE e.student_id = ? AND e.course_id = ?
             ");
             $stmt->bind_param("iii", $userId, $userId, $courseId);
@@ -922,7 +922,7 @@ switch ($action) {
             SELECT lp.*, l.title as lesson_title, c.title as course_title
             FROM lesson_progress lp
             JOIN lessons l ON lp.lesson_id = l.id
-            JOIN courses c ON l.course_id = c.id
+            JOIN courses_new c ON l.course_id = c.id
             WHERE lp.student_id = ?
             ORDER BY lp.updated_at DESC
             LIMIT 10
@@ -1010,25 +1010,25 @@ switch ($action) {
          * Get dashboard statistics
          */
         // Get enrolled courses count
-        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE student_id = ?");
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments_new WHERE student_id = ?");
         $stmt->bind_param("i", $userId);
         $stmt->execute();
         $stats['enrolled_courses'] = $stmt->get_result()->fetch_assoc()['count'];
         
         // Get completed courses count
-        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE student_id = ? AND status = 'completed'");
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments_new WHERE student_id = ? AND status = 'completed'");
         $stmt->bind_param("i", $userId);
         $stmt->execute();
         $stats['completed_courses'] = $stmt->get_result()->fetch_assoc()['count'];
         
         // Get in-progress courses count
-        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments WHERE student_id = ? AND status = 'active'");
+        $stmt = $conn->prepare("SELECT COUNT(*) as count FROM enrollments_new WHERE student_id = ? AND status = 'active'");
         $stmt->bind_param("i", $userId);
         $stmt->execute();
         $stats['in_progress_courses'] = $stmt->get_result()->fetch_assoc()['count'];
         
         // Get average progress
-        $stmt = $conn->prepare("SELECT AVG(progress_percentage) as avg_progress FROM enrollments WHERE student_id = ? AND progress_percentage > 0");
+        $stmt = $conn->prepare("SELECT AVG(progress_percentage) as avg_progress FROM enrollments_new WHERE student_id = ? AND progress_percentage > 0");
         $stmt->bind_param("i", $userId);
         $stmt->execute();
         $stats['average_progress'] = round($stmt->get_result()->fetch_assoc()['avg_progress'] ?? 0, 1);
@@ -1050,7 +1050,7 @@ switch ($action) {
             SELECT COUNT(*) as count 
             FROM lesson_assignments la
             JOIN lessons l ON la.lesson_id = l.id
-            JOIN enrollments e ON l.course_id = e.course_id
+            JOIN enrollments_new e ON l.course_id = e.course_id
             LEFT JOIN assignment_submissions s ON la.id = s.assignment_id AND s.student_id = ?
             WHERE e.student_id = ? AND la.due_date >= CURDATE() AND s.id IS NULL
         ");
@@ -1073,8 +1073,8 @@ switch ($action) {
         // Get recent enrollments
         $stmt = $conn->prepare("
             SELECT c.title, e.enrolled_at, c.thumbnail
-            FROM enrollments e
-            JOIN courses c ON e.course_id = c.id
+            FROM enrollments_new e
+            JOIN courses_new c ON e.course_id = c.id
             WHERE e.student_id = ?
             ORDER BY e.enrolled_at DESC
             LIMIT 5
@@ -1100,7 +1100,7 @@ switch ($action) {
         }
         
         // Verify enrollment
-        $stmt = $conn->prepare("SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?");
+        $stmt = $conn->prepare("SELECT * FROM enrollments_new WHERE student_id = ? AND course_id = ?");
         $stmt->bind_param("ii", $userId, $courseId);
         $stmt->execute();
         
@@ -1165,7 +1165,7 @@ function updateCourseProgress($conn, $studentId, $courseId) {
     
     // Update enrollment
     $stmt = $conn->prepare("
-        UPDATE enrollments 
+        UPDATE enrollments_new 
         SET progress_percentage = ?, status = ?, completed_at = ?
         WHERE student_id = ? AND course_id = ?
     ");

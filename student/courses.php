@@ -1,6 +1,6 @@
 <?php
-require_once '../config/config.php';
-require_once '../includes/auth.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 if (!isLoggedIn()) {
     redirect('../login.php');
@@ -46,7 +46,7 @@ $totalPages = ceil($totalCourses / $limit);
 
 // Get categories for filter
 $conn = connectDB();
-$categories = $conn->query("SELECT id, name FROM categories ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+$categories = $conn->query("SELECT id, name FROM categories_new ORDER BY name")->fetch_all(MYSQLI_ASSOC);
 
 // Get enrolled courses and wishlist for current user
 $enrolledCourses = [];
@@ -102,39 +102,41 @@ $conn->close();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="../assets/css/theme.css" rel="stylesheet">
     <link href="css/student-theme.css" rel="stylesheet">
     <style>
-        /* Enhanced Sidebar */
-        .sidebar-modern {
-            background: white;
+        /* Consistent Sidebar Styling */
+        .sidebar-nav {
+            background: var(--gradient-primary);
             border-radius: 16px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             overflow: hidden;
             margin-bottom: 1.5rem;
         }
 
-        .sidebar-modern .list-group-item {
+        .sidebar-nav .list-group-item {
             border: none;
             padding: 1rem 1.25rem;
             transition: all 0.3s ease;
-            background: white;
+            background: transparent;
             font-weight: 500;
-            color: var(--dark-color);
+            color: rgba(255, 255, 255, 0.9);
             border-left: 4px solid transparent;
         }
 
-        .sidebar-modern .list-group-item:hover {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        .sidebar-nav .list-group-item:hover {
+            background: rgba(255, 255, 255, 0.1);
             transform: translateX(8px);
-            border-left-color: var(--primary-color);
+            border-left-color: white;
+            color: white;
         }
 
-        .sidebar-modern .list-group-item.active {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        .sidebar-nav .list-group-item.active {
+            background: rgba(255, 255, 255, 0.2);
             color: white;
             display: flex;
             gap: 0.5rem;
-            flex-wrap: wrap;
+            font-weight: 600;
         }
 
         .course-price {
@@ -684,57 +686,12 @@ $conn->close();
     </style>
 </head>
 <body>
-    <?php include 'includes/navigation.php'; ?>
+    <?php require_once '../includes/universal_header.php'; ?>
 
     <div class="container-fluid py-4">
         <div class="row">
             <div class="col-md-3">
-                <div class="sidebar-modern list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="courses.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-book me-2"></i> Browse Courses
-                    </a>
-                    <a href="my-courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-book-open me-2"></i> My Courses
-                    </a>
-                    <a href="certificates.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-certificate me-2"></i> Certificates
-                    </a>
-                    <a href="quiz-results.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-bar me-2"></i> Quiz Results
-                    </a>
-                    <a href="discussions.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-comments me-2"></i> Discussions
-                    </a>
-                    <a href="notifications.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-bell me-2"></i> Notifications
-                    </a>
-                    <a href="profile.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-user me-2"></i> Profile
-                    </a>
-                    <a href="settings.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-cog me-2"></i> Settings
-                    </a>
-                </div>
-                
-                <!-- Quick Stats -->
-                <div class="stat-card">
-                    <h6 class="mb-3 fw-bold">Quick Overview</h6>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-muted">Available Courses</span>
-                        <span class="fw-bold"><?php echo $totalCourses; ?></span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-muted">Enrolled</span>
-                        <span class="fw-bold text-success"><?php echo count($enrolledCourses); ?></span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted">Wishlist</span>
-                        <span class="fw-bold text-info"><?php echo count($wishlistCourses); ?></span>
-                    </div>
-                </div>
+                <?php require_once 'includes/sidebar.php'; ?>
             </div>
             
             <div class="col-md-9">

@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 $courseId = intval($_GET['course_id']);
 
-// Verify admin or instructor access
+// Verify admin, instructor, or student access
 $role = getUserRole();
 if ($role !== 'admin') {
     // If instructor, ensure they own the course
@@ -23,6 +23,13 @@ if ($role !== 'admin') {
         $c = $course->getCourseById($courseId);
         if (!$c || (int)$c['instructor_id'] !== (int)$_SESSION['user_id']) {
             sendJSON(['success' => false, 'message' => 'Access denied']);
+        }
+    } elseif ($role === 'student') {
+        // Check if student is enrolled in the course
+        $course = new Course();
+        $enrollment = $course->getEnrollment($_SESSION['user_id'], $courseId);
+        if (!$enrollment) {
+            sendJSON(['success' => false, 'message' => 'You must be enrolled in this course to view lessons']);
         }
     } else {
         sendJSON(['success' => false, 'message' => 'Access denied']);

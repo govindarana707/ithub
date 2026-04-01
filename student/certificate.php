@@ -58,6 +58,59 @@ $conn->query("CREATE TABLE IF NOT EXISTS notifications (
 
 $conn->close();
 
+// Get student information from database to ensure correct name
+$studentName = $_SESSION['full_name'] ?? 'Student';
+error_log("Certificate Debug: Session user_id = $userId, Session full_name = " . ($_SESSION['full_name'] ?? 'not set'));
+
+if (empty($studentName) || $studentName === 'Student') {
+    // Fallback: fetch from database
+    $conn = connectDB();
+    $stmt = $conn->prepare("SELECT full_name FROM users_new WHERE id = ?");
+    if ($stmt) {
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $result = $stmt->get_result()->fetch_assoc();
+        if ($result && !empty($result['full_name'])) {
+            $studentName = $result['full_name'];
+            $_SESSION['full_name'] = $studentName; // Update session
+            error_log("Certificate Debug: Fetched student name from database: $studentName");
+        }
+        $stmt->close();
+    }
+    $conn->close();
+}
+
+// Enhanced security: Double-check certificate belongs to logged-in user
+$conn = connectDB();
+$securityCheck = $conn->prepare("SELECT COUNT(*) as count FROM certificates WHERE student_id = ? AND course_id = ?");
+if ($securityCheck) {
+    $securityCheck->bind_param("ii", $userId, $courseId);
+    $securityCheck->execute();
+    $certCount = $securityCheck->get_result()->fetch_assoc()['count'];
+    $securityCheck->close();
+    
+    // If certificate exists but doesn't belong to user, deny access
+    if ($certCount == 0) {
+        // Check if any certificate exists for this course (to determine if we should show "not completed" vs "access denied")
+        $anyCertCheck = $conn->prepare("SELECT COUNT(*) as count FROM certificates WHERE course_id = ?");
+        if ($anyCertCheck) {
+            $anyCertCheck->bind_param("i", $courseId);
+            $anyCertCheck->execute();
+            $anyCerts = $anyCertCheck->get_result()->fetch_assoc()['count'];
+            $anyCertCheck->close();
+            
+            if ($anyCerts > 0) {
+                // Certificates exist for this course, but not for this user - access denied
+                $_SESSION['error_message'] = 'Access denied. This certificate does not belong to you.';
+                error_log("Certificate Security Alert: User $userId attempted to access certificate for course $courseId that belongs to another user");
+                $conn->close();
+                redirect('my-courses.php');
+            }
+        }
+    }
+}
+$conn->close();
+
 // Check if student is enrolled and has completed the course
 $enrollment = $course->getEnrollment($userId, $courseId);
 if (!$enrollment || $enrollment['progress_percentage'] < 100) {
@@ -134,12 +187,13 @@ $conn->close();
     <title>Certificate - <?php echo htmlspecialchars($courseData['title']); ?> - IT HUB</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="../assets/css/theme.css" rel="stylesheet">
+    <link href="css/student-theme.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@400;600&display=swap');
         
         .certificate-container {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%);
             padding: 3rem;
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
@@ -258,62 +312,174 @@ $conn->close();
             color: #2c3e50;
         }
         
+        /* Enhanced Print Styles */
         @media print {
+            /* Hide non-printable elements */
             .no-print {
                 display: none !important;
             }
             
+            /* Remove universal header and navigation */
+            .universal-header,
+            header,
+            nav,
+            .container-fluid.py-4 > div:first-child,
+            .card.mt-4 {
+                display: none !important;
+            }
+            
+            /* Full page certificate */
+            body {
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            .container-fluid {
+                padding: 0 !important;
+                max-width: none !important;
+                width: 100% !important;
+            }
+            
             .certificate-container {
-                background: white;
-                padding: 0;
-                box-shadow: none;
+                background: white !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                margin: 0 !important;
+                min-height: 100vh !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
             }
             
             .certificate {
-                box-shadow: none;
+                box-shadow: none !important;
+                border: 2px solid #4169E1 !important;
+                page-break-inside: avoid;
+                transform: scale(0.9);
+                transform-origin: center;
+            }
+            
+            /* Optimize text for print */
+            .certificate-title {
+                font-size: 28px !important;
+                color: #4169E1 !important;
+            }
+            
+            .student-name {
+                font-size: 32px !important;
+                color: #2c3e50 !important;
+                font-weight: bold !important;
+            }
+            
+            .course-title {
+                font-size: 24px !important;
+                color: #4169E1 !important;
+            }
+            
+            .certificate-text {
+                color: #2c3e50 !important;
+            }
+            
+            /* Ensure proper spacing */
+            .certificate-details {
+                margin-top: 40px !important;
+            }
+            
+            .certificate-signature {
+                margin: 20px 0 !important;
+            }
+            
+            .signature-line {
+                border-bottom: 2px solid #2c3e50 !important;
+                width: 200px !important;
+                margin: 0 auto 10px !important;
+            }
+            
+            .certificate-date {
+                margin-top: 30px !important;
+                color: #2c3e50 !important;
+            }
+            
+            .certificate-seal {
+                color: #4169E1 !important;
+                font-size: 48px !important;
+            }
+            
+            /* Page break handling */
+            .certificate {
+                page-break-after: always;
+            }
+            
+            /* Print optimization */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+        
+        /* Print preview styles */
+        @media screen {
+            .print-preview {
+                background: #f5f5f5;
+                border: 1px dashed #ccc;
+                padding: 20px;
+                margin: 20px 0;
+                border-radius: 8px;
+            }
+            
+            .print-preview .certificate {
+                transform: scale(0.7);
+                transform-origin: top center;
+            }
+        }
+        
+        /* Print background styles */
+        .print-background .certificate {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+        }
+        
+        @media print {
+            .print-background .certificate {
+                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+            }
+            
+            .no-border .certificate {
+                border: none !important;
+            }
+            
+            .no-seal .certificate-seal {
+                display: none !important;
             }
         }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary no-print">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-circle me-1"></i><?php echo htmlspecialchars($_SESSION['full_name']); ?>
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="dashboard.php"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
-                        <li><a class="dropdown-item" href="my-courses.php"><i class="fas fa-graduation-cap me-2"></i>My Courses</a></li>
-                        <li><a class="dropdown-item" href="certificates.php"><i class="fas fa-certificate me-2"></i>My Certificates</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="../logout.php"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <?php require_once '../includes/universal_header.php'; ?>
 
     <div class="container-fluid py-4">
         <!-- Action Buttons -->
         <div class="text-center mb-4 no-print">
-            <button onclick="window.print()" class="btn btn-primary me-2">
+            <button onclick="printCertificate()" class="btn btn-primary me-2">
                 <i class="fas fa-print me-1"></i>Print Certificate
             </button>
-            <button onclick="downloadCertificate()" class="btn btn-success me-2">
-                <i class="fas fa-download me-1"></i>Download PDF
+            <button onclick="printWithBackground()" class="btn btn-outline-primary me-2">
+                <i class="fas fa-image me-1"></i>Print with Background
+            </button>
+            <button onclick="downloadPDF()" class="btn btn-success me-2">
+                <i class="fas fa-file-pdf me-1"></i>Download PDF
             </button>
             <button onclick="shareCertificate()" class="btn btn-info me-2">
                 <i class="fas fa-share-alt me-1"></i>Share
             </button>
-            <a href="my-courses.php" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-1"></i>Back to Courses
-            </a>
+            <div class="mt-3">
+                <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-cog me-1"></i>Print Settings
+                </button>
+                <a href="my-courses.php" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Courses
+                </a>
+            </div>
         </div>
 
         <!-- Certificate -->
@@ -327,7 +493,7 @@ $conn->close();
                     <h1 class="certificate-title">Certificate of Completion</h1>
                     <p class="certificate-subtitle">This is to certify that</p>
                     
-                    <h2 class="student-name"><?php echo htmlspecialchars($_SESSION['full_name']); ?></h2>
+                    <h2 class="student-name"><?php echo htmlspecialchars($studentName); ?></h2>
                     
                     <p class="certificate-text">
                         has successfully completed the course
@@ -463,6 +629,175 @@ $conn->close();
                 $('.alert').alert('close');
             }, 3000);
         }
+        
+        // Enhanced Print Functions
+        function printCertificate() {
+            // Remove print background class temporarily
+            document.body.classList.remove('print-background');
+            window.print();
+        }
+        
+        function printWithBackground() {
+            // Add print background class
+            document.body.classList.add('print-background');
+            window.print();
+            // Remove class after print dialog closes
+            setTimeout(() => {
+                document.body.classList.remove('print-background');
+            }, 1000);
+        }
+        
+        function downloadPDF() {
+            // Generate PDF using existing functionality
+            const certificateId = '<?php echo htmlspecialchars($existingCertificate["certificate_code"] ?? $certificateId ?? "N/A"); ?>';
+            window.open('../generate_real_pdf.php?id=' + certificateId, '_blank');
+        }
+        
+        function shareCertificate() {
+            const certificateId = '<?php echo htmlspecialchars($existingCertificate["certificate_code"] ?? $certificateId ?? "N/A"); ?>';
+            const studentName = '<?php echo htmlspecialchars($studentName); ?>';
+            const courseTitle = '<?php echo htmlspecialchars($courseData["title"]); ?>';
+            const verificationUrl = '<?php echo BASE_URL; ?>verify-certificate.php?code=' + certificateId;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Certificate of Completion - ' + courseTitle,
+                    text: `I have successfully completed the ${courseTitle} course at IT HUB!`,
+                    url: verificationUrl
+                }).then(() => {
+                    showAlert('Certificate shared successfully!', 'success');
+                }).catch((error) => {
+                    console.log('Share failed:', error);
+                    copyToClipboard(verificationUrl);
+                });
+            } else {
+                // Fallback for browsers that don't support Web Share API
+                copyToClipboard(verificationUrl);
+            }
+        }
+        
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showAlert('Certificate link copied to clipboard!', 'success');
+            }).catch((error) => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showAlert('Certificate link copied to clipboard!', 'success');
+            });
+        }
+        
+        // Print settings dialog
+        function showPrintSettings() {
+            const settingsHtml = `
+                <div class="modal fade" id="printSettingsModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Print Settings</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="printBackground" checked>
+                                    <label class="form-check-label" for="printBackground">
+                                        Print with background design
+                                    </label>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="printBorder" checked>
+                                    <label class="form-check-label" for="printBorder">
+                                        Print with decorative border
+                                    </label>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="printSeal" checked>
+                                    <label class="form-check-label" for="printSeal">
+                                        Print with official seal
+                                    </label>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="printSize" class="form-label">Print Size</label>
+                                    <select class="form-select" id="printSize">
+                                        <option value="A4">A4 (Standard)</option>
+                                        <option value="A3">A3 (Large)</option>
+                                        <option value="Letter">Letter (US)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="button" class="btn btn-primary" onclick="applyPrintSettings()">Apply Settings</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            $('body').append(settingsHtml);
+            $('#printSettingsModal').modal('show');
+            
+            // Remove modal from DOM after hidden
+            $('#printSettingsModal').on('hidden.bs.modal', function () {
+                $(this).remove();
+            });
+        }
+        
+        function applyPrintSettings() {
+            const printBackground = document.getElementById('printBackground').checked;
+            const printBorder = document.getElementById('printBorder').checked;
+            const printSeal = document.getElementById('printSeal').checked;
+            
+            // Apply settings to print styles
+            if (printBackground) {
+                document.body.classList.add('print-background');
+            } else {
+                document.body.classList.remove('print-background');
+            }
+            
+            if (!printBorder) {
+                document.body.classList.add('no-border');
+            } else {
+                document.body.classList.remove('no-border');
+            }
+            
+            if (!printSeal) {
+                document.body.classList.add('no-seal');
+            } else {
+                document.body.classList.remove('no-seal');
+            }
+            
+            $('#printSettingsModal').modal('hide');
+            window.print();
+            
+            // Reset classes after printing
+            setTimeout(() => {
+                document.body.classList.remove('print-background', 'no-border', 'no-seal');
+            }, 1000);
+        }
+        
+        // Add print styles for settings
+        const printStyles = document.createElement('style');
+        printStyles.textContent = `
+            @media print {
+                .print-background .certificate {
+                    background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%) !important;
+                }
+                
+                .no-border .certificate {
+                    border: none !important;
+                }
+                
+                .no-seal .certificate-seal {
+                    display: none !important;
+                }
+            }
+        `;
+        document.head.appendChild(printStyles);
     </script>
 </body>
 </html>

@@ -12,7 +12,7 @@ class Course {
         $conn = $this->db->getConnection();
         
         $stmt = $conn->prepare("
-            INSERT INTO courses (title, description, category_id, instructor_id, price, duration_hours, difficulty_level, status, thumbnail, created_at, updated_at) 
+            INSERT INTO courses_new (title, description, category_id, instructor_id, price, duration_hours, difficulty_level, status, thumbnail, created_at, updated_at) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ");
         
@@ -111,9 +111,9 @@ class Course {
         
         $sql = "
             SELECT c.*, cat.name as category_name, u.full_name as instructor_name
-            FROM courses c
-            LEFT JOIN categories cat ON c.category_id = cat.id
-            LEFT JOIN users u ON c.instructor_id = u.id
+            FROM courses_new c
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
+            LEFT JOIN users_new u ON c.instructor_id = u.id
             WHERE 1=1
         ";
         
@@ -152,8 +152,8 @@ class Course {
                    COUNT(l.id) as lesson_count
             FROM courses_new c
             LEFT JOIN categories_new cat ON c.category_id = cat.id
-            LEFT JOIN users u ON c.instructor_id = u.id
-            LEFT JOIN enrollments e ON c.id = e.course_id
+            LEFT JOIN users_new u ON c.instructor_id = u.id
+            LEFT JOIN enrollments_new e ON c.id = e.course_id
             LEFT JOIN course_reviews cr ON c.id = cr.course_id
             LEFT JOIN lessons l ON c.id = l.course_id
             WHERE c.status = 'published'
@@ -283,9 +283,9 @@ class Course {
         
         $sql = "
             SELECT c.*, cat.name as category_name, u.full_name as instructor_name
-            FROM courses c
-            LEFT JOIN categories cat ON c.category_id = cat.id
-            LEFT JOIN users u ON c.instructor_id = u.id
+            FROM courses_new c
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
+            LEFT JOIN users_new u ON c.instructor_id = u.id
             WHERE c.status = 'published' 
             AND (c.title LIKE ? OR c.description LIKE ?)
         ";
@@ -338,19 +338,19 @@ class Course {
         ];
         
         // Total courses
-        $result = $conn->query("SELECT COUNT(*) as total FROM courses");
+        $result = $conn->query("SELECT COUNT(*) as total FROM courses_new");
         if ($result && $row = $result->fetch_assoc()) {
             $stats['total'] = $row['total'];
         }
         
         // Published courses
-        $result = $conn->query("SELECT COUNT(*) as published FROM courses WHERE status = 'published'");
+        $result = $conn->query("SELECT COUNT(*) as published FROM courses_new WHERE status = 'published'");
         if ($result && $row = $result->fetch_assoc()) {
             $stats['published'] = $row['published'];
         }
         
         // Draft courses
-        $result = $conn->query("SELECT COUNT(*) as draft FROM courses WHERE status = 'draft'");
+        $result = $conn->query("SELECT COUNT(*) as draft FROM courses_new WHERE status = 'draft'");
         if ($result && $row = $result->fetch_assoc()) {
             $stats['draft'] = $row['draft'];
         }
@@ -383,10 +383,10 @@ class Course {
             SELECT c.*, COALESCE(cat.name, 'Uncategorized') as category_name, COALESCE(u.full_name, 'Unknown Instructor') as instructor_name,
                    COUNT(e.id) as enrollment_count,
                    COALESCE(AVG(e.progress_percentage), 0) as avg_progress
-            FROM courses c
-            LEFT JOIN categories cat ON c.category_id = cat.id
-            LEFT JOIN users u ON c.instructor_id = u.id
-            LEFT JOIN enrollments e ON c.id = e.course_id
+            FROM courses_new c
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
+            LEFT JOIN users_new u ON c.instructor_id = u.id
+            LEFT JOIN enrollments_new e ON c.id = e.course_id
             WHERE c.status = 'published'
             GROUP BY c.id
             ORDER BY enrollment_count DESC, avg_progress DESC
@@ -430,9 +430,9 @@ class Course {
         
         $stmt = $conn->prepare("
             SELECT c.*, cat.name as category_name, u.full_name as instructor_name
-            FROM courses c
-            JOIN categories cat ON c.category_id = cat.id
-            JOIN users u ON c.instructor_id = u.id
+            FROM courses_new c
+            JOIN categories_new cat ON c.category_id = cat.id
+            JOIN users_new u ON c.instructor_id = u.id
             WHERE c.status = 'published' 
             AND c.id NOT IN (
                 SELECT course_id FROM enrollments_new WHERE user_id = ?
@@ -526,7 +526,7 @@ class Course {
         
         // Create duplicate
         $stmt = $conn->prepare("
-            INSERT INTO courses (title, description, category_id, instructor_id, price, duration_hours, difficulty_level, status, thumbnail, created_at, updated_at) 
+            INSERT INTO courses_new (title, description, category_id, instructor_id, price, duration_hours, difficulty_level, status, thumbnail, created_at, updated_at) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ");
         
@@ -561,9 +561,9 @@ class Course {
         if ($studentId) {
             $stmt = $conn->prepare("
                 SELECT l.*, 
-                       CASE WHEN cl.student_id IS NOT NULL THEN 1 ELSE 0 END as is_completed
+                       CASE WHEN lp.completed = 1 THEN 1 ELSE 0 END as is_completed
                 FROM lessons l
-                LEFT JOIN completed_lessons cl ON l.id = cl.lesson_id AND cl.student_id = ?
+                LEFT JOIN lesson_progress lp ON l.id = lp.lesson_id AND lp.student_id = ?
                 WHERE l.course_id = ?
                 ORDER BY l.lesson_order
             ");
@@ -612,20 +612,56 @@ class Course {
     public function markLessonComplete($studentId, $lessonId) {
         $conn = $this->db->getConnection();
         
-        // Check if already completed
-        $stmt = $conn->prepare("SELECT id FROM completed_lessons WHERE student_id = ? AND lesson_id = ?");
+        error_log("markLessonComplete: student_id=$studentId, lesson_id=$lessonId");
+        
+        // Check if already exists in lesson_progress
+        $stmt = $conn->prepare("SELECT id, completed FROM lesson_progress WHERE student_id = ? AND lesson_id = ?");
+        if ($stmt === false) {
+            error_log("Failed to prepare select statement: " . $conn->error);
+            return false;
+        }
         $stmt->bind_param("ii", $studentId, $lessonId);
         $stmt->execute();
         
-        if ($stmt->get_result()->num_rows > 0) {
-            return true; // Already completed
+        $result = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        
+        if ($result) {
+            // Record exists
+            $isAlreadyCompleted = $result['completed'] == 1;
+            error_log("Progress record exists: id={$result['id']}, completed=$isAlreadyCompleted");
+            
+            if ($isAlreadyCompleted) {
+                // Already completed - return success
+                error_log("Lesson already marked as complete");
+                return true;
+            } else {
+                // Update existing record
+                $stmt = $conn->prepare("UPDATE lesson_progress SET completed = 1, last_accessed_at = NOW(), completed_at = NOW() WHERE student_id = ? AND lesson_id = ?");
+                if ($stmt === false) {
+                    error_log("Failed to prepare update statement: " . $conn->error);
+                    return false;
+                }
+                $stmt->bind_param("ii", $studentId, $lessonId);
+                $success = $stmt->execute();
+                error_log("Update result: " . ($success ? 'success' : 'failed'));
+                $stmt->close();
+                return $success;
+            }
+        } else {
+            // Insert new record
+            error_log("No existing record, inserting new one");
+            $stmt = $conn->prepare("INSERT INTO lesson_progress (student_id, lesson_id, completed, last_accessed_at, completed_at) VALUES (?, ?, 1, NOW(), NOW())");
+            if ($stmt === false) {
+                error_log("Failed to prepare insert statement: " . $conn->error);
+                return false;
+            }
+            $stmt->bind_param("ii", $studentId, $lessonId);
+            $success = $stmt->execute();
+            error_log("Insert result: " . ($success ? 'success' : 'failed'));
+            $stmt->close();
+            return $success;
         }
-        
-        // Mark as completed
-        $stmt = $conn->prepare("INSERT INTO completed_lessons (student_id, lesson_id, completed_at) VALUES (?, ?, NOW())");
-        $stmt->bind_param("ii", $studentId, $lessonId);
-        
-        return $stmt->execute();
     }
     
     public function updateCourseProgress($studentId, $courseId) {
@@ -639,9 +675,9 @@ class Course {
         
         $stmt = $conn->prepare("
             SELECT COUNT(*) as completed 
-            FROM completed_lessons cl
-            JOIN lessons l ON cl.lesson_id = l.id
-            WHERE cl.student_id = ? AND l.course_id = ?
+            FROM lesson_progress lp
+            JOIN lessons l ON lp.lesson_id = l.id
+            WHERE lp.student_id = ? AND l.course_id = ? AND lp.completed = 1
         ");
         $stmt->bind_param("ii", $studentId, $courseId);
         $stmt->execute();
@@ -651,7 +687,7 @@ class Course {
         $progress = $totalLessons > 0 ? round(($completedLessons / $totalLessons) * 100, 2) : 0;
         
         // Update enrollment progress
-        $stmt = $conn->prepare("UPDATE enrollments SET progress_percentage = ? WHERE student_id = ? AND course_id = ?");
+        $stmt = $conn->prepare("UPDATE enrollments_new SET progress_percentage = ? WHERE user_id = ? AND course_id = ?");
         $stmt->bind_param("dii", $progress, $studentId, $courseId);
         
         return $stmt->execute();
@@ -675,16 +711,16 @@ class Course {
             return []; // No enrollments found
         }
         
-        // Use courses_new table (the active table with course data)
+        // Use courses_new table (the correct table) with optimized query
         $stmt = $conn->prepare("
-            SELECT c.*, e.enrolled_at, e.progress_percentage, e.status as enrollment_status,
+            SELECT c.*, e.enrolled_at, e.updated_at, e.status as enrollment_status,
                    cat.name as category_name, u.full_name as instructor_name
             FROM courses_new c
             JOIN enrollments_new e ON c.id = e.course_id
-            LEFT JOIN categories cat ON c.category_id = cat.id
-            LEFT JOIN users u ON c.instructor_id = u.id
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
+            LEFT JOIN users_new u ON c.instructor_id = u.id
             WHERE e.user_id = ? AND e.status = 'active'
-            ORDER BY e.enrolled_at DESC
+            ORDER BY e.updated_at DESC, e.enrolled_at DESC
         ");
         
         if ($stmt === false) {
@@ -697,12 +733,57 @@ class Course {
         $result = $stmt->get_result();
         $courses = $result->fetch_all(MYSQLI_ASSOC);
         
-        // Recalculate progress for each course to ensure accuracy
-        foreach ($courses as &$course) {
-            $course['progress_percentage'] = $this->calculateCourseProgress($studentId, $course['id']);
+        // Batch calculate progress for better performance
+        $courseIds = array_column($courses, 'id');
+        if (!empty($courseIds)) {
+            $batchProgress = $this->batchCalculateProgress($studentId, $courseIds);
+            
+            foreach ($courses as &$course) {
+                $course['progress_percentage'] = $batchProgress[$course['id']] ?? 0;
+                
+                // Get next lesson for resume functionality
+                $nextLesson = $this->getNextLesson($studentId, $course['id']);
+                $course['next_lesson'] = $nextLesson;
+                $course['total_lessons'] = $this->getTotalLessons($course['id']);
+                $course['completed_lessons'] = $this->getCompletedLessons($studentId, $course['id']);
+            }
         }
         
         return $courses;
+    }
+    
+    public function getTotalLessons($courseId) {
+        $conn = $this->db->getConnection();
+        
+        $stmt = $conn->prepare("SELECT COUNT(*) as total FROM lessons WHERE course_id = ? AND is_published = 1");
+        if ($stmt === false) {
+            return 0;
+        }
+        
+        $stmt->bind_param("i", $courseId);
+        $stmt->execute();
+        
+        return $stmt->get_result()->fetch_assoc()['total'] ?? 0;
+    }
+    
+    public function getCompletedLessons($studentId, $courseId) {
+        $conn = $this->db->getConnection();
+        
+        $stmt = $conn->prepare("
+            SELECT COUNT(*) as completed
+            FROM lesson_progress lp
+            JOIN lessons l ON lp.lesson_id = l.id
+            WHERE lp.student_id = ? AND l.course_id = ? AND lp.completed = 1 AND l.is_published = 1
+        ");
+        
+        if ($stmt === false) {
+            return 0;
+        }
+        
+        $stmt->bind_param("ii", $studentId, $courseId);
+        $stmt->execute();
+        
+        return $stmt->get_result()->fetch_assoc()['completed'] ?? 0;
     }
     
     public function calculateCourseProgress($studentId, $courseId) {
@@ -755,7 +836,7 @@ class Course {
         
         // Update enrollment progress
         $stmt = $conn->prepare("
-            UPDATE enrollments 
+            UPDATE enrollments_new 
             SET progress_percentage = ?, 
                 status = CASE 
                     WHEN progress_percentage >= 100 THEN 'completed'
@@ -855,15 +936,24 @@ class Course {
         $stmt->execute();
         $stats['total_enrollments'] = $stmt->get_result()->fetch_assoc()['total'];
         
-        // Completed courses
-        $stmt = $conn->prepare("SELECT COUNT(*) as completed FROM enrollments_new WHERE user_id = ? AND status = 'completed'");
-        if ($stmt === false) {
-            error_log("Failed to prepare completed courses query: " . $conn->error);
-            return ['total_enrollments' => 0, 'completed_courses' => 0, 'in_progress' => 0, 'completion_rate' => 0, 'total_study_hours' => 0];
+        // Calculate completed courses based on actual progress
+        $enrolledCourses = $this->getEnrolledCourses($studentId);
+        $courseIds = array_column($enrolledCourses, 'id');
+        
+        if (!empty($courseIds)) {
+            $batchProgress = $this->batchCalculateProgress($studentId, $courseIds);
+            $completedCount = 0;
+            
+            foreach ($batchProgress as $progress) {
+                if ($progress >= 100) {
+                    $completedCount++;
+                }
+            }
+            
+            $stats['completed_courses'] = $completedCount;
+        } else {
+            $stats['completed_courses'] = 0;
         }
-        $stmt->bind_param("i", $studentId);
-        $stmt->execute();
-        $stats['completed_courses'] = $stmt->get_result()->fetch_assoc()['completed'];
         
         // In progress courses
         $stats['in_progress'] = $stats['total_enrollments'] - $stats['completed_courses'];
@@ -1013,10 +1103,10 @@ class Course {
             SELECT c.*, cat.name as category_name, u.full_name as instructor_name,
                    COUNT(e.id) as enrollment_count,
                    ROUND(AVG(e.progress_percentage), 2) as avg_progress
-            FROM courses c
-            LEFT JOIN categories cat ON c.category_id = cat.id
-            LEFT JOIN users u ON c.instructor_id = u.id
-            LEFT JOIN enrollments e ON c.id = e.course_id
+            FROM courses_new c
+            LEFT JOIN categories_new cat ON c.category_id = cat.id
+            LEFT JOIN users_new u ON c.instructor_id = u.id
+            LEFT JOIN enrollments_new e ON c.id = e.course_id
             WHERE 1=1
         ";
 
@@ -1072,7 +1162,7 @@ class Course {
         $status = $filters['status'] ?? null;
         $instructorId = $filters['instructor_id'] ?? null;
 
-        $sql = "SELECT COUNT(*) as total FROM courses c WHERE 1=1";
+        $sql = "SELECT COUNT(*) as total FROM courses_new c WHERE 1=1";
         $params = [];
         $types = '';
 
@@ -1124,18 +1214,18 @@ class Course {
         
         // Check if required tables exist
         $lessonsCheck = $conn->query("SHOW TABLES LIKE 'lessons'");
-        $completedLessonsCheck = $conn->query("SHOW TABLES LIKE 'completed_lessons'");
+        $lessonProgressCheck = $conn->query("SHOW TABLES LIKE 'lesson_progress'");
         
-        if ($lessonsCheck->num_rows == 0 || $completedLessonsCheck->num_rows == 0) {
+        if ($lessonsCheck->num_rows == 0 || $lessonProgressCheck->num_rows == 0) {
             return null; // Tables don't exist, return null
         }
         
-        // Get lessons that are not yet completed by the student
+        // Get the next lesson that is not yet completed by the student
         $stmt = $conn->prepare("
             SELECT l.*
             FROM lessons l
-            LEFT JOIN completed_lessons cl ON l.id = cl.lesson_id AND cl.student_id = ?
-            WHERE l.course_id = ? AND cl.lesson_id IS NULL
+            LEFT JOIN lesson_progress lp ON l.id = lp.lesson_id AND lp.student_id = ? AND lp.completed = 1
+            WHERE l.course_id = ? AND l.is_published = 1 AND lp.lesson_id IS NULL
             ORDER BY l.lesson_order ASC
             LIMIT 1
         ");
@@ -1229,7 +1319,28 @@ class Course {
         foreach ($courseIds as $courseId) {
             $total = $lessonCounts[$courseId] ?? 0;
             $completed = $completedCounts[$courseId] ?? 0;
-            $result[$courseId] = $total > 0 ? round(($completed / $total) * 100, 2) : 0;
+            
+            // Handle edge case: if course has no lessons, consider it as 100% if enrolled
+            if ($total == 0) {
+                // Check if course has any lessons at all
+                $lessonCheckStmt = $conn->prepare("SELECT COUNT(*) as lesson_count FROM lessons WHERE course_id = ?");
+                $lessonCheckStmt->bind_param("i", $courseId);
+                $lessonCheckStmt->execute();
+                $lessonCheckResult = $lessonCheckStmt->get_result()->fetch_assoc();
+                $lessonCheckStmt->close();
+                
+                if ($lessonCheckResult && $lessonCheckResult['lesson_count'] > 0) {
+                    // Course has lessons but batch calculation failed, fallback to individual calculation
+                    $total = $lessonCheckResult['lesson_count'];
+                    $result[$courseId] = $total > 0 ? round(($completed / $total) * 100, 2) : 0;
+                } else {
+                    // Course has no lessons, consider it as 100% (course is completed without lessons)
+                    $result[$courseId] = 100;
+                }
+            } else {
+                // Normal calculation
+                $result[$courseId] = $total > 0 ? round(($completed / $total) * 100, 2) : 0;
+            }
         }
         
         return $result;

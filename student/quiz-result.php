@@ -43,8 +43,44 @@ $results = $quiz->getQuizAttemptResults($attemptId);
     <title>Quiz Results - IT HUB</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="../assets/css/theme.css" rel="stylesheet">
+    <link href="css/student-theme.css" rel="stylesheet">
     <style>
+        /* Force Royal Blue Colors */
+        :root {
+            --primary-color: #4169E1 !important;
+            --secondary-color: #2563EB !important;
+            --gradient-primary: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        /* Force Royal Blue for Sidebar */
+        .sidebar-nav {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        /* Force Royal Blue for Universal Header */
+        .universal-header {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        /* Force Royal Blue for any remaining elements */
+        .btn-primary {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+            border: none !important;
+        }
+        
+        .bg-primary {
+            background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%) !important;
+        }
+        
+        .text-primary {
+            color: #4169E1 !important;
+        }
+        
+        .border-primary {
+            border-color: #4169E1 !important;
+        }
+        
         .result-card {
             border: none;
             border-radius: 15px;
@@ -63,23 +99,23 @@ $results = $quiz->getQuizAttemptResults($attemptId);
             color: white;
             margin: 0 auto;
         }
-        .score-excellent { background: linear-gradient(135deg, #28a745, #20c997); }
-        .score-good { background: linear-gradient(135deg, #007bff, #6610f2); }
-        .score-average { background: linear-gradient(135deg, #ffc107, #fd7e14); }
-        .score-fail { background: linear-gradient(135deg, #dc3545, #e83e8c); }
+        .score-excellent { background: var(--gradient-success); }
+        .score-good { background: var(--gradient-primary); }
+        .score-average { background: var(--gradient-warning); }
+        .score-fail { background: var(--gradient-danger); }
         
         .question-review {
-            border-left: 4px solid #e9ecef;
+            border-left: 4px solid var(--border-color);
             padding-left: 1rem;
             margin-bottom: 1.5rem;
         }
         .question-review.correct {
-            border-left-color: #28a745;
-            background-color: #f8fff9;
+            border-left-color: var(--success-color);
+            background-color: rgba(16, 185, 129, 0.1);
         }
         .question-review.incorrect {
-            border-left-color: #dc3545;
-            background-color: #fff8f8;
+            border-left-color: var(--danger-color);
+            background-color: rgba(239, 68, 68, 0.1);
         }
         
         .option-review {
@@ -88,42 +124,21 @@ $results = $quiz->getQuizAttemptResults($attemptId);
             margin-bottom: 0.5rem;
         }
         .option-review.selected {
-            background-color: #e7f3ff;
-            border: 1px solid #007bff;
+            background-color: rgba(102, 126, 234, 0.1);
+            border: 1px solid var(--primary-color);
         }
         .option-review.correct {
-            background-color: #d4edda;
-            border: 1px solid #28a745;
+            background-color: rgba(16, 185, 129, 0.2);
+            border: 1px solid var(--success-color);
         }
         .option-review.incorrect {
-            background-color: #f8d7da;
-            border: 1px solid #dc3545;
+            background-color: rgba(239, 68, 68, 0.2);
+            border: 1px solid var(--danger-color);
         }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-circle me-1"></i><?php echo htmlspecialchars($_SESSION['full_name']); ?>
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="dashboard.php"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
-                        <li><a class="dropdown-item" href="my-courses.php"><i class="fas fa-graduation-cap me-2"></i>My Courses</a></li>
-                        <li><a class="dropdown-item" href="quiz-results.php"><i class="fas fa-chart-bar me-2"></i>Quiz Results</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="../logout.php"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <?php require_once '../includes/universal_header.php'; ?>
 
     <div class="container-fluid py-4">
         <div class="row justify-content-center">

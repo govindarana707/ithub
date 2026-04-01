@@ -41,6 +41,7 @@ $_SESSION['error_message'] = $errorMessage;
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="../assets/css/theme.css" rel="stylesheet">
     <link href="css/student-theme.css" rel="stylesheet">
     <style>
         .failure-container {
@@ -58,8 +59,8 @@ $_SESSION['error_message'] = $errorMessage;
         }
         
         .failure-header {
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-            color: white;
+            background: var(--gradient-danger);
+            color: var(--bg-primary);
             padding: 40px;
         }
         
@@ -76,11 +77,11 @@ $_SESSION['error_message'] = $errorMessage;
         
         .failure-icon i {
             font-size: 50px;
-            color: #e74c3c;
+            color: var(--danger-color);
         }
         
         .btn-retry {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--gradient-primary);
             border: none;
             padding: 15px 40px;
             font-size: 18px;
@@ -93,7 +94,7 @@ $_SESSION['error_message'] = $errorMessage;
         }
         
         .info-box {
-            background: #f8f9fa;
+            background: var(--bg-secondary);
             border-radius: 10px;
             padding: 20px;
             margin: 20px 0;

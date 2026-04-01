@@ -105,7 +105,20 @@ $(document).ready(function() {
                     // Redirect to dashboard based on role
                     window.location.href = response.redirect;
                 } else {
-                    showAlert(response.message, 'danger');
+                    // Enhanced error handling for rate limiting
+                    let errorMessage = response.message;
+                    let alertType = 'danger';
+                    
+                    if (response.locked) {
+                        alertType = 'warning';
+                        // Add countdown timer for rate limit
+                        if (response.remaining_minutes) {
+                            errorMessage += `<br><small>You can try again in <span id="countdown">${response.remaining_minutes}</span> minute(s).</small>`;
+                            startCountdown(response.remaining_minutes);
+                        }
+                    }
+                    
+                    showAlert(errorMessage, alertType);
                     submitBtn.prop('disabled', false).html(originalText);
                 }
             },
@@ -147,7 +160,41 @@ $(document).ready(function() {
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         `;
+        
+        // Remove existing alerts
+        $('.alert').remove();
+        
+        // Add new alert at the top of the form
         $('#loginForm').prepend(alertHtml);
+        
+        // Scroll to top to show the alert
+        $('html, body').animate({
+            scrollTop: $('#loginForm').offset().top - 100
+        }, 300);
+    }
+    
+    // Countdown timer function for rate limiting
+    function startCountdown(minutes) {
+        let seconds = minutes * 60;
+        const countdownElement = $('#countdown');
+        
+        if (countdownElement.length) {
+            const interval = setInterval(function() {
+                if (seconds > 0) {
+                    const mins = Math.floor(seconds / 60);
+                    const secs = seconds % 60;
+                    countdownElement.text(mins + ':' + (secs < 10 ? '0' : '') + secs);
+                    seconds--;
+                } else {
+                    clearInterval(interval);
+                    countdownElement.text('now');
+                    // Refresh the page after a short delay to allow immediate login
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                }
+            }, 1000);
+        }
     }
 });
 </script>

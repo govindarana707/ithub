@@ -391,7 +391,7 @@ function handleGetCourse() {
     // Get course with category name
     $stmt = $conn->prepare("
         SELECT c.*, cat.name as category_name,
-               (SELECT COUNT(*) FROM enrollments WHERE course_id = c.id) as enrollment_count,
+               (SELECT COUNT(*) FROM enrollments_new WHERE course_id = c.id) as enrollment_count,
                (SELECT COUNT(*) FROM lessons WHERE course_id = c.id) as lesson_count
         FROM courses_new c
         LEFT JOIN categories_new cat ON c.category_id = cat.id

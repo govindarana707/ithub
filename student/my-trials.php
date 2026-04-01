@@ -28,33 +28,34 @@ $unreadCount = $notificationService->getUnreadCount($_SESSION['user_id']);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
+    <link href="../assets/css/theme.css" rel="stylesheet">
     <style>
         .trial-card {
-            border-left: 4px solid #007bff;
-            transition: all 0.3s ease;
+            border-left: 4px solid var(--primary-color);
+            transition: var(--transition);
         }
         .trial-card.expiring-soon {
-            border-left-color: #ffc107;
+            border-left-color: var(--warning-color);
         }
         .trial-card.expiring-critical {
-            border-left-color: #dc3545;
+            border-left-color: var(--danger-color);
         }
         .trial-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow);
         }
         .days-remaining {
             font-size: 1.2rem;
             font-weight: bold;
         }
         .days-remaining.plenty {
-            color: #28a745;
+            color: var(--success-color);
         }
         .days-remaining.warning {
-            color: #ffc107;
+            color: var(--warning-color);
         }
         .days-remaining.danger {
-            color: #dc3545;
+            color: var(--danger-color);
         }
         .progress-ring {
             width: 60px;
@@ -66,18 +67,18 @@ $unreadCount = $notificationService->getUnreadCount($_SESSION['user_id']);
             transform-origin: 50% 50%;
         }
         .trial-stats {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px;
+            background: var(--gradient-primary);
+            color: var(--bg-primary);
+            border-radius: var(--radius-lg);
         }
         .upgrade-btn {
-            background: linear-gradient(45deg, #28a745, #20c997);
+            background: var(--gradient-success);
             border: none;
-            transition: all 0.3s ease;
+            transition: var(--transition);
         }
         .upgrade-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+            box-shadow: var(--shadow-success);
         }
     </style>
 </head>
@@ -194,11 +195,11 @@ $unreadCount = $notificationService->getUnreadCount($_SESSION['user_id']);
                                         <!-- Circular Progress -->
                                         <svg class="progress-ring mx-auto mb-3">
                                             <circle cx="30" cy="30" r="25" 
-                                                   stroke="#e9ecef" 
+                                                   stroke="var(--border-color)" 
                                                    stroke-width="5" 
                                                    fill="transparent"/>
                                             <circle cx="30" cy="30" r="25" 
-                                                   stroke="#28a745" 
+                                                   stroke="var(--success-color)" 
                                                    stroke-width="5" 
                                                    fill="transparent"
                                                    stroke-dasharray="<?php echo (2 * 3.14159 * 25); ?>"

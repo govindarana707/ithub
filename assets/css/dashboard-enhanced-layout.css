@@ -6,9 +6,9 @@
 /* CSS Variables for easier theming and maintenance */
 :root {
     /* Primary Colors */
-    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --primary-color: #667eea;
-    --primary-dark: #5a67d8;
+    --primary-gradient: linear-gradient(135deg, #4169E1 0%, #2563EB 100%);
+    --primary-color: #4169E1;
+    --primary-dark: #1E3A8A;
     
     /* Success Colors */
     --success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -134,7 +134,7 @@
 .brand-logo {
     width: 48px;
     height: 48px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%);
     border-radius: 12px;
     display: flex;
     align-items: center;
@@ -241,13 +241,13 @@
 .nav-item:hover {
     background: rgba(255, 255, 255, 0.05);
     color: white;
-    border-left-color: #667eea;
+    border-left-color: #4169E1;
 }
 
 .nav-item.active {
     background: rgba(102, 126, 234, 0.1);
     color: white;
-    border-left-color: #667eea;
+    border-left-color: #4169E1;
 }
 
 .nav-item.logout {
@@ -318,7 +318,7 @@
     font-weight: 800;
     color: #1e293b;
     margin: 0 0 0.5rem 0;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -429,7 +429,7 @@
 }
 
 .quick-stat-icon.bg-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%);
 }
 
 .quick-stat-icon.bg-success {
@@ -517,7 +517,7 @@
     left: 0;
     right: 0;
     height: 4px;
-    background: linear-gradient(90deg, #667eea, #764ba2);
+    background: linear-gradient(90deg, #4169E1, #2563EB);
 }
 
 .overview-stat-card:hover {
@@ -525,7 +525,7 @@
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
-.overview-stat-card.primary::before { background: linear-gradient(90deg, #667eea, #764ba2); }
+.overview-stat-card.primary::before { background: linear-gradient(90deg, #4169E1, #2563EB); }
 .overview-stat-card.info::before { background: linear-gradient(90deg, #3b82f6, #1d4ed8); }
 .overview-stat-card.success::before { background: linear-gradient(90deg, #10b981, #059669); }
 .overview-stat-card.warning::before { background: linear-gradient(90deg, #f59e0b, #d97706); }
@@ -555,7 +555,7 @@
     border-radius: 50%;
 }
 
-.stat-icon.primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.stat-icon.primary { background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%); }
 .stat-icon.info { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
 .stat-icon.success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
 .stat-icon.warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
@@ -587,7 +587,7 @@
 
 .progress-bar-enhanced {
     height: 100%;
-    background: linear-gradient(90deg, #667eea, #764ba2);
+    background: linear-gradient(90deg, #4169E1, #2563EB);
     border-radius: 4px;
     transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
@@ -634,7 +634,7 @@
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, #667eea, #764ba2);
+    background: linear-gradient(90deg, #4169E1, #2563EB);
 }
 
 /* Completion Probability */
@@ -646,7 +646,7 @@
     padding: 0.75rem;
     background: rgba(102, 126, 234, 0.05);
     border-radius: 8px;
-    border-left: 3px solid #667eea;
+    border-left: 3px solid #4169E1;
 }
 
 .probability-indicator {
@@ -697,7 +697,7 @@
     position: absolute;
     top: 1rem;
     right: 1rem;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%);
     color: white;
     width: 40px;
     height: 40px;
@@ -802,7 +802,7 @@
         top: 1rem;
         left: 1rem;
         z-index: 1001;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%);
         color: white;
         border: none;
         border-radius: 8px;

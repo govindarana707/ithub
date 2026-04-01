@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Get data
 $conn = connectDB();
-$stmt = $conn->prepare("SELECT id, title FROM courses WHERE instructor_id = ? ORDER BY title");
+$stmt = $conn->prepare("SELECT id, title FROM courses_new WHERE instructor_id = ? ORDER BY title");
 $stmt->bind_param("i", $instructorId);
 $stmt->execute();
 $instructorCourses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -453,32 +453,7 @@ $stats = $discussion->getDiscussionStats();
             <div class="row">
                 <!-- Sidebar -->
                 <div class="col-md-3">
-                    <div class="list-group">
-                        <a href="dashboard.php" class="list-group-item list-group-item-action">
-                            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                        </a>
-                        <a href="courses.php" class="list-group-item list-group-item-action">
-                            <i class="fas fa-chalkboard-teacher me-2"></i> My Courses
-                        </a>
-                        <a href="create-course.php" class="list-group-item list-group-item-action">
-                            <i class="fas fa-plus me-2"></i> Create Course
-                        </a>
-                        <a href="students.php" class="list-group-item list-group-item-action">
-                            <i class="fas fa-users me-2"></i> Students
-                        </a>
-                        <a href="discussions.php" class="list-group-item list-group-item-action active">
-                            <i class="fas fa-comments me-2"></i> Discussions
-                        </a>
-                        <a href="earnings.php" class="list-group-item list-group-item-action">
-                            <i class="fas fa-rupee-sign me-2"></i> Earnings
-                        </a>
-                        <a href="profile.php" class="list-group-item list-group-item-action">
-                            <i class="fas fa-user me-2"></i> Profile
-                        </a>
-                        <a href="../logout.php" class="list-group-item list-group-item-action">
-                            <i class="fas fa-sign-out-alt me-2"></i> Logout
-                        </a>
-                    </div>
+                    <?php require_once '../includes/instructor_sidebar.php'; ?>
                 </div>
 
                 <!-- Main Content -->
@@ -579,7 +554,7 @@ $stats = $discussion->getDiscussionStats();
                                     </div>
                                 <?php else: ?>
                                     <?php foreach ($discussions as $discussion): ?>
-                                        <div class="discussion-item <?php echo $discussion['is_pinned'] ? 'pinned' : ''; ?>">
+                                        <div class="discussion-item <?php echo $discussion['pinned'] ? 'pinned' : ''; ?>">
                                             <div class="discussion-header">
                                                 <?php if (!empty($discussion['profile_image'])): ?>
                                                     <img src="../uploads/<?php echo $discussion['profile_image']; ?>" 
@@ -593,7 +568,7 @@ $stats = $discussion->getDiscussionStats();
                                                 <div class="discussion-meta">
                                                     <div class="discussion-title">
                                                         <?php echo htmlspecialchars($discussion['title']); ?>
-                                                        <?php if ($discussion['is_pinned']): ?>
+                                                        <?php if ($discussion['pinned']): ?>
                                                             <i class="fas fa-thumbtack text-warning ms-2"></i>
                                                         <?php endif; ?>
                                                         <?php if ($discussion['is_resolved']): ?>
@@ -616,13 +591,13 @@ $stats = $discussion->getDiscussionStats();
                                             
                                             <div class="discussion-actions">
                                                 <span class="badge badge-primary me-2">
-                                                    <i class="fas fa-comment me-1"></i><?php echo $discussion['reply_count']; ?> replies
+                                                    <i class="fas fa-comment me-1"></i><?php echo $discussion['replies_count']; ?> replies
                                                 </span>
                                                 <button class="btn-modern btn-outline" onclick="viewDiscussion(<?php echo $discussion['id']; ?>)">
                                                     <i class="fas fa-eye me-1"></i>View
                                                 </button>
-                                                <button class="btn-modern btn-outline" onclick="togglePin(<?php echo $discussion['id']; ?>, <?php echo $discussion['is_pinned'] ? 0 : 1; ?>)">
-                                                    <i class="fas fa-thumbtack me-1"></i><?php echo $discussion['is_pinned'] ? 'Unpin' : 'Pin'; ?>
+                                                <button class="btn-modern btn-outline" onclick="togglePin(<?php echo $discussion['id']; ?>, <?php echo $discussion['pinned'] ? 0 : 1; ?>)">
+                                                    <i class="fas fa-thumbtack me-1"></i><?php echo $discussion['pinned'] ? 'Unpin' : 'Pin'; ?>
                                                 </button>
                                                 <button class="btn-modern btn-outline" onclick="toggleResolve(<?php echo $discussion['id']; ?>, <?php echo $discussion['is_resolved'] ? 0 : 1; ?>)">
                                                     <i class="fas fa-check me-1"></i><?php echo $discussion['is_resolved'] ? 'Reopen' : 'Resolve'; ?>

@@ -51,7 +51,12 @@ if (!is_array($faqs)) $faqs = [];
 $courseStats = $courseModel->getCourseStatistics($courseId);
 $db = new Database();
 $conn = $db->getConnection();
-$categories = $conn->query("SELECT id, name FROM categories ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+$categories = $conn->query("SELECT id, name FROM categories_new ORDER BY name");
+if ($categories === false) {
+    $categories = [];
+} else {
+    $categories = $categories->fetch_all(MYSQLI_ASSOC);
+}
 $instructors = $userModel->getInstructors();
 ?>
 
