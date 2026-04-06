@@ -37,86 +37,41 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST') 
     header('Location: settings.php');
     exit;
 }
+
+require_once dirname(__DIR__) . '/includes/universal_header.php';
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings - IT HUB</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-shield me-1"></i> Admin
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="dashboard.php">Dashboard</a></li>
-                        <li><a class="dropdown-item" href="users.php">User Management</a></li>
-                        <li><a class="dropdown-item" href="courses.php">Course Management</a></li>
-                        <li><a class="dropdown-item" href="analytics.php">Analytics</a></li>
-                        <li><a class="dropdown-item" href="settings.php">Settings</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </nav>
+<link rel="stylesheet" href="../assets/css/admin-theme.css">
 
-    <div class="container-fluid py-4">
-        <div class="row">
-            <div class="col-md-3">
-                <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="users.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-users-cog me-2"></i> User Management
-                    </a>
-                    <a href="courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-book-open me-2"></i> Course Management
-                    </a>
-                    <a href="categories.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tags me-2"></i> Categories
-                    </a>
-                    <a href="analytics.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-line me-2"></i> Analytics
-                    </a>
-                    <a href="reports.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-file-alt me-2"></i> Reports
-                    </a>
-                    <a href="logs.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-list-alt me-2"></i> Activity Logs
-                    </a>
-                    <a href="settings.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-cog me-2"></i> Settings
-                    </a>
-                </div>
-            </div>
-            
-            <div class="col-md-9">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1>Settings</h1>
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3">
+            <?php require_once 'includes/sidebar.php'; ?>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="col-md-9">
+            <!-- Admin Dashboard Header -->
+            <div class="admin-dashboard-header mb-4">
+                <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <span class="badge bg-danger">Administrator</span>
+                        <h2 class="mb-1">⚙️ Settings</h2>
+                        <p class="mb-0 opacity-75">Manage system settings and maintenance</p>
+                    </div>
+                    <div>
+                        <span class="admin-badge">Administrator</span>
                     </div>
                 </div>
+            </div>
 
-                <!-- General Settings -->
-                <div class="dashboard-card mb-4">
-                    <h3>General Settings</h3>
+            <!-- General Settings -->
+            <div class="admin-content-card mb-4">
+                <div class="admin-card-header">
+                    <i class="fas fa-cog me-2"></i>
+                    General Settings
+                </div>
+                <div class="card-body">
                     <form method="POST">
                         <input type="hidden" name="action" value="update_settings">
                         
@@ -167,16 +122,21 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST') 
                         </div>
                         
                         <div class="mt-3">
-                            <button type="submit" class="btn btn-primary">
+                            <button type="submit" class="btn-modern btn-primary-modern">
                                 <i class="fas fa-save me-2"></i>Save Settings
                             </button>
                         </div>
                     </form>
                 </div>
+            </div>
 
-                <!-- System Maintenance -->
-                <div class="dashboard-card mb-4">
-                    <h3>System Maintenance</h3>
+            <!-- System Maintenance -->
+            <div class="admin-content-card mb-4">
+                <div class="admin-card-header">
+                    <i class="fas fa-tools me-2"></i>
+                    System Maintenance
+                </div>
+                <div class="card-body">
                     <div class="row">
                         <div class="col-md-4">
                             <div class="text-center">
@@ -187,7 +147,7 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST') 
                                 <p class="text-muted">Clear system cache and temporary files</p>
                                 <form method="POST" class="d-inline">
                                     <input type="hidden" name="action" value="clear_cache">
-                                    <button type="submit" class="btn btn-outline-primary">
+                                    <button type="submit" class="btn-modern btn-outline-primary-modern">
                                         <i class="fas fa-broom me-2"></i>Clear Cache
                                     </button>
                                 </form>
@@ -203,7 +163,7 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST') 
                                 <p class="text-muted">Create a backup of the database</p>
                                 <form method="POST" class="d-inline">
                                     <input type="hidden" name="action" value="backup_database">
-                                    <button type="submit" class="btn btn-outline-success">
+                                    <button type="submit" class="btn-modern btn-outline-success-modern">
                                         <i class="fas fa-download me-2"></i>Backup Now
                                     </button>
                                 </form>
@@ -217,20 +177,25 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST') 
                                 </div>
                                 <h5>Optimize Database</h5>
                                 <p class="text-muted">Optimize database performance</p>
-                                <button class="btn btn-outline-info" onclick="optimizeDatabase()">
+                                <button class="btn-modern btn-outline-info-modern" onclick="optimizeDatabase()">
                                     <i class="fas fa-sync me-2"></i>Optimize
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- System Information -->
-                <div class="dashboard-card">
-                    <h3>System Information</h3>
+            <!-- System Information -->
+            <div class="admin-content-card">
+                <div class="admin-card-header">
+                    <i class="fas fa-info-circle me-2"></i>
+                    System Information
+                </div>
+                <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <table class="table table-sm">
+                            <table class="admin-modern-table">
                                 <tr>
                                     <th>PHP Version:</th>
                                     <td><?php echo PHP_VERSION; ?></td>
@@ -251,7 +216,7 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST') 
                         </div>
                         
                         <div class="col-md-6">
-                            <table class="table table-sm">
+                            <table class="admin-modern-table">
                                 <tr>
                                     <th>Memory Limit:</th>
                                     <td><?php echo ini_get('memory_limit'); ?></td>
@@ -275,23 +240,44 @@ if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST') 
             </div>
         </div>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="../assets/js/main.js"></script>
-    <script>
-        function optimizeDatabase() {
-            if (confirm('This will optimize the database tables. Continue?')) {
-                // AJAX call to optimize database
-                $.post('api/optimize_database.php', {}, function(response) {
-                    if (response.success) {
-                        alert('Database optimized successfully!');
-                    } else {
-                        alert('Failed to optimize database');
-                    }
-                });
-            }
+<script>
+    function optimizeDatabase() {
+        if (confirm('This will optimize the database tables. Continue?')) {
+            // AJAX call to optimize database
+            fetch('api/optimize_database.php', {
+                method: 'POST'
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Database optimized successfully!');
+                } else {
+                    alert('Failed to optimize database');
+                }
+            })
+            .catch(error => {
+                alert('An error occurred while optimizing the database');
+            });
         }
-    </script>
-</body>
-</html>
+    }
+
+    // Add animations on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Animate content cards
+        const contentCards = document.querySelectorAll('.admin-content-card');
+        contentCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 200);
+        });
+    });
+</script>
+
+<?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>

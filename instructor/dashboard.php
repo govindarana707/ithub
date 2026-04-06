@@ -41,98 +41,28 @@ try {
 // Get recent activity
 $recentActivity = $instructor->getInstructorActivityLog($instructorId, 10);
 
-// Debug: Add fallback data if recent activity is empty
-if (empty($recentActivity)) {
-    $recentActivity = [
-        [
-            'action' => 'login',
-            'details' => 'Instructor logged into the system',
-            'created_at' => date('Y-m-d H:i:s', strtotime('-2 hours'))
-        ],
-        [
-            'action' => 'course_created',
-            'details' => 'Created new course: Introduction to Web Development',
-            'created_at' => date('Y-m-d H:i:s', strtotime('-1 day'))
-        ],
-        [
-            'action' => 'student_enrolled',
-            'details' => 'New student enrolled in Web Development course',
-            'created_at' => date('Y-m-d H:i:s', strtotime('-3 days'))
-        ]
-    ];
-}
-
-// Debug: Add fallback data if instructor courses is empty
-if (empty($instructorCourses)) {
-    $instructorCourses = [
-        [
-            'id' => 1,
-            'title' => 'Introduction to Web Development',
-            'status' => 'published',
-            'created_at' => date('Y-m-d H:i:s', strtotime('-5 days')),
-            'thumbnail' => null,
-            'enrollment_count' => 25,
-            'avg_progress' => 75,
-            'revenue' => 750
-        ],
-        [
-            'id' => 2,
-            'title' => 'Advanced JavaScript Techniques',
-            'status' => 'draft',
-            'created_at' => date('Y-m-d H:i:s', strtotime('-3 days')),
-            'thumbnail' => null,
-            'enrollment_count' => 0,
-            'avg_progress' => 0,
-            'revenue' => 0
-        ],
-        [
-            'id' => 3,
-            'title' => 'PHP for Beginners',
-            'status' => 'published',
-            'created_at' => date('Y-m-d H:i:s', strtotime('-1 week')),
-            'thumbnail' => null,
-            'enrollment_count' => 15,
-            'avg_progress' => 60,
-            'revenue' => 450
-        ]
-    ];
-}
-
 // Get top performing courses
 $topCourses = [];
 if (isset($analytics['course_performance']) && is_array($analytics['course_performance'])) {
     $topCourses = array_slice($analytics['course_performance'], 0, 3);
 }
 
-// Debug: Add fallback data if analytics is empty
-if (empty($analytics) || !isset($analytics['enrollment_trend'])) {
-    // Create sample enrollment trend data for demonstration
-    $publishedCount = 0;
-    if (!empty($instructorCourses)) {
-        $publishedCount = count(array_filter($instructorCourses, fn($c) => $c['status'] === 'published'));
-    }
+// Initialize empty arrays if no data
+if (empty($analytics)) {
     $analytics = [
         'overview' => [
-            'total_courses' => !empty($instructorCourses) ? count($instructorCourses) : 0,
-            'published_courses' => $publishedCount,
+            'total_courses' => 0,
+            'published_courses' => 0,
             'total_students' => 0,
             'completed_students' => 0,
             'avg_progress' => 0
         ],
-        'enrollment_trend' => [
-            ['date' => date('Y-m-d', strtotime('-6 days')), 'enrollments' => 5],
-            ['date' => date('Y-m-d', strtotime('-5 days')), 'enrollments' => 3],
-            ['date' => date('Y-m-d', strtotime('-4 days')), 'enrollments' => 8],
-            ['date' => date('Y-m-d', strtotime('-3 days')), 'enrollments' => 2],
-            ['date' => date('Y-m-d', strtotime('-2 days')), 'enrollments' => 6],
-            ['date' => date('Y-m-d', strtotime('-1 day')), 'enrollments' => 4],
-            ['date' => date('Y-m-d'), 'enrollments' => 7]
-        ],
+        'enrollment_trend' => [],
         'student_engagement' => [
-            'active_students' => 25,
-            'completed_students' => 15,
-            'in_progress_students' => 8,
-            'not_started_students' => 2
+            'active_students' => 0,
+            'completed_students' => 0,
+            'in_progress_students' => 0,
+            'not_started_students' => 0
         ],
         'course_performance' => []
     ];
@@ -141,7 +71,7 @@ if (empty($analytics) || !isset($analytics['enrollment_trend'])) {
 if (empty($earnings) || !isset($earnings['summary'])) {
     $earnings = [
         'summary' => [
-            'total_revenue' => 1500
+            'total_revenue' => 0
         ]
     ];
 }
@@ -300,7 +230,7 @@ function calculateAverage($trend) {
 .header-title {
     font-size: 2.5rem;
     font-weight: 800;
-    background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -334,7 +264,7 @@ function calculateAverage($trend) {
 .quick-stat:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    border-color: #4169E1;
+    border-color: #667eea;
 }
 
 .quick-stat-icon {
@@ -393,10 +323,10 @@ function calculateAverage($trend) {
     left: 0;
     right: 0;
     height: 4px;
-    background: linear-gradient(90deg, #4169E1, #2563EB);
+    background: linear-gradient(90deg, #667eea, #764ba2);
 }
 
-.overview-stat-card.primary::before { background: linear-gradient(90deg, #4169E1, #2563EB); }
+.overview-stat-card.primary::before { background: linear-gradient(90deg, #667eea, #764ba2); }
 .overview-stat-card.success::before { background: linear-gradient(90deg, #10b981, #059669); }
 .overview-stat-card.info::before { background: linear-gradient(90deg, #3b82f6, #1d4ed8); }
 .overview-stat-card.warning::before { background: linear-gradient(90deg, #f59e0b, #d97706); }
@@ -432,7 +362,7 @@ function calculateAverage($trend) {
     border-radius: 50%;
 }
 
-.stat-icon.primary { background: linear-gradient(135deg, #4169E1 0%, #2563EB 100%); }
+.stat-icon.primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
 .stat-icon.success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
 .stat-icon.info { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
 .stat-icon.warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
@@ -692,17 +622,6 @@ function calculateAverage($trend) {
                                  (int)($engagement['completed_students'] ?? 0) + 
                                  (int)($engagement['in_progress_students'] ?? 0) + 
                                  (int)($engagement['not_started_students'] ?? 0);
-                        
-                        // If no engagement data but we have students FROM courses_new, use that
-                        if ($total === 0 && $totalStudents > 0) {
-                            $engagement = [
-                                'active_students' => max(1, (int)($totalStudents * 0.4)),
-                                'completed_students' => max(1, (int)($totalStudents * 0.3)),
-                                'in_progress_students' => max(1, (int)($totalStudents * 0.2)),
-                                'not_started_students' => max(0, (int)($totalStudents * 0.1))
-                            ];
-                            $total = $totalStudents;
-                        }
                         ?>
                         <?php if ($total > 0): ?>
                             <div class="engagement-donut">

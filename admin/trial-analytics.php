@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_expirations']
             color: #ffc107;
         }
         .conversion-rate.low {
-            color: #dc3545;
+            color: #4169E1;
         }
         .chart-container {
             position: relative;
@@ -311,7 +311,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['process_expirations']
                 datasets: [{
                     label: 'Number of Trials',
                     data: [stats.converted_trials, stats.total_trials - stats.converted_trials],
-                    backgroundColor: ['#28a745', '#dc3545']
+                    backgroundColor: ['#28a745', '#4169E1']
                 }]
             },
             options: {

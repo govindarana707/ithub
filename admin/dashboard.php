@@ -23,8 +23,32 @@ $stats = [
     'courses' => $course->getCourseStats()
 ];
 
-// Get recent activities
+// Get system overview data
 $conn = connectDB();
+
+// Get all stats in optimized queries
+$stmt = $conn->query("SELECT COUNT(*) as total FROM users_new WHERE role = 'student'");
+$studentCount = $stmt && ($row = $stmt->fetch_assoc()) ? $row['total'] : 0;
+
+$stmt = $conn->query("SELECT COUNT(*) as total FROM users_new WHERE role = 'instructor'");
+$instructorCount = $stmt && ($row = $stmt->fetch_assoc()) ? $row['total'] : 0;
+
+$stmt = $conn->query("SELECT COUNT(*) as total FROM enrollments_new");
+$enrollmentCount = $stmt && ($row = $stmt->fetch_assoc()) ? $row['total'] : 0;
+
+$stmt = $conn->query("SELECT COUNT(*) as total FROM quiz_attempts");
+$quizAttempts = $stmt && ($row = $stmt->fetch_assoc()) ? $row['total'] : 0;
+
+$stmt = $conn->query("SELECT COUNT(*) as total FROM courses_new WHERE status = 'published'");
+$publishedCourses = $stmt && ($row = $stmt->fetch_assoc()) ? $row['total'] : 0;
+
+$stmt = $conn->query("SELECT COUNT(*) as total FROM courses_new WHERE status = 'pending'");
+$pendingCourses = $stmt && ($row = $stmt->fetch_assoc()) ? $row['total'] : 0;
+
+$stmt = $conn->query("SELECT COUNT(*) as total FROM certificates");
+$certificatesCount = $stmt && ($row = $stmt->fetch_assoc()) ? $row['total'] : 0;
+
+// Get recent activities
 $stmt = $conn->prepare("
     SELECT al.action, al.details, al.created_at, u.full_name, u.email
     FROM admin_logs al
@@ -35,49 +59,6 @@ $stmt = $conn->prepare("
 $stmt->execute();
 $recentActivities = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
-
-// Get system overview data
-$stmt = $conn->query("SELECT COUNT(*) as total FROM users_new WHERE role = 'student'");
-if ($stmt && $row = $stmt->fetch_assoc()) {
-    $studentCount = $row['total'];
-} else {
-    $studentCount = 0;
-}
-
-$stmt = $conn->query("SELECT COUNT(*) as total FROM users_new WHERE role = 'instructor'");
-if ($stmt && $row = $stmt->fetch_assoc()) {
-    $instructorCount = $row['total'];
-} else {
-    $instructorCount = 0;
-}
-
-$stmt = $conn->query("SELECT COUNT(*) as total FROM enrollments_new");
-if ($stmt && $row = $stmt->fetch_assoc()) {
-    $enrollmentCount = $row['total'];
-} else {
-    $enrollmentCount = 0;
-}
-
-$stmt = $conn->query("SELECT COUNT(*) as total FROM quiz_attempts");
-if ($stmt && $row = $stmt->fetch_assoc()) {
-    $quizAttempts = $row['total'];
-} else {
-    $quizAttempts = 0;
-}
-
-$stmt = $conn->query("SELECT COUNT(*) as total FROM courses_new WHERE status = 'published'");
-if ($stmt && $row = $stmt->fetch_assoc()) {
-    $publishedCourses = $row['total'];
-} else {
-    $publishedCourses = 0;
-}
-
-$stmt = $conn->query("SELECT COUNT(*) as total FROM certificates");
-if ($stmt && $row = $stmt->fetch_assoc()) {
-    $certificatesCount = $row['total'];
-} else {
-    $certificatesCount = 0;
-}
 
 // Get recent users
 $stmt = $conn->prepare("SELECT id, full_name, email, role, status, created_at FROM users_new ORDER BY created_at DESC LIMIT 5");
@@ -99,425 +80,576 @@ $recentCourses = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 $conn->close();
+
+// Get admin info for welcome message
+$adminName = $_SESSION['full_name'] ?? 'Administrator';
+
+// Quick stats for header
+$quickStats = [
+    'total_users' => $studentCount + $instructorCount,
+    'total_courses' => $publishedCourses,
+    'total_enrollments' => $enrollmentCount,
+    'pending_approvals' => $pendingCourses
+];
+
+// Load universal header
+require_once dirname(__DIR__) . '/includes/universal_header.php';
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - IT HUB</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        /* Modern Dashboard Styles */
-        body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
+<style>
+    /* Modern Admin Dashboard Styles */
+    .admin-dashboard {
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        min-height: 100vh;
+    }
+
+    .dashboard-header {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        margin-bottom: 2rem;
+        border: 1px solid #e5e7eb;
+    }
+
+    .header-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1.5rem;
+    }
+
+    .header-left {
+        flex: 1;
+    }
+
+    .header-title {
+        font-size: 2.5rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 0.5rem;
+    }
+
+    .header-subtitle {
+        color: #64748b;
+        font-size: 1.1rem;
+        margin: 0;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+    }
+
+    .btn-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        background: white;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .btn-icon:hover {
+        background: #f8fafc;
+        border-color: #667eea;
+        color: #667eea;
+        transform: translateY(-2px);
+    }
+
+    /* Quick Stats Bar */
+    .quick-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .quick-stat {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: #f8fafc;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        transition: all 0.3s ease;
+    }
+
+    .quick-stat:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border-color: #667eea;
+    }
+
+    .quick-stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        color: white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .quick-stat-icon.primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .quick-stat-icon.success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .quick-stat-icon.info {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    }
+
+    .quick-stat-icon.warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+
+    .quick-stat-content {
+        flex: 1;
+    }
+
+    .quick-stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 0.25rem;
+        line-height: 1;
+    }
+
+    .quick-stat-label {
+        font-size: 0.875rem;
+        color: #64748b;
+        font-weight: 500;
+    }
+
+    /* Overview Stats Grid */
+    .overview-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .overview-stat-card {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        border: 1px solid #e5e7eb;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .overview-stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+    }
+
+    .overview-stat-card.primary::before {
+        background: linear-gradient(90deg, #667eea, #764ba2);
+    }
+
+    .overview-stat-card.success::before {
+        background: linear-gradient(90deg, #10b981, #059669);
+    }
+
+    .overview-stat-card.info::before {
+        background: linear-gradient(90deg, #3b82f6, #2563eb);
+    }
+
+    .overview-stat-card.warning::before {
+        background: linear-gradient(90deg, #f59e0b, #d97706);
+    }
+
+    .overview-stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+    }
+
+    .stat-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+        margin: 0 auto 1.5rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .stat-icon::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(45deg, rgba(255,255,255,0.2), transparent);
+        border-radius: 50%;
+    }
+
+    .stat-icon.primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .stat-icon.success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .stat-icon.info {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    }
+
+    .stat-icon.warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #1e293b;
+        margin-bottom: 0.5rem;
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        color: #64748b;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Content Cards */
+    .admin-content-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        border: 1px solid #e5e7eb;
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+
+    .admin-card-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #e5e7eb;
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    }
+
+    .admin-card-header h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0;
+    }
+
+    .admin-card-header h3 i {
+        color: #667eea;
+    }
+
+    /* Modern Table */
+    .admin-table {
+        margin: 0;
+    }
+
+    .admin-table thead th {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 1rem 1.5rem;
+        border: none;
+    }
+
+    .admin-table tbody td {
+        padding: 1rem 1.5rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .admin-table tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    .admin-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    /* Avatar Placeholder */
+    .avatar-placeholder {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    /* Badges */
+    .badge {
+        padding: 0.5rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .badge.bg-success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    }
+
+    .badge.bg-warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+    }
+
+    .badge.bg-info {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    }
+
+    .badge.bg-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    }
+
+    /* Buttons */
+    .admin-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    .admin-btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .admin-btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .header-content {
+            flex-direction: column;
+            gap: 1rem;
         }
 
-        /* Modern Dashboard Header */
+        .header-title {
+            font-size: 1.75rem;
+        }
+
+        .header-actions {
+            width: 100%;
+            justify-content: flex-start;
+        }
+
+        .quick-stats {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .overview-stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
         .dashboard-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px 30px;
-            border-radius: 20px;
-            margin-bottom: 30px;
-            position: relative;
-            overflow: hidden;
+            padding: 1.5rem;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .overview-stats-grid {
+            grid-template-columns: 1fr;
         }
 
-        .dashboard-header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><defs><pattern id=\"grain\" width=\"100\" height=\"100\" patternUnits=\"userSpaceOnUse\"><circle cx=\"25\" cy=\"25\" r=\"1\" fill=\"white\" opacity=\"0.1\"/><circle cx=\"75\" cy=\"75\" r=\"1\" fill=\"white\" opacity=\"0.1\"/><circle cx=\"50\" cy=\"10\" r=\"1\" fill=\"white\" opacity=\"0.1\"/><circle cx=\"10\" cy=\"50\" r=\"1\" fill=\"white\" opacity=\"0.1\"/><circle cx=\"90\" cy=\"30\" r=\"1\" fill=\"white\" opacity=\"0.1\"/></pattern></defs><rect width=\"100\" height=\"100\" fill=\"url(%23grain)\"/></svg>') repeat;
-            opacity: 0.3;
+        .quick-stats {
+            grid-template-columns: 1fr;
         }
+    }
 
-        .dashboard-header h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 10px;
-            position: relative;
-            z-index: 1;
+    /* Animations */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
         }
-
-        .dashboard-header p {
-            font-size: 1.1rem;
-            opacity: 0.9;
-            margin-bottom: 0;
-            position: relative;
-            z-index: 1;
+        to {
+            opacity: 1;
+            transform: translateY(0);
         }
+    }
 
-        /* Enhanced Stats Cards */
-        .stat-card {
-            background: white;
-            border-radius: 16px;
-            padding: 25px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            border-top: 4px solid;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
+    .overview-stat-card {
+        animation: fadeInUp 0.6s ease-out;
+    }
 
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, var(--card-color) 0%, var(--card-color-light) 100%);
-            opacity: 0.05;
-            transition: opacity 0.3s ease;
-        }
+    .overview-stat-card:nth-child(1) { animation-delay: 0.1s; }
+    .overview-stat-card:nth-child(2) { animation-delay: 0.2s; }
+    .overview-stat-card:nth-child(3) { animation-delay: 0.3s; }
+    .overview-stat-card:nth-child(4) { animation-delay: 0.4s; }
 
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-        }
+    .admin-content-card {
+        animation: fadeInUp 0.6s ease-out;
+        animation-delay: 0.5s;
+        animation-fill-mode: both;
+    }
+</style>
 
-        .stat-card:hover::before {
-            opacity: 0.1;
-        }
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-md-3">
+            <?php require_once 'includes/sidebar.php'; ?>
+        </div>
 
-        .stat-card.primary {
-            border-top-color: #667eea;
-            --card-color: #667eea;
-            --card-color-light: #764ba2;
-        }
-
-        .stat-card.success {
-            border-top-color: #10b981;
-            --card-color: #10b981;
-            --card-color-light: #059669;
-        }
-
-        .stat-card.warning {
-            border-top-color: #f59e0b;
-            --card-color: #f59e0b;
-            --card-color-light: #d97706;
-        }
-
-        .stat-card.info {
-            border-top-color: #3b82f6;
-            --card-color: #3b82f6;
-            --card-color-light: #2563eb;
-        }
-
-        .stat-card.danger {
-            border-top-color: #ef4444;
-            --card-color: #ef4444;
-            --card-color-light: #dc2626;
-        }
-
-        .stat-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            margin-bottom: 15px;
-            color: white;
-            position: relative;
-            z-index: 1;
-        }
-
-        .stat-card.primary .stat-icon {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-
-        .stat-card.success .stat-icon {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-        }
-
-        .stat-card.warning .stat-icon {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-        }
-
-        .stat-card.info .stat-icon {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        }
-
-        .stat-card.danger .stat-icon {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-        }
-
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #1e293b;
-            margin-bottom: 5px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .stat-label {
-            color: #64748b;
-            font-size: 0.95rem;
-            font-weight: 500;
-            position: relative;
-            z-index: 1;
-        }
-
-        /* Enhanced Content Cards */
-        .content-card {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            margin-bottom: 30px;
-            transition: all 0.3s ease;
-        }
-
-        .content-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-        }
-
-        .card-header {
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            margin: -30px -30px 20px -30px;
-            padding: 20px 30px;
-            border-radius: 20px 20px 0 0;
-            border-bottom: 2px solid #e2e8f0;
-        }
-
-        .card-header h3 {
-            color: #1e293b;
-            font-weight: 600;
-            margin: 0;
-            font-size: 1.3rem;
-        }
-
-        /* Enhanced Tables */
-        .modern-table {
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        }
-
-        .modern-table thead {
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-        }
-
-        .modern-table th {
-            background: transparent;
-            padding: 15px;
-            font-weight: 600;
-            color: #1e293b;
-            border: none;
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .modern-table td {
-            padding: 15px;
-            border-bottom: 1px solid #f1f5f9;
-            vertical-align: middle;
-        }
-
-        .modern-table tbody tr {
-            transition: all 0.2s ease;
-        }
-
-        .modern-table tbody tr:hover {
-            background: #f8fafc;
-            transform: scale(1.01);
-        }
-
-        /* Enhanced Badges */
-        .badge {
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* Enhanced Buttons */
-        .btn-modern {
-            padding: 10px 20px;
-            border-radius: 10px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            border: none;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-modern:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        .btn-primary-modern {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        /* Animations */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .stat-card {
-            animation: fadeInUp 0.5s ease forwards;
-        }
-
-        .stat-card:nth-child(1) { animation-delay: 0.1s; }
-        .stat-card:nth-child(2) { animation-delay: 0.2s; }
-        .stat-card:nth-child(3) { animation-delay: 0.3s; }
-        .stat-card:nth-child(4) { animation-delay: 0.4s; }
-        .stat-card:nth-child(5) { animation-delay: 0.5s; }
-
-        .content-card {
-            animation: fadeInUp 0.5s ease forwards;
-        }
-
-        .content-card:nth-child(2) { animation-delay: 0.2s; }
-        .content-card:nth-child(3) { animation-delay: 0.4s; }
-
-        /* Admin Badge */
-        .admin-badge {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container-fluid py-4">
-        <div class="row">
-            <div class="col-md-3">
-                <?php require_once 'includes/sidebar.php'; ?>
-            </div>
-            
             <div class="col-md-9">
                 <!-- Modern Dashboard Header -->
                 <div class="dashboard-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h1><i class="fas fa-shield-alt me-3"></i>Admin Dashboard</h1>
-                            <p>System management and overview</p>
+                    <div class="header-content">
+                        <div class="header-left">
+                            <h1 class="header-title">Admin Dashboard</h1>
+                            <p class="header-subtitle">Welcome back, <?php echo htmlspecialchars($adminName); ?>! Here's your system overview.</p>
                         </div>
-                        <div class="admin-badge">
-                            <i class="fas fa-user-shield"></i>
-                            <span>Administrator</span>
+                        <div class="header-actions">
+                            <button class="btn btn-primary" onclick="window.location.href='users.php'">
+                                <i class="fas fa-users me-2"></i>Manage Users
+                            </button>
+                            <button class="btn-icon" onclick="refreshDashboard()">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
                         </div>
                     </div>
-                </div>
 
-                <!-- System Overview Stats -->
-                <div class="row mb-4">
-                    <div class="col-md-3 mb-3">
-                        <div class="stat-card primary">
-                            <div class="stat-icon">
-                                <i class="fas fa-user-graduate"></i>
-                            </div>
-                            <div class="stat-value"><?php echo $studentCount; ?></div>
-                            <div class="stat-label">Total Students</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="stat-card success">
-                            <div class="stat-icon">
-                                <i class="fas fa-chalkboard-teacher"></i>
-                            </div>
-                            <div class="stat-value"><?php echo $instructorCount; ?></div>
-                            <div class="stat-label">Instructors</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="stat-card info">
-                            <div class="stat-icon">
-                                <i class="fas fa-book"></i>
-                            </div>
-                            <div class="stat-value"><?php echo $publishedCourses; ?></div>
-                            <div class="stat-label">Published Courses</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="stat-card warning">
-                            <div class="stat-icon">
-                                <i class="fas fa-certificate"></i>
-                            </div>
-                            <div class="stat-value"><?php echo $certificatesCount; ?></div>
-                            <div class="stat-label">Certificates</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Additional Stats Row -->
-                <div class="row mb-4">
-                    <div class="col-md-4 mb-3">
-                        <div class="stat-card danger">
-                            <div class="stat-icon">
+                    <!-- Quick Stats Bar -->
+                    <div class="quick-stats">
+                        <div class="quick-stat">
+                            <div class="quick-stat-icon primary">
                                 <i class="fas fa-users"></i>
                             </div>
-                            <div class="stat-value"><?php echo $enrollmentCount; ?></div>
-                            <div class="stat-label">Total Enrollments</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <div class="stat-card info">
-                            <div class="stat-icon">
-                                <i class="fas fa-clipboard-check"></i>
+                            <div class="quick-stat-content">
+                                <div class="quick-stat-value"><?php echo $quickStats['total_users']; ?></div>
+                                <div class="quick-stat-label">Total Users</div>
                             </div>
-                            <div class="stat-value"><?php echo $quizAttempts; ?></div>
-                            <div class="stat-label">Quiz Attempts</div>
                         </div>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <div class="stat-card primary">
-                            <div class="stat-icon">
-                                <i class="fas fa-chart-line"></i>
+                        <div class="quick-stat">
+                            <div class="quick-stat-icon success">
+                                <i class="fas fa-book"></i>
                             </div>
-                            <div class="stat-value"><?php echo round(($publishedCourses / max($instructorCount, 1)), 1); ?></div>
-                            <div class="stat-label">Avg Courses/Instructor</div>
+                            <div class="quick-stat-content">
+                                <div class="quick-stat-value"><?php echo $quickStats['total_courses']; ?></div>
+                                <div class="quick-stat-label">Published Courses</div>
+                            </div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-icon info">
+                                <i class="fas fa-user-check"></i>
+                            </div>
+                            <div class="quick-stat-content">
+                                <div class="quick-stat-value"><?php echo $quickStats['total_enrollments']; ?></div>
+                                <div class="quick-stat-label">Total Enrollments</div>
+                            </div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-icon warning">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="quick-stat-content">
+                                <div class="quick-stat-value"><?php echo $quickStats['pending_approvals']; ?></div>
+                                <div class="quick-stat-label">Pending Approvals</div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-<!-- Recent Users Card -->
-                <div class="content-card">
-                    <div class="card-header">
+                <!-- Overview Stats Cards -->
+                <div class="overview-stats-grid">
+                    <div class="overview-stat-card primary">
+                        <div class="stat-icon primary">
+                            <i class="fas fa-user-graduate"></i>
+                        </div>
+                        <div class="stat-value"><?php echo $studentCount; ?></div>
+                        <div class="stat-label">Total Students</div>
+                        <small class="text-muted mt-2 d-block">Active Learners</small>
+                    </div>
+                    <div class="overview-stat-card success">
+                        <div class="stat-icon success">
+                            <i class="fas fa-chalkboard-teacher"></i>
+                        </div>
+                        <div class="stat-value"><?php echo $instructorCount; ?></div>
+                        <div class="stat-label">Total Instructors</div>
+                        <small class="text-muted mt-2 d-block">Content Creators</small>
+                    </div>
+                    <div class="overview-stat-card info">
+                        <div class="stat-icon info">
+                            <i class="fas fa-book-open"></i>
+                        </div>
+                        <div class="stat-value"><?php echo $publishedCourses; ?></div>
+                        <div class="stat-label">Published Courses</div>
+                        <small class="text-muted mt-2 d-block">Live Content</small>
+                    </div>
+                    <div class="overview-stat-card warning">
+                        <div class="stat-icon warning">
+                            <i class="fas fa-certificate"></i>
+                        </div>
+                        <div class="stat-value"><?php echo $certificatesCount; ?></div>
+                        <div class="stat-label">Certificates Issued</div>
+                        <small class="text-muted mt-2 d-block">Achievements</small>
+                    </div>
+                </div>
+
+                <!-- Recent Users Card -->
+                <div class="admin-content-card">
+                    <div class="admin-card-header">
                         <div class="d-flex justify-content-between align-items-center">
                             <h3><i class="fas fa-users me-2"></i>Recent Users</h3>
-                            <a href="users.php" class="btn-modern btn-primary-modern">
+                            <a href="users.php" class="admin-btn admin-btn-primary">
                                 <i class="fas fa-arrow-right"></i>
                                 View All
                             </a>
                         </div>
                     </div>
                     <div class="table-responsive">
-                        <table class="table modern-table">
+                        <table class="table admin-table">
                             <thead>
                                 <tr>
                                     <th>Name</th>
@@ -532,7 +664,7 @@ $conn->close();
                                     <tr>
                                         <td>
                                             <div class="d-flex align-items-center gap-2">
-                                                <div class="avatar-placeholder" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                                                <div class="avatar-placeholder">
                                                     <?php echo strtoupper(substr($user['full_name'], 0, 1)); ?>
                                                 </div>
                                                 <span><?php echo htmlspecialchars($user['full_name']); ?></span>
@@ -541,7 +673,7 @@ $conn->close();
                                         <td><?php echo htmlspecialchars($user['email']); ?></td>
                                         <td><span class="badge bg-info"><?php echo ucfirst($user['role']); ?></span></td>
                                         <td>
-                                            <span class="badge bg-<?php echo $user['status'] === 'active' ? 'success' : ($user['status'] === 'blocked' ? 'danger' : 'warning'); ?>">
+                                            <span class="badge bg-<?php echo $user['status'] === 'active' ? 'success' : ($user['status'] === 'blocked' ? 'primary' : 'warning'); ?>">
                                                 <?php echo ucfirst($user['status']); ?>
                                             </span>
                                         </td>
@@ -554,18 +686,18 @@ $conn->close();
                 </div>
 
                 <!-- Recent Courses Card -->
-                <div class="content-card">
-                    <div class="card-header">
+                <div class="admin-content-card">
+                    <div class="admin-card-header">
                         <div class="d-flex justify-content-between align-items-center">
                             <h3><i class="fas fa-book me-2"></i>Recent Courses</h3>
-                            <a href="courses.php" class="btn-modern btn-primary-modern">
+                            <a href="courses.php" class="admin-btn admin-btn-primary">
                                 <i class="fas fa-arrow-right"></i>
                                 View All
                             </a>
                         </div>
                     </div>
                     <div class="table-responsive">
-                        <table class="table modern-table">
+                        <table class="table admin-table">
                             <thead>
                                 <tr>
                                     <th>Course Title</th>
@@ -580,7 +712,7 @@ $conn->close();
                                     <tr>
                                         <td>
                                             <div class="d-flex align-items-center gap-2">
-                                                <i class="fas fa-book text-primary"></i>
+                                                <i class="fas fa-book text-primary" style="color: #667eea !important;"></i>
                                                 <span><?php echo htmlspecialchars($course['title']); ?></span>
                                             </div>
                                         </td>
@@ -602,50 +734,24 @@ $conn->close();
         </div>
     </div>
 
-    <!-- Enhanced JavaScript -->
     <script>
-        // Enhanced animations on page load
+        function refreshDashboard() {
+            location.reload();
+        }
+
+        // Add hover effects to stat cards
         document.addEventListener('DOMContentLoaded', function() {
-            // Animate stat cards
-            const statCards = document.querySelectorAll('.stat-card');
-            statCards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                
-                setTimeout(() => {
-                    card.style.transition = 'all 0.5s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 100);
-            });
-
-            // Animate content cards
-            const contentCards = document.querySelectorAll('.content-card');
-            contentCards.forEach((card, index) => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                
-                setTimeout(() => {
-                    card.style.transition = 'all 0.5s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, 500 + (index * 200));
-            });
-
-            // Add hover effects to stat cards
+            const statCards = document.querySelectorAll('.overview-stat-card');
             statCards.forEach(card => {
                 card.addEventListener('mouseenter', function() {
-                    this.style.transform = 'translateY(-5px) scale(1.02)';
+                    this.style.transform = 'translateY(-4px) scale(1.02)';
                 });
-                
+
                 card.addEventListener('mouseleave', function() {
                     this.style.transform = 'translateY(0) scale(1)';
                 });
             });
         });
     </script>
-
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+<?php
+// End of admin dashboard - universal_header.php will close body and html

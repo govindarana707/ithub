@@ -23,7 +23,7 @@ try {
     $stmt = $conn->prepare("
         SELECT role, COUNT(*) as count,
                COUNT(CASE WHEN created_at >= ? THEN 1 END) as new_count
-        FROM users 
+        FROM users_new 
         GROUP BY role
     ");
     if ($stmt) {
@@ -74,7 +74,7 @@ try {
 try {
     $stmt = $conn->prepare("
         SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as count 
-        FROM users 
+        FROM users_new 
         WHERE created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
         GROUP BY DATE_FORMAT(created_at, '%Y-%m')
         ORDER BY month
@@ -266,7 +266,7 @@ try {
     $stmt = $conn->prepare("
         SELECT DATE(created_at) as date, COUNT(*) as activity_count
         FROM (
-            SELECT created_at FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            SELECT created_at FROM users_new WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
             UNION ALL
             SELECT enrolled_at as created_at FROM enrollments WHERE enrolled_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
             UNION ALL
@@ -289,361 +289,241 @@ try {
 
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Analytics Dashboard - IT HUB</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .analytics-card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            margin-bottom: 25px;
-            transition: all 0.3s ease;
-            border-left: 4px solid transparent;
-        }
-        .analytics-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        }
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px;
-            padding: 25px;
-            text-align: center;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 200%;
-            height: 200%;
-            background: rgba(255,255,255,0.1);
-            transform: rotate(45deg);
-            transition: all 0.5s ease;
-        }
-        .stat-card:hover::before {
-            right: -30%;
-        }
-        .stat-card h3 {
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin: 0;
-            position: relative;
-            z-index: 1;
-        }
-        .stat-card.primary { background: linear-gradient(135deg, #007bff, #0056b3); }
-        .stat-card.success { background: linear-gradient(135deg, #28a745, #1e7e34); }
-        .stat-card.warning { background: linear-gradient(135deg, #ffc107, #e0a800); }
-        .stat-card.danger { background: linear-gradient(135deg, #dc3545, #c82333); }
-        .stat-card.info { background: linear-gradient(135deg, #17a2b8, #138496); }
-        .chart-container {
-            position: relative;
-            height: 300px;
-            margin-top: 20px;
-        }
-        .progress-ring {
-            width: 120px;
-            height: 120px;
-            margin: 0 auto;
-        }
-        .progress-ring svg {
-            transform: rotate(-90deg);
-        }
-        .progress-ring circle {
-            fill: none;
-            stroke-width: 8;
-        }
-        .progress-ring .background {
-            stroke: rgba(255,255,255,0.3);
-        }
-        .progress-ring .progress {
-            stroke: white;
-            stroke-linecap: round;
-            transition: stroke-dashoffset 0.5s ease;
-        }
-        .date-filter {
-            background: white;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 25px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-        .metric-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            border: 1px solid #e9ecef;
-            transition: all 0.3s ease;
-        }
-        .metric-card:hover {
-            border-color: #007bff;
-            box-shadow: 0 4px 15px rgba(0,123,255,0.1);
-        }
-        .metric-card .metric-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #495057;
-        }
-        .metric-card .metric-label {
-            color: #6c757d;
-            font-size: 0.9rem;
-            margin-top: 5px;
-        }
-        .metric-card .metric-change {
-            font-size: 0.8rem;
-            margin-top: 10px;
-        }
-        .metric-change.positive { color: #28a745; }
-        .metric-change.negative { color: #dc3545; }
-        .table-responsive {
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        .custom-table {
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        .custom-table thead {
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-        }
-        .custom-table th {
-            border: none;
-            font-weight: 600;
-            color: #495057;
-            padding: 15px;
-        }
-        .custom-table td {
-            padding: 12px 15px;
-            vertical-align: middle;
-        }
-        .badge-custom {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-weight: 500;
-        }
-        .loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255,255,255,0.9);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            border-radius: 15px;
-        }
-        .analytics-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px 0;
-            margin: -25px -25px 25px -25px;
-            border-radius: 15px 15px 0 0;
-        }
-        .insights-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-shield me-1"></i> Admin
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="dashboard.php">Dashboard</a></li>
-                        <li><a class="dropdown-item" href="users.php">User Management</a></li>
-                        <li><a class="dropdown-item" href="courses.php">Course Management</a></li>
-                        <li><a class="dropdown-item" href="analytics.php">Analytics</a></li>
-                        <li><a class="dropdown-item" href="settings.php">Settings</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
-                    </ul>
-                </div>
-            </div>
+<?php require_once dirname(__DIR__) . '/includes/universal_header.php'; ?>
+
+<link rel="stylesheet" href="../assets/css/admin-theme.css">
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+/* Analytics-specific styles */
+.analytics-card {
+    background: var(--admin-bg-primary);
+    border-radius: var(--admin-radius-xl);
+    border: 1px solid var(--admin-border);
+    box-shadow: var(--admin-shadow-sm);
+    margin-bottom: 25px;
+    overflow: hidden;
+}
+
+.analytics-card .card-header {
+    background: linear-gradient(135deg, var(--admin-bg-secondary) 0%, #f1f5f9 100%);
+    border-bottom: 1px solid var(--admin-border);
+    padding: 20px 25px;
+    font-weight: 600;
+}
+
+.analytics-card .card-body {
+    padding: 25px;
+}
+
+.date-filter {
+    background: var(--admin-bg-secondary);
+    border-radius: var(--admin-radius-xl);
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid var(--admin-border);
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin-top: 20px;
+}
+
+.metric-card {
+    background: var(--admin-bg-primary);
+    border-radius: var(--admin-radius-xl);
+    padding: 25px;
+    text-align: center;
+    border: 1px solid var(--admin-border);
+    box-shadow: var(--admin-shadow-sm);
+    transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--admin-shadow-lg);
+    border-color: var(--admin-primary-light);
+}
+
+.metric-card .metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--admin-text-primary);
+}
+
+.metric-card .metric-label {
+    color: var(--admin-text-secondary);
+    font-size: 0.9rem;
+    margin-top: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-card .metric-change {
+    font-size: 0.85rem;
+    margin-top: 10px;
+    font-weight: 500;
+}
+
+.metric-card .metric-change.positive { color: var(--admin-success); }
+.metric-card .metric-change.negative { color: var(--admin-danger); }
+
+.custom-table {
+    background: white;
+    border-radius: var(--admin-radius-lg);
+    overflow: hidden;
+}
+
+.custom-table thead {
+    background: var(--admin-bg-secondary);
+}
+
+.custom-table th {
+    border: none;
+    font-weight: 600;
+    color: var(--admin-text-primary);
+    padding: 15px;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+}
+
+.custom-table td {
+    padding: 12px 15px;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--admin-border-light);
+}
+
+.custom-table tbody tr:hover {
+    background: var(--admin-bg-secondary);
+}
+
+.badge-custom {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.insights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+</style>
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3">
+            <?php require_once 'includes/sidebar.php'; ?>
         </div>
-    </nav>
-
-    <div class="container-fluid py-4">
-        <div class="row">
-            <div class="col-md-3">
-                <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="users.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-users-cog me-2"></i> User Management
-                    </a>
-                    <a href="courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-book-open me-2"></i> Course Management
-                    </a>
-                    <a href="categories.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tags me-2"></i> Categories
-                    </a>
-                    <a href="analytics.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-chart-line me-2"></i> Analytics
-                    </a>
-                    <a href="reports.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-file-alt me-2"></i> Reports
-                    </a>
-                    <a href="logs.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-list-alt me-2"></i> Activity Logs
-                    </a>
-                    <a href="settings.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-cog me-2"></i> Settings
-                    </a>
+        
+        <!-- Main Content -->
+        <div class="col-md-9">
+            <!-- Admin Dashboard Header -->
+            <div class="admin-dashboard-header mb-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="mb-1">📊 Analytics Dashboard</h2>
+                        <p class="mb-0 opacity-75">Real-time insights and performance metrics</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <button class="btn-modern btn-secondary-modern" onclick="refreshAnalytics()">
+                            <i class="fas fa-sync-alt me-2"></i>Refresh
+                        </button>
+                        <span class="admin-badge">Administrator</span>
+                    </div>
                 </div>
             </div>
-            
-            <div class="col-md-9">
-                <div class="analytics-card">
-                    <div class="analytics-header">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h1 class="mb-2">Advanced Analytics Dashboard</h1>
-                                <p class="mb-0 opacity-75">Real-time insights and performance metrics</p>
-                            </div>
-                            <div class="d-flex align-items-center gap-3">
-                                <span class="badge bg-light text-dark">Administrator</span>
-                                <button class="btn btn-light btn-sm" onclick="refreshAnalytics()">
-                                    <i class="fas fa-sync-alt me-1"></i>Refresh
-                                </button>
-                            </div>
+
+            <!-- Date Range Filter -->
+            <div class="date-filter">
+                <div class="row align-items-center">
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Date Range</label>
+                        <select class="form-select" id="dateRange" onchange="updateDateRange()">
+                            <option value="7" <?php echo $dateRange == '7' ? 'selected' : ''; ?>>Last 7 Days</option>
+                            <option value="30" <?php echo $dateRange == '30' ? 'selected' : ''; ?>>Last 30 Days</option>
+                            <option value="90" <?php echo $dateRange == '90' ? 'selected' : ''; ?>>Last 3 Months</option>
+                            <option value="365" <?php echo $dateRange == '365' ? 'selected' : ''; ?>>Last Year</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">From</label>
+                        <input type="date" class="form-control" id="startDate" value="<?php echo $startDate; ?>">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">To</label>
+                        <input type="date" class="form-control" id="endDate" value="<?php echo $endDate; ?>">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">&nbsp;</label>
+                        <button class="btn-modern btn-primary-modern w-100" onclick="applyCustomDateRange()">
+                            <i class="fas fa-filter me-2"></i>Apply Filter
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Key Metrics Overview -->
+            <div class="row mb-4">
+                <?php foreach ($userStats as $stat): ?>
+                    <div class="col-md-3">
+                        <div class="admin-stat-card <?php echo getRoleCardColor($stat['role']); ?>">
+                            <div class="admin-stat-icon"><i class="fas fa-<?php echo getRoleIcon($stat['role']); ?>"></i></div>
+                            <div class="admin-stat-value"><?php echo number_format($stat['count']); ?></div>
+                            <div class="admin-stat-label"><?php echo ucfirst($stat['role']); ?>s</div>
+                            <small class="text-success">+<?php echo $stat['new_count']; ?> new</small>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <!-- Revenue and Performance Metrics -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <div class="metric-value text-success">Rs<?php echo number_format(array_sum(array_column($monthlyRevenue, 'revenue')), 2); ?></div>
+                        <div class="metric-label">Total Revenue</div>
+                        <div class="metric-change positive">
+                            <i class="fas fa-arrow-up me-1"></i>+12.5%
                         </div>
                     </div>
                 </div>
-
-                <!-- Date Range Filter -->
-                <div class="date-filter">
-                    <div class="row align-items-center">
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold">Date Range</label>
-                            <select class="form-select" id="dateRange" onchange="updateDateRange()">
-                                <option value="7" <?php echo $dateRange == '7' ? 'selected' : ''; ?>>Last 7 Days</option>
-                                <option value="30" <?php echo $dateRange == '30' ? 'selected' : ''; ?>>Last 30 Days</option>
-                                <option value="90" <?php echo $dateRange == '90' ? 'selected' : ''; ?>>Last 3 Months</option>
-                                <option value="365" <?php echo $dateRange == '365' ? 'selected' : ''; ?>>Last Year</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold">From</label>
-                            <input type="date" class="form-control" id="startDate" value="<?php echo $startDate; ?>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold">To</label>
-                            <input type="date" class="form-control" id="endDate" value="<?php echo $endDate; ?>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold">&nbsp;</label>
-                            <button class="btn btn-primary w-100" onclick="applyCustomDateRange()">
-                                <i class="fas fa-filter me-1"></i>Apply Filter
-                            </button>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <div class="metric-value text-primary"><?php echo round($quizStats['avg_score'], 1); ?>%</div>
+                        <div class="metric-label">Avg Quiz Score</div>
+                        <div class="metric-change positive">
+                            <i class="fas fa-arrow-up me-1"></i>+3.2%
                         </div>
                     </div>
                 </div>
-
-                <!-- Key Metrics Overview -->
-                <div class="row mb-4">
-                    <?php foreach ($userStats as $stat): ?>
-                        <div class="col-md-3">
-                            <div class="stat-card <?php echo getRoleCardColor($stat['role']); ?>">
-                                <div class="loading-overlay">
-                                    <div class="spinner-border text-primary" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                </div>
-                                <h3><?php echo number_format($stat['count']); ?></h3>
-                                <p class="mb-2"><?php echo ucfirst($stat['role']); ?>s</p>
-                                <small class="opacity-75">
-                                    <i class="fas fa-<?php echo getRoleIcon($stat['role']); ?> me-1"></i>
-                                    +<?php echo $stat['new_count']; ?> new
-                                </small>
-                                <div class="progress-ring mt-3">
-                                    <svg width="120" height="120">
-                                        <circle class="background" cx="60" cy="60" r="50"></circle>
-                                        <circle class="progress" cx="60" cy="60" r="50" 
-                                            stroke-dasharray="314" 
-                                            stroke-dashoffset="<?php echo 314 - (314 * ($stat['new_count'] / max($stat['count'], 1))) / 100; ?>">
-                                        </circle>
-                                    </svg>
-                                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px; font-weight: bold;">
-                                        <?php echo round(($stat['new_count'] / max($stat['count'], 1)) * 100); ?>%
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-
-                <!-- Revenue and Performance Metrics -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value text-success">Rs<?php echo number_format(array_sum(array_column($monthlyRevenue, 'revenue')), 2); ?></div>
-                            <div class="metric-label">Total Revenue</div>
-                            <div class="metric-change positive">
-                                <i class="fas fa-arrow-up me-1"></i>+12.5%
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value text-primary"><?php echo round($quizStats['avg_score'], 1); ?>%</div>
-                            <div class="metric-label">Avg Quiz Score</div>
-                            <div class="metric-change positive">
-                                <i class="fas fa-arrow-up me-1"></i>+3.2%
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value text-info"><?php echo $certificateStats['total']; ?></div>
-                            <div class="metric-label">Certificates Issued</div>
-                            <div class="metric-change positive">
-                                <i class="fas fa-arrow-up me-1"></i>+<?php echo $certificateStats['new_certificates']; ?>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value text-warning"><?php echo round($progressStats['overall_avg'], 1); ?>%</div>
-                            <div class="metric-label">Avg Progress</div>
-                            <div class="metric-change positive">
-                                <i class="fas fa-arrow-up me-1"></i>+5.8%
-                            </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <div class="metric-value text-info"><?php echo $certificateStats['total']; ?></div>
+                        <div class="metric-label">Certificates Issued</div>
+                        <div class="metric-change positive">
+                            <i class="fas fa-arrow-up me-1"></i>+<?php echo $certificateStats['new_certificates']; ?>
                         </div>
                     </div>
                 </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <div class="metric-value text-warning"><?php echo round($progressStats['overall_avg'], 1); ?>%</div>
+                        <div class="metric-label">Avg Progress</div>
+                        <div class="metric-change positive">
+                            <i class="fas fa-arrow-up me-1"></i>+5.8%
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                <!-- Charts Row -->
-                <div class="row mb-4">
+            <!-- Charts Row -->
+            <div class="row mb-4">
                     <div class="col-md-6">
                         <div class="analytics-card">
                             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -674,8 +554,8 @@ try {
                     </div>
                 </div>
 
-                <!-- Revenue and Activity Charts -->
-                <div class="row mb-4">
+            <!-- Revenue and Activity Charts -->
+            <div class="row mb-4">
                     <div class="col-md-8">
                         <div class="analytics-card">
                             <h5 class="mb-3">Revenue Analytics</h5>
@@ -694,8 +574,8 @@ try {
                     </div>
                 </div>
 
-                <!-- Progress Distribution -->
-                <div class="row mb-4">
+            <!-- Progress Distribution -->
+            <div class="row mb-4">
                     <div class="col-md-6">
                         <div class="analytics-card">
                             <h5 class="mb-3">Student Progress Distribution</h5>
@@ -714,12 +594,12 @@ try {
                     </div>
                 </div>
 
-                <!-- Top Courses Table -->
-                <div class="analytics-card">
+            <!-- Top Courses Table -->
+            <div class="analytics-card">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0">Top Performing Courses</h5>
-                        <button class="btn btn-outline-primary btn-sm" onclick="exportAnalytics('courses')">
-                            <i class="fas fa-download me-1"></i>Export
+                        <button class="btn-modern btn-secondary-modern btn-sm" onclick="exportAnalytics('courses')">
+                            <i class="fas fa-download me-2"></i>Export
                         </button>
                     </div>
                     <div class="table-responsive">
@@ -791,8 +671,8 @@ try {
                     </div>
                 </div>
 
-                <!-- Instructor Performance -->
-                <div class="row">
+            <!-- Instructor Performance -->
+            <div class="row">
                     <div class="col-md-12">
                         <div class="analytics-card">
                             <h5 class="mb-3">Instructor Performance</h5>
@@ -1318,8 +1198,8 @@ try {
             }
         });
     </script>
-</body>
-</html>
+
+<?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>
 
 <?php
 function getRoleCardColor($role) {

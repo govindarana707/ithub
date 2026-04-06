@@ -335,7 +335,526 @@ body {
     min-height: calc(100vh - 200px);
 }
 
-/* Navbar Styles */
+/* Global UX Principles */
+
+/* Modern Hero Section Styles */
+.modern-hero {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.modern-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+    opacity: 0.3;
+}
+
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.text-gradient {
+    background: linear-gradient(135deg, #fff 0%, #f0f0f0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.hero-stats {
+    padding: 1.5rem 0;
+}
+
+.stat-item {
+    text-align: center;
+    color: white;
+}
+
+.stat-item h3 {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.stat-item p {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin: 0;
+}
+
+.modern-btn {
+    border-radius: 50px;
+    padding: 0.75rem 2rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    position: relative;
+    overflow: hidden;
+}
+
+.modern-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.modern-btn:hover::before {
+    left: 100%;
+}
+
+.hero-image-wrapper {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+}
+
+.hero-image-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border-radius: 20px;
+}
+
+/* Modern Feature Cards */
+.modern-feature-card {
+    background: white;
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(102, 126, 234, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.modern-feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-primary);
+}
+
+.modern-feature-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 20px 40px rgba(102, 126, 234, 0.2);
+}
+
+.modern-icon-wrapper {
+    width: 70px;
+    height: 70px;
+    border-radius: 20px;
+    background: var(--gradient-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    transition: all 0.3s ease;
+}
+
+.modern-feature-card:hover .modern-icon-wrapper {
+    transform: scale(1.1) rotate(5deg);
+}
+
+.feature-learn-more {
+    margin-top: 1.5rem;
+}
+
+.btn-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-link:hover {
+    color: var(--secondary-color);
+    transform: translateX(5px);
+}
+
+/* Enhanced Animations */
+@keyframes slideInUp {
+    0% {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.hero-content > * {
+    animation: slideInUp 0.8s ease-out;
+}
+
+.hero-content > *:nth-child(1) { animation-delay: 0.1s; }
+.hero-content > *:nth-child(2) { animation-delay: 0.3s; }
+.hero-content > *:nth-child(3) { animation-delay: 0.5s; }
+.hero-content > *:nth-child(4) { animation-delay: 0.7s; }
+.hero-content > *:nth-child(5) { animation-delay: 0.9s; }
+
+/* Responsive Design */
+/* Mobile Devices (576px and below) */
+@media (max-width: 576px) {
+    .hero-section {
+        min-height: auto !important;
+        padding: 4rem 0 2rem !important;
+    }
+    
+    .hero-content {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .hero-title {
+        font-size: 2rem !important;
+        line-height: 1.2;
+    }
+    
+    .hero-subtitle {
+        font-size: 1rem !important;
+        margin-bottom: 1.5rem !important;
+    }
+    
+    .hero-stats {
+        flex-direction: column;
+        gap: 1rem;
+        margin-bottom: 2rem !important;
+    }
+    
+    .stat-item {
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        backdrop-filter: blur(10px);
+    }
+    
+    .stat-item h3 {
+        font-size: 1.5rem !important;
+    }
+    
+    .hero-buttons {
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem !important;
+    }
+    
+    .modern-btn {
+        width: 100%;
+        max-width: 280px;
+        padding: 1rem 1.5rem !important;
+    }
+    
+    .hero-image-wrapper {
+        margin-top: 2rem;
+        border-radius: 15px;
+    }
+    
+    .modern-feature-card {
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .modern-icon-wrapper {
+        width: 60px;
+        height: 60px;
+        font-size: 1.25rem;
+    }
+    
+    .section-title {
+        font-size: 1.75rem !important;
+    }
+    
+    .section-subtitle {
+        font-size: 1rem !important;
+    }
+    
+    .course-card {
+        margin-bottom: 1.5rem;
+    }
+    
+    .testimonial-card {
+        margin-bottom: 1.5rem;
+    }
+    
+    .stat-card {
+        margin-bottom: 1rem;
+        padding: 1.5rem !important;
+    }
+    
+    .stat-card h3 {
+        font-size: 1.5rem !important;
+    }
+    
+    .cta-section {
+        padding: 3rem 0 !important;
+    }
+    
+    .cta-section .section-title {
+        font-size: 1.5rem !important;
+    }
+    
+    .btn-glass {
+        width: 100%;
+        max-width: 280px;
+    }
+}
+
+/* Tablet Devices (577px to 768px) */
+@media (min-width: 577px) and (max-width: 768px) {
+    .hero-section {
+        padding: 5rem 0 3rem !important;
+    }
+    
+    .hero-title {
+        font-size: 2.5rem !important;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.1rem !important;
+    }
+    
+    .hero-stats {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1.5rem;
+    }
+    
+    .stat-item {
+        flex: 0 0 calc(50% - 0.75rem);
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        backdrop-filter: blur(10px);
+    }
+    
+    .hero-buttons {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1rem !important;
+    }
+    
+    .modern-btn {
+        min-width: 200px;
+    }
+    
+    .modern-feature-card {
+        padding: 1.75rem;
+    }
+    
+    .modern-icon-wrapper {
+        width: 65px;
+        height: 65px;
+        font-size: 1.35rem;
+    }
+    
+    .section-title {
+        font-size: 2rem !important;
+    }
+    
+    .course-card {
+        margin-bottom: 2rem;
+    }
+    
+    .testimonial-card {
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        margin-bottom: 1.5rem;
+    }
+}
+
+/* Small Desktop and Large Tablets (769px to 992px) */
+@media (min-width: 769px) and (max-width: 992px) {
+    .hero-title {
+        font-size: 3rem !important;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.2rem !important;
+    }
+    
+    .hero-stats {
+        gap: 2rem;
+    }
+    
+    .stat-item h3 {
+        font-size: 1.75rem;
+    }
+    
+    .modern-feature-card {
+        padding: 1.75rem;
+    }
+    
+    .modern-icon-wrapper {
+        width: 65px;
+        height: 65px;
+    }
+    
+    .section-title {
+        font-size: 2.25rem !important;
+    }
+}
+
+/* Large Desktop (993px to 1200px) */
+@media (min-width: 993px) and (max-width: 1200px) {
+    .hero-title {
+        font-size: 3.5rem !important;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.25rem !important;
+    }
+    
+    .stat-item h3 {
+        font-size: 2.25rem;
+    }
+    
+    .modern-feature-card {
+        padding: 1.75rem;
+    }
+}
+
+/* Extra Large Desktop (1201px and above) */
+@media (min-width: 1201px) {
+    .hero-title {
+        font-size: 4rem !important;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.3rem !important;
+    }
+    
+    .stat-item h3 {
+        font-size: 2.5rem;
+    }
+    
+    .container {
+        max-width: 1200px;
+    }
+}
+
+/* Landscape Orientation Fixes */
+@media (max-height: 600px) and (orientation: landscape) {
+    .hero-section {
+        min-height: auto !important;
+        padding: 2rem 0 !important;
+    }
+    
+    .hero-content {
+        margin-bottom: 1rem;
+    }
+    
+    .hero-title {
+        font-size: 2rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    .hero-subtitle {
+        font-size: 0.9rem !important;
+        margin-bottom: 1rem !important;
+    }
+    
+    .hero-stats {
+        margin-bottom: 1rem !important;
+    }
+    
+    .stat-item h3 {
+        font-size: 1.25rem !important;
+    }
+    
+    .stat-item p {
+        font-size: 0.8rem !important;
+    }
+    
+    .hero-buttons {
+        margin-bottom: 1rem !important;
+    }
+    
+    .modern-btn {
+        padding: 0.5rem 1.5rem !important;
+        font-size: 0.9rem !important;
+    }
+}
+
+/* High DPI Displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .hero-image {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+    
+    .modern-icon-wrapper i {
+        font-size: 1.6rem;
+    }
+}
+
+/* Touch Device Optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .modern-feature-card:hover {
+        transform: none;
+    }
+    
+    .modern-feature-card:active {
+        transform: scale(0.98);
+    }
+    
+    .modern-btn:hover::before {
+        display: none;
+    }
+    
+    .card:hover {
+        transform: none;
+    }
+    
+    .card:active {
+        transform: scale(0.98);
+    }
+    
+    .btn-link:hover {
+        transform: none;
+    }
+    
+    .btn-link:active {
+        transform: scale(0.95);
+    }
+}
+
 .navbar-brand {
     font-weight: bold;
     font-size: 1.5rem;
@@ -348,6 +867,283 @@ body {
 
 .navbar-nav .nav-link:hover {
     color: #fff !important;
+}
+
+/* Navigation Responsive Fixes */
+@media (max-width: 992px) {
+    .navbar-nav {
+        text-align: center;
+        padding: 1rem 0;
+    }
+    
+    .navbar-nav .nav-link {
+        padding: 0.75rem 1rem;
+        margin: 0.25rem 0;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .navbar-nav .nav-link:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateX(5px);
+    }
+    
+    .navbar-collapse {
+        background: rgba(0, 0, 0, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        margin-top: 1rem;
+        padding: 1rem;
+    }
+    
+    .navbar-toggler {
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .navbar-toggler:focus {
+        box-shadow: 0 0 0 0.25rem rgba(255, 255, 255, 0.25);
+    }
+}
+
+@media (max-width: 576px) {
+    .navbar-brand {
+        font-size: 1.25rem;
+    }
+    
+    .navbar {
+        padding: 0.5rem 0;
+    }
+    
+    .navbar-collapse {
+        margin: 0.5rem;
+        padding: 0.75rem;
+    }
+}
+
+/* Particles Animation Responsive Fixes */
+@media (max-width: 768px) {
+    .hero-particles {
+        display: none;
+    }
+    
+    .modern-hero::before {
+        opacity: 0.2;
+    }
+}
+
+/* Course Cards Responsive Improvements */
+@media (max-width: 768px) {
+    .course-card .card-img-top {
+        height: 200px;
+        object-fit: cover;
+    }
+    
+    .course-card .card-body {
+        padding: 1.25rem;
+    }
+    
+    .course-card .card-title {
+        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .course-card .card-text {
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+    
+    .course-meta {
+        font-size: 0.8rem;
+        margin-bottom: 1rem;
+    }
+    
+    .course-meta small {
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+}
+
+/* Testimonial Cards Responsive Improvements */
+@media (max-width: 768px) {
+    .testimonial-card {
+        padding: 1.5rem;
+    }
+    
+    .testimonial-card .card-text {
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+    
+    .testimonial-card .blockquote-footer {
+        font-size: 0.9rem;
+        margin-top: 1rem;
+    }
+    
+    .testimonial-card .fa-star {
+        font-size: 0.9rem;
+    }
+}
+
+/* Statistics Section Responsive Improvements */
+@media (max-width: 768px) {
+    .stat-card {
+        text-align: center;
+        padding: 2rem 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .stat-card h3 {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-card p {
+        font-size: 0.95rem;
+        margin: 0;
+    }
+}
+
+/* CTA Section Responsive Improvements */
+@media (max-width: 768px) {
+    .cta-section {
+        padding: 4rem 0;
+        text-align: center;
+    }
+    
+    .cta-section .section-title {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+    }
+    
+    .cta-section .section-subtitle {
+        font-size: 1rem;
+        margin-bottom: 2rem;
+        line-height: 1.6;
+    }
+    
+    .btn-glass {
+        padding: 1rem 2rem;
+        font-size: 1rem;
+        min-width: 200px;
+    }
+}
+
+/* Footer Responsive Improvements */
+@media (max-width: 768px) {
+    footer {
+        padding: 3rem 0 1rem;
+    }
+    
+    footer h5 {
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+    }
+    
+    footer ul {
+        margin-bottom: 2rem;
+    }
+    
+    footer ul li {
+        margin-bottom: 0.5rem;
+    }
+    
+    footer .social-icons a {
+        font-size: 1.25rem;
+        margin: 0 0.5rem;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .hero-section,
+    .navbar,
+    .hero-particles,
+    .btn,
+    .testimonial-card,
+    .cta-section {
+        display: none !important;
+    }
+    
+    .section {
+        padding: 2rem 0 !important;
+    }
+    
+    .modern-feature-card {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+    
+    .course-card {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+}
+
+/* Loading States */
+.loading-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Focus States for Accessibility */
+.modern-btn:focus,
+.btn-link:focus,
+.card:focus {
+    outline: 3px solid rgba(102, 126, 234, 0.5);
+    outline-offset: 2px;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    .hero-content > *,
+    .modern-feature-card,
+    .card,
+    .modern-btn,
+    .btn-link {
+        animation: none !important;
+        transition: none !important;
+    }
+    
+    .hero-particles .particle {
+        animation: none !important;
+    }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    .modern-hero {
+        background: #000;
+    }
+    
+    .hero-badge {
+        background: #fff;
+        color: #000;
+        border: 2px solid #000;
+    }
+    
+    .text-gradient {
+        background: none;
+        -webkit-text-fill-color: #fff;
+        color: #fff;
+    }
+    
+    .modern-btn {
+        border: 2px solid #fff;
+    }
+    
+    .modern-feature-card {
+        border: 2px solid #000;
+    }
 }
 
 /* Card Styles */
@@ -1741,9 +2537,11 @@ footer {
         color: #f1f5f9;
     }
 }
-/ *  
- G l o b a l  
- U X  
- P r i n c i p l e s  
- * /  
- 
+
+/* 
+   Global UX Principles
+   - Consistent design language
+   - Accessible and inclusive design
+   - Performance-optimized interactions
+   - Mobile-first responsive approach
+*/

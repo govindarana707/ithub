@@ -15,7 +15,7 @@ require_once 'includes/session_helper.php';
     <?php require_once 'includes/header.php'; ?>
 
     <!-- Hero Section -->
-    <section class="hero-section">
+    <section class="hero-section modern-hero">
         <div class="hero-particles">
             <div class="particle" style="width: 10px; height: 10px; left: 10%; animation-delay: 0s;"></div>
             <div class="particle" style="width: 15px; height: 15px; left: 20%; animation-delay: 2s;"></div>
@@ -30,31 +30,52 @@ require_once 'includes/session_helper.php';
         <div class="container">
             <div class="row align-items-center min-vh-100">
                 <div class="col-lg-6 hero-content">
-                    <h1 class="hero-title">Welcome to IT HUB</h1>
+                    <div class="hero-badge">
+                        <i class="fas fa-graduation-cap me-2"></i>
+                        <span>Learn from Industry Experts</span>
+                    </div>
+                    <h1 class="hero-title">Welcome to <span class="text-gradient">IT HUB</span></h1>
                     <p class="hero-subtitle">
                         Your premier online learning platform for IT education and professional development. 
                         Learn from industry experts, enhance your skills, and advance your career.
                     </p>
-                    <div class="hero-buttons d-flex gap-3">
+                    <div class="hero-stats d-flex gap-4 mb-4">
+                        <div class="stat-item">
+                            <h3>10,000+</h3>
+                            <p>Students</p>
+                        </div>
+                        <div class="stat-item">
+                            <h3>500+</h3>
+                            <p>Courses</p>
+                        </div>
+                        <div class="stat-item">
+                            <h3>95%</h3>
+                            <p>Success Rate</p>
+                        </div>
+                    </div>
+                    <div class="hero-buttons d-flex gap-3 flex-wrap">
                         <?php if (!isLoggedIn()): ?>
-                            <a href="register.php" class="btn btn-light btn-lg">
+                            <a href="register.php" class="btn btn-primary btn-lg modern-btn">
                                 <i class="fas fa-user-plus me-2"></i>Get Started
                             </a>
-                            <a href="courses.php" class="btn btn-outline-light btn-lg">
+                            <a href="courses.php" class="btn btn-outline-primary btn-lg modern-btn">
                                 <i class="fas fa-book me-2"></i>Browse Courses
                             </a>
                         <?php else: ?>
-                            <a href="dashboard.php" class="btn btn-light btn-lg">
+                            <a href="dashboard.php" class="btn btn-primary btn-lg modern-btn">
                                 <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
                             </a>
-                            <a href="courses.php" class="btn btn-outline-light btn-lg">
+                            <a href="courses.php" class="btn btn-outline-primary btn-lg modern-btn">
                                 <i class="fas fa-book me-2"></i>Browse Courses
                             </a>
                         <?php endif; ?>
                     </div>
                 </div>
                 <div class="col-lg-6">
-                    <img src="assets/images/hero1.png" alt="Online Learning" class="img-fluid rounded shadow hero-image">
+                    <div class="hero-image-wrapper">
+                        <img src="assets/images/hero1.png" alt="Online Learning" class="img-fluid rounded shadow hero-image">
+                        <div class="hero-image-overlay"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -70,32 +91,41 @@ require_once 'includes/session_helper.php';
             
             <div class="row g-4">
                 <div class="col-md-4 reveal">
-                    <div class="feature-card h-100">
-                        <div class="icon-wrapper">
+                    <div class="feature-card modern-feature-card h-100">
+                        <div class="icon-wrapper modern-icon-wrapper">
                             <i class="fas fa-chalkboard-teacher"></i>
                         </div>
                         <h4>Expert Instructors</h4>
                         <p>Learn from industry professionals with years of real-world experience in IT.</p>
+                        <div class="feature-learn-more">
+                            <a href="#" class="btn-link">Learn More <i class="fas fa-arrow-right"></i></a>
+                        </div>
                     </div>
                 </div>
                 
                 <div class="col-md-4 reveal" style="animation-delay: 0.2s">
-                    <div class="feature-card h-100">
-                        <div class="icon-wrapper">
+                    <div class="feature-card modern-feature-card h-100">
+                        <div class="icon-wrapper modern-icon-wrapper">
                             <i class="fas fa-laptop-code"></i>
                         </div>
                         <h4>Hands-on Learning</h4>
                         <p>Practice with real projects and assignments to build practical skills.</p>
+                        <div class="feature-learn-more">
+                            <a href="#" class="btn-link">Learn More <i class="fas fa-arrow-right"></i></a>
+                        </div>
                     </div>
                 </div>
                 
                 <div class="col-md-4 reveal" style="animation-delay: 0.4s">
-                    <div class="feature-card h-100">
-                        <div class="icon-wrapper">
+                    <div class="feature-card modern-feature-card h-100">
+                        <div class="icon-wrapper modern-icon-wrapper">
                             <i class="fas fa-certificate"></i>
                         </div>
                         <h4>Certification</h4>
                         <p>Earn certificates upon completion to showcase your achievements.</p>
+                        <div class="feature-learn-more">
+                            <a href="#" class="btn-link">Learn More <i class="fas fa-arrow-right"></i></a>
+                        </div>
                     </div>
                 </div>
             </div>

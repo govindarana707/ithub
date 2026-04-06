@@ -102,87 +102,59 @@ $totalPages = ceil($totalLogs / $limit);
 
 // Get unique actions for filter dropdown
 $actions = $conn->query("SELECT DISTINCT action FROM admin_logs ORDER BY action")->fetch_all(MYSQLI_ASSOC);
+
+require_once dirname(__DIR__) . '/includes/universal_header.php';
+
+function getActionBadgeClass($action) {
+    $classes = [
+        'login' => 'success',
+        'register' => 'info',
+        'course_created' => 'primary',
+        'enrollment' => 'success',
+        'quiz_completed' => 'warning',
+        'profile_updated' => 'secondary',
+        'password_changed' => 'danger',
+        'user_created' => 'primary',
+        'user_updated' => 'info',
+        'user_deleted' => 'danger'
+    ];
+    return $classes[$action] ?? 'secondary';
+}
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Activity Logs - IT HUB</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-shield me-1"></i> Admin
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="dashboard.php">Dashboard</a></li>
-                        <li><a class="dropdown-item" href="users.php">User Management</a></li>
-                        <li><a class="dropdown-item" href="courses.php">Course Management</a></li>
-                        <li><a class="dropdown-item" href="analytics.php">Analytics</a></li>
-                        <li><a class="dropdown-item" href="settings.php">Settings</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </nav>
+<link rel="stylesheet" href="../assets/css/admin-theme.css">
 
-    <div class="container-fluid py-4">
-        <div class="row">
-            <div class="col-md-3">
-                <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="users.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-users-cog me-2"></i> User Management
-                    </a>
-                    <a href="courses.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-book-open me-2"></i> Course Management
-                    </a>
-                    <a href="categories.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tags me-2"></i> Categories
-                    </a>
-                    <a href="analytics.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-line me-2"></i> Analytics
-                    </a>
-                    <a href="reports.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-file-alt me-2"></i> Reports
-                    </a>
-                    <a href="logs.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-list-alt me-2"></i> Activity Logs
-                    </a>
-                    <a href="settings.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-cog me-2"></i> Settings
-                    </a>
-                </div>
-            </div>
-            
-            <div class="col-md-9">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1>Activity Logs</h1>
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3">
+            <?php require_once 'includes/sidebar.php'; ?>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="col-md-9">
+            <!-- Admin Dashboard Header -->
+            <div class="admin-dashboard-header mb-4">
+                <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <span class="badge bg-danger">Administrator</span>
+                        <h2 class="mb-1">📋 Activity Logs</h2>
+                        <p class="mb-0 opacity-75">Monitor system activity and user actions</p>
+                    </div>
+                    <div>
+                        <span class="admin-badge">Administrator</span>
                     </div>
                 </div>
+            </div>
 
-                <!-- Filters -->
-                <div class="dashboard-card mb-4">
+            <!-- Filters -->
+            <div class="admin-content-card mb-4">
+                <div class="admin-card-header">
+                    <i class="fas fa-filter me-2"></i>
+                    Filters
+                </div>
+                <div class="card-body">
                     <form method="GET" class="row g-3">
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <label class="form-label">Action</label>
                             <select name="action" class="form-select">
                                 <option value="">All Actions</option>
@@ -194,12 +166,12 @@ $actions = $conn->query("SELECT DISTINCT action FROM admin_logs ORDER BY action"
                             </select>
                         </div>
                         
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <label class="form-label">Date From</label>
                             <input type="date" name="date_from" class="form-control" value="<?php echo htmlspecialchars($date_from); ?>">
                         </div>
                         
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <label class="form-label">Date To</label>
                             <input type="date" name="date_to" class="form-control" value="<?php echo htmlspecialchars($date_to); ?>">
                         </div>
@@ -207,31 +179,37 @@ $actions = $conn->query("SELECT DISTINCT action FROM admin_logs ORDER BY action"
                         <div class="col-md-3">
                             <label class="form-label">&nbsp;</label>
                             <div class="d-flex gap-2">
-                                <button type="submit" class="btn btn-primary">Filter</button>
-                                <a href="logs.php" class="btn btn-outline-secondary">Clear</a>
+                                <button type="submit" class="btn-modern btn-primary-modern">Filter</button>
+                                <a href="logs.php" class="btn-modern btn-secondary-modern">Clear</a>
                             </div>
                         </div>
-                        
-                        <div class="col-md-3">
-                            <label class="form-label">&nbsp;</label>
-                            <button class="btn btn-outline-warning w-100" onclick="exportLogs()">
-                                <i class="fas fa-download me-2"></i>Export Logs
-                            </button>
-                        </div>
                     </form>
+                    
+                    <div class="mt-3">
+                        <button class="btn-modern btn-outline-warning-modern" onclick="exportLogs()">
+                            <i class="fas fa-download me-2"></i>Export Logs
+                        </button>
+                    </div>
                 </div>
+            </div>
 
-                <!-- Logs Table -->
-                <div class="dashboard-card">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h3>Activity Logs (<?php echo $totalLogs; ?> total)</h3>
-                        <button class="btn btn-sm btn-outline-danger" onclick="clearLogs()">
+            <!-- Logs Table -->
+            <div class="admin-content-card">
+                <div class="admin-card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-list-alt me-2"></i>
+                            Activity Logs
+                            <span class="admin-badge primary ms-2"><?php echo $totalLogs; ?> total</span>
+                        </div>
+                        <button class="btn-modern btn-outline-danger-modern" onclick="clearLogs()">
                             <i class="fas fa-trash me-1"></i>Clear Old Logs
                         </button>
                     </div>
-                    
+                </div>
+                <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover">
+                        <table class="admin-modern-table">
                             <thead>
                                 <tr>
                                     <th>ID</th>
@@ -245,9 +223,12 @@ $actions = $conn->query("SELECT DISTINCT action FROM admin_logs ORDER BY action"
                             <tbody>
                                 <?php if (empty($logs)): ?>
                                     <tr>
-                                        <td colspan="6" class="text-center py-4">
-                                            <i class="fas fa-list-alt fa-2x text-muted mb-2"></i>
-                                            <p class="text-muted">No activity logs found</p>
+                                        <td colspan="6" class="text-center py-5">
+                                            <div class="admin-empty-state">
+                                                <i class="fas fa-list-alt fa-3x text-muted mb-3"></i>
+                                                <h5>No activity logs found</h5>
+                                                <p class="text-muted">Try adjusting your filters</p>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php else: ?>
@@ -256,18 +237,17 @@ $actions = $conn->query("SELECT DISTINCT action FROM admin_logs ORDER BY action"
                                             <td><?php echo $log['id']; ?></td>
                                             <td>
                                                 <div class="d-flex align-items-center">
-                                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2" 
-                                                         style="width: 24px; height: 24px; font-size: 10px;">
+                                                    <div class="admin-avatar-placeholder me-2" style="width: 32px; height: 32px; font-size: 0.75rem;">
                                                         <?php echo strtoupper(substr($log['full_name'], 0, 1)); ?>
                                                     </div>
                                                     <div>
-                                                        <div><?php echo htmlspecialchars($log['full_name']); ?></div>
+                                                        <div class="fw-bold"><?php echo htmlspecialchars($log['full_name']); ?></div>
                                                         <small class="text-muted"><?php echo htmlspecialchars($log['user_role']); ?></small>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td>
-                                                <span class="badge bg-<?php echo getActionBadgeColor($log['action']); ?>">
+                                                <span class="admin-badge <?php echo getActionBadgeClass($log['action']); ?>">
                                                     <?php echo ucfirst($log['action']); ?>
                                                 </span>
                                             </td>
@@ -283,64 +263,65 @@ $actions = $conn->query("SELECT DISTINCT action FROM admin_logs ORDER BY action"
                     
                     <!-- Pagination -->
                     <?php if ($totalPages > 1): ?>
-                        <nav class="mt-3">
-                            <ul class="pagination justify-content-center">
-                                <?php if ($page > 1): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page=<?php echo $page - 1; ?>&action=<?php echo $action; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>">Previous</a>
-                                    </li>
-                                <?php endif; ?>
-                                
-                                <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
-                                    <li class="page-item <?php echo $i == $page ? 'active' : ''; ?>">
-                                        <a class="page-link" href="?page=<?php echo $i; ?>&action=<?php echo $action; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>"><?php echo $i; ?></a>
-                                    </li>
-                                <?php endfor; ?>
-                                
-                                <?php if ($page < $totalPages): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page=<?php echo $page + 1; ?>&action=<?php echo $action; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>">Next</a>
-                                    </li>
-                                <?php endif; ?>
-                            </ul>
-                        </nav>
+                        <div class="admin-pagination">
+                            <?php if ($page > 1): ?>
+                                <a class="admin-page-btn" href="?page=<?php echo $page - 1; ?>&action=<?php echo $action; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>">Previous</a>
+                            <?php endif; ?>
+                            
+                            <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                                <a class="admin-page-btn <?php echo $i == $page ? 'active' : ''; ?>" href="?page=<?php echo $i; ?>&action=<?php echo $action; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>"><?php echo $i; ?></a>
+                            <?php endfor; ?>
+                            
+                            <?php if ($page < $totalPages): ?>
+                                <a class="admin-page-btn" href="?page=<?php echo $page + 1; ?>&action=<?php echo $action; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>">Next</a>
+                            <?php endif; ?>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="../assets/js/main.js"></script>
-    <script>
-        function exportLogs() {
-            window.location.href = 'api/export_logs.php';
+<script>
+    function exportLogs() {
+        window.location.href = 'api/export_logs.php';
+    }
+    
+    function clearLogs() {
+        if (confirm('Are you sure you want to clear logs older than 30 days? This action cannot be undone.')) {
+            window.location.href = 'api/clear_logs.php';
         }
-        
-        function clearLogs() {
-            if (confirm('Are you sure you want to clear logs older than 30 days? This action cannot be undone.')) {
-                window.location.href = 'api/clear_logs.php';
-            }
-        }
-    </script>
-</body>
-</html>
+    }
 
-<?php
-function getActionBadgeColor($action) {
-    $colors = [
-        'login' => 'success',
-        'register' => 'info',
-        'course_created' => 'primary',
-        'enrollment' => 'success',
-        'quiz_completed' => 'warning',
-        'profile_updated' => 'secondary',
-        'password_changed' => 'danger',
-        'user_created' => 'primary',
-        'user_updated' => 'info',
-        'user_deleted' => 'danger'
-    ];
-    return $colors[$action] ?? 'secondary';
-}
-?>
+    // Add animations on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Animate content cards
+        const contentCards = document.querySelectorAll('.admin-content-card');
+        contentCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 200);
+        });
+
+        // Animate table rows
+        const tableRows = document.querySelectorAll('.admin-modern-table tbody tr');
+        tableRows.forEach((row, index) => {
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(-20px)';
+            row.style.transition = 'all 0.3s ease';
+            
+            setTimeout(() => {
+                row.style.opacity = '1';
+                row.style.transform = 'translateX(0)';
+            }, 400 + (index * 50));
+        });
+    });
+</script>
+
+<?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>

@@ -259,7 +259,7 @@ $menuItems = $currentConfig['menu_items'];
 // Generate dynamic styles to match theme
 $dynamicStyles = "
 .universal-header {
-    background: var(--gradient-primary) !important;
+    background: linear-gradient(135deg, {$primaryColor} 0%, {$secondaryColor} 100%) !important;
     padding: 0.75rem 0;
     min-height: 70px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -1603,9 +1603,14 @@ function hex2rgb($hex)
 
 <body>
     <!-- Universal Header -->
-    <header class="universal-header navbar navbar-expand-lg navbar-dark" style="background: var(--gradient-primary);">
+    <header class="universal-header navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
+            <a class="navbar-brand" href="<?php 
+                if ($moduleName === 'student') echo 'dashboard.php';
+                elseif ($moduleName === 'instructor') echo 'dashboard.php';
+                elseif ($moduleName === 'admin') echo 'dashboard.php';
+                else echo '../index.php';
+            ?>">
                 <i class="fas fa-graduation-cap me-2"></i>IT HUB
             </a>
 
@@ -1625,7 +1630,10 @@ function hex2rgb($hex)
                                 <i class="fas fa-list me-2"></i> View All Notifications
                             </a></li>
                             <?php if ($notificationCount > 0): ?>
-                                <li><a class="dropdown-item" href="../api/mark_notifications_read.php">
+                                <li><a class="dropdown-item" href="<?php 
+                                    if ($moduleName === 'student' || $moduleName === 'instructor' || $moduleName === 'admin') echo '../api/mark_notifications_read.php';
+                                    else echo 'api/mark_notifications_read.php';
+                                ?>">
                                     <i class="fas fa-check me-2"></i> Mark All as Read
                                 </a></li>
                             <?php endif; ?>
@@ -1649,7 +1657,10 @@ function hex2rgb($hex)
                                 <i class="fas fa-cog me-2"></i> Settings
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="../logout.php">
+                            <li><a class="dropdown-item text-danger" href="<?php 
+                                if ($moduleName === 'student' || $moduleName === 'instructor' || $moduleName === 'admin') echo '../logout.php';
+                                else echo 'logout.php';
+                            ?>">
                                 <i class="fas fa-sign-out-alt me-2"></i> Logout
                             </a></li>
                         </ul>

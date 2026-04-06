@@ -45,8 +45,8 @@ require_once __DIR__ . '/../config/config.php';
                                 <?php echo $_SESSION['full_name'] ?? 'User'; ?>
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>profile.php">Profile</a></li>
-                                <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>settings.php">Settings</a></li>
+                                <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>student/profile.php">Profile</a></li>
+                                <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>student/settings.php">Settings</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>logout.php">Logout</a></li>
                             </ul>

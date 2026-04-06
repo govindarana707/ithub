@@ -122,21 +122,14 @@ $courses = $course->getAdminCourses($filters, $limit, $offset);
 $db = new Database();
 $conn = $db->getConnection();
 
-// Check if categories table exists and get categories
+// Use categories_new table
 $categories = [];
 try {
-    $result = $conn->query("SELECT id, name FROM categories ORDER BY name");
+    $result = $conn->query("SELECT id, name FROM categories_new ORDER BY name");
     if ($result) {
         $categories = $result->fetch_all(MYSQLI_ASSOC);
-    } else {
-        // Try categories_new table if categories doesn't exist
-        $result = $conn->query("SELECT id, name FROM categories_new ORDER BY name");
-        if ($result) {
-            $categories = $result->fetch_all(MYSQLI_ASSOC);
-        }
     }
 } catch (Exception $e) {
-    // If both queries fail, categories will remain empty
     $categories = [];
 }
 
@@ -150,462 +143,355 @@ $popularCourses = $course->getPopularCourses(5);
 
 // Get course statistics
 $courseStats = $course->getCourseStats();
+require_once dirname(__DIR__) . '/includes/universal_header.php';
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Course Management - IT HUB</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
-    <style>
-        .course-card {
-            transition: all 0.3s ease;
-            border: 1px solid #e0e0e0;
-            border-radius: 12px;
-            overflow: hidden;
-            position: relative;
-            background: white;
-        }
-        .course-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 12px 24px rgba(0,0,0,0.15);
-        }
-        .course-thumbnail {
-            height: 200px;
-            object-fit: cover;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            position: relative;
-        }
-        .course-thumbnail .overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.7) 100%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        .course-card:hover .course-thumbnail .overlay {
-            opacity: 1;
-        }
-        .course-price {
-            font-size: 1.5rem;
-            font-weight: bold;
-            background: linear-gradient(45deg, #28a745, #20c997);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .course-meta {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 15px;
-        }
-        .course-stats {
-            display: flex;
-            gap: 15px;
-            margin-top: 15px;
-            padding: 15px;
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            border-radius: 10px;
-        }
-        .stat-item {
-            text-align: center;
-            flex: 1;
-        }
-        .stat-item .number {
-            font-size: 1.3rem;
-            font-weight: bold;
-            color: #495057;
-            display: block;
-        }
-        .stat-item .label {
-            font-size: 0.85rem;
-            color: #6c757d;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .action-buttons {
-            display: flex;
-            gap: 8px;
-            margin-top: 15px;
-        }
-        .btn-sm {
-            padding: 0.4rem 0.8rem;
-            font-size: 0.8rem;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-        }
-        .btn-sm:hover {
-            transform: translateY(-2px);
-        }
-        .filter-section {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            padding: 25px;
-            border-radius: 15px;
-            margin-bottom: 25px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.07);
-        }
-        .course-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-            gap: 25px;
-        }
-        .stat-card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            transition: all 0.3s ease;
-            border-left: 4px solid;
-        }
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        }
-        .stat-card.primary { border-left-color: #007bff; }
-        .stat-card.success { border-left-color: #28a745; }
-        .stat-card.info { border-left-color: #17a2b8; }
-        .stat-card.warning { border-left-color: #ffc107; }
-        .stat-card h3 {
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .stat-card p {
-            margin: 0;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-size: 0.9rem;
-        }
-        .view-toggle {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .view-toggle .btn {
-            border-radius: 8px;
-        }
-        .dataTables_wrapper {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        }
-        .course-progress-ring {
-            width: 60px;
-            height: 60px;
-            position: relative;
-        }
-        .course-progress-ring svg {
-            transform: rotate(-90deg);
-        }
-        .course-progress-ring circle {
-            fill: none;
-            stroke-width: 4;
-        }
-        .course-progress-ring .background {
-            stroke: #e9ecef;
-        }
-        .course-progress-ring .progress {
-            stroke: #28a745;
-            stroke-linecap: round;
-            transition: stroke-dashoffset 0.5s ease;
-        }
-        .search-highlight {
-            background-color: #fff3cd;
-            padding: 2px 4px;
-            border-radius: 3px;
-        }
-        .bulk-actions-bar {
-            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-            color: white;
-            padding: 15px 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            display: none;
-        }
-        .loading-spinner {
-            display: none;
-            text-align: center;
-            padding: 40px;
-        }
-        .course-badge {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 10;
-        }
-        .course-filters-advanced {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="../dashboard.php">
-                <i class="fas fa-graduation-cap me-2"></i>IT HUB
-            </a>
-            
-            <div class="navbar-nav ms-auto">
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-shield me-1"></i> Admin
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="dashboard.php">Dashboard</a></li>
-                        <li><a class="dropdown-item" href="users.php">User Management</a></li>
-                        <li><a class="dropdown-item" href="courses.php">Course Management</a></li>
-                        <li><a class="dropdown-item" href="analytics.php">Analytics</a></li>
-                        <li><a class="dropdown-item" href="settings.php">Settings</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </nav>
+<link rel="stylesheet" href="../assets/css/admin-theme.css">
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
 
-    <div class="container-fluid py-4">
-        <div class="row">
-            <div class="col-md-3">
-                <div class="list-group">
-                    <a href="dashboard.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-                    </a>
-                    <a href="users.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-users-cog me-2"></i> User Management
-                    </a>
-                    <a href="courses.php" class="list-group-item list-group-item-action active">
-                        <i class="fas fa-book-open me-2"></i> Course Management
-                    </a>
-                    <a href="categories.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-tags me-2"></i> Categories
-                    </a>
-                    <a href="analytics.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-chart-line me-2"></i> Analytics
-                    </a>
-                    <a href="reports.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-file-alt me-2"></i> Reports
-                    </a>
-                    <a href="logs.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-list-alt me-2"></i> Activity Logs
-                    </a>
-                    <a href="settings.php" class="list-group-item list-group-item-action">
-                        <i class="fas fa-cog me-2"></i> Settings
-                    </a>
-                </div>
-                
-                <!-- Course Statistics Sidebar -->
-                <div class="list-group mt-3">
-                    <div class="list-group-item active">
-                        <i class="fas fa-chart-pie me-2"></i> Statistics
-                    </div>
-                    <div class="list-group-item">
-                        <i class="fas fa-trophy me-2"></i> Popular Courses
-                    </div>
-                </div>
-                
-                <!-- Popular Courses -->
-                <div class="list-group mt-3">
-                    <h6 class="list-group-item active">Popular Courses</h6>
-                    <?php foreach ($popularCourses as $popularCourse): ?>
-                        <div class="list-group-item">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span><?php echo htmlspecialchars($popularCourse['title']); ?></span>
-                                <span class="badge bg-primary"><?php echo $popularCourse['enrollment_count']; ?></span>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            
-            <div class="col-md-9">
-                <div class="d-flex justify-content-between align-items-center mb-4">
+<style>
+/* Course-specific styles */
+.course-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 25px;
+}
+
+.course-card {
+    background: var(--admin-bg-primary);
+    border-radius: var(--admin-radius-xl);
+    border: 1px solid var(--admin-border-light);
+    box-shadow: var(--admin-shadow-sm);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.course-card:hover {
+    transform: translateY(-8px);
+    box-shadow: var(--admin-shadow-xl);
+    border-color: var(--admin-primary-light);
+}
+
+.course-thumbnail {
+    height: 160px;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.course-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.course-card:hover .course-thumbnail img {
+    transform: scale(1.05);
+}
+
+.course-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+}
+
+.course-badge .badge {
+    font-size: 0.75rem;
+    padding: 0.5em 0.8em;
+    border-radius: 20px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.course-card .card-body {
+    padding: 1.5rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.course-card .card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--admin-text-primary);
+    line-height: 1.4;
+    margin-bottom: 0.5rem;
+}
+
+.course-card .course-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 1rem 0;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--admin-border-light);
+}
+
+.course-price {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--admin-primary);
+}
+
+.course-card .course-stats-bar {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: linear-gradient(135deg, var(--admin-bg-secondary) 0%, #f1f5f9 100%);
+    border-radius: var(--admin-radius-lg);
+    margin-top: auto;
+    margin-bottom: 1rem;
+}
+
+.course-card .stat-item {
+    text-align: center;
+    flex: 1;
+}
+
+.course-card .stat-item .number {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--admin-text-primary);
+    display: block;
+    line-height: 1;
+}
+
+.course-card .stat-item .label {
+    font-size: 0.7rem;
+    color: var(--admin-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+}
+
+.course-card .action-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.course-card .action-buttons .btn {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+    border-radius: var(--admin-radius);
+    transition: all 0.2s ease;
+}
+
+.course-card .action-buttons .btn:hover {
+    transform: translateY(-2px);
+}
+
+.filter-section {
+    background: var(--admin-bg-secondary);
+    border-radius: var(--admin-radius-xl);
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid var(--admin-border);
+}
+
+.view-toggle .btn {
+    border-radius: var(--admin-radius);
+}
+
+.bulk-actions-bar {
+    background: var(--admin-gradient);
+    color: white;
+    padding: 15px 20px;
+    border-radius: var(--admin-radius-lg);
+    margin-bottom: 20px;
+    display: none;
+}
+
+#tableView {
+    background: var(--admin-bg-primary);
+    border-radius: var(--admin-radius-xl);
+    padding: 20px;
+    border: 1px solid var(--admin-border);
+}
+
+#tableView .table {
+    margin-bottom: 0;
+}
+
+#tableView .table thead th {
+    background: var(--admin-bg-secondary);
+    border-bottom: 2px solid var(--admin-border);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+}
+
+#tableView .table tbody tr:hover {
+    background: var(--admin-bg-secondary);
+}
+
+.progress {
+    height: 6px;
+    background: var(--admin-bg-tertiary);
+    border-radius: 3px;
+}
+
+.progress-bar {
+    background: var(--admin-success);
+    border-radius: 3px;
+}
+
+.pagination .page-link {
+    border: 1px solid var(--admin-border);
+    color: var(--admin-text-primary);
+    border-radius: var(--admin-radius);
+    margin: 0 2px;
+}
+
+.pagination .page-item.active .page-link {
+    background: var(--admin-gradient);
+    border-color: var(--admin-primary);
+    color: white;
+}
+</style>
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3">
+            <?php require_once 'includes/sidebar.php'; ?>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="col-md-9">
+            <!-- Admin Dashboard Header -->
+            <div class="admin-dashboard-header mb-4">
+                <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h1 class="mb-2">Advanced Course Management</h1>
-                        <p class="text-muted mb-0">Manage your courses with powerful tools and insights</p>
+                        <h2 class="mb-1">📚 Course Management</h2>
+                        <p class="mb-0 opacity-75">Manage your courses with powerful tools and insights</p>
                     </div>
                     <div class="d-flex align-items-center gap-3">
                         <div class="view-toggle">
-                            <button class="btn btn-outline-primary btn-sm active" onclick="toggleView('grid')" id="gridViewBtn">
-                                <i class="fas fa-th"></i> Grid
+                            <button class="btn btn-sm btn-outline-light active" onclick="toggleView('grid')" id="gridViewBtn">
+                                <i class="fas fa-th me-1"></i> Grid
                             </button>
-                            <button class="btn btn-outline-primary btn-sm" onclick="toggleView('table')" id="tableViewBtn">
-                                <i class="fas fa-list"></i> Table
+                            <button class="btn btn-sm btn-outline-light" onclick="toggleView('table')" id="tableViewBtn">
+                                <i class="fas fa-list me-1"></i> Table
                             </button>
                         </div>
-                        <div class="dropdown">
-                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-download me-2"></i>Export
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="#" onclick="exportCourses('csv')">Export as CSV</a></li>
-                                <li><a class="dropdown-item" href="#" onclick="exportCourses('excel')">Export as Excel</a></li>
-                                <li><a class="dropdown-item" href="#" onclick="exportCourses('pdf')">Export as PDF</a></li>
-                            </ul>
-                        </div>
-                        <span class="badge bg-danger">Administrator</span>
+                        <span class="admin-badge">Administrator</span>
                     </div>
                 </div>
+            </div>
 
-                <!-- Advanced Filters -->
-                <div class="course-filters-advanced">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Advanced Filters</h5>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleFilters()">
-                            <i class="fas fa-chevron-up" id="filterToggleIcon"></i>
-                        </button>
-                    </div>
-                    
-                    <div id="advancedFilters">
-                        <form method="GET" id="filterForm">
-                            <div class="row g-3">
-                                <div class="col-md-3">
-                                    <label class="form-label">Search</label>
-                                    <div class="input-group">
-                                        <input type="text" name="search" class="form-control" placeholder="Search courses..." value="<?php echo htmlspecialchars($search); ?>">
-                                        <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label">Category</label>
-                                    <select name="category" class="form-select select2">
-                                        <option value="">All Categories</option>
-                                        <?php foreach ($categories as $cat): ?>
-                                            <option value="<?php echo $cat['id']; ?>" <?php echo ((string)$cat['id'] === (string)$category) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($cat['name']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label">Status</label>
-                                    <select name="status" class="form-select select2">
-                                        <option value="">All Status</option>
-                                        <option value="published" <?php echo $status === 'published' ? 'selected' : ''; ?>>Published</option>
-                                        <option value="draft" <?php echo $status === 'draft' ? 'selected' : ''; ?>>Draft</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label">Instructor</label>
-                                    <select name="instructor" class="form-select select2">
-                                        <option value="">All Instructors</option>
-                                        <?php foreach ($instructors as $inst): ?>
-                                            <option value="<?php echo $inst['id']; ?>" <?php echo ((string)$inst['id'] === (string)$instructor) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($inst['full_name']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Price Range</label>
-                                    <div class="row g-2">
-                                        <div class="col-6">
-                                            <input type="number" name="min_price" class="form-control" placeholder="Min" value="<?php echo htmlspecialchars($_GET['min_price'] ?? ''); ?>">
-                                        </div>
-                                        <div class="col-6">
-                                            <input type="number" name="max_price" class="form-control" placeholder="Max" value="<?php echo htmlspecialchars($_GET['max_price'] ?? ''); ?>">
-                                        </div>
-                                    </div>
+            <!-- Advanced Filters -->
+            <div class="filter-section">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Advanced Filters</h5>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="toggleFilters()">
+                        <i class="fas fa-chevron-up" id="filterToggleIcon"></i>
+                    </button>
+                </div>
+                
+                <div id="advancedFilters">
+                    <form method="GET" id="filterForm">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Search</label>
+                                <div class="input-group">
+                                    <input type="text" name="search" class="form-control" placeholder="Search courses..." value="<?php echo htmlspecialchars($search); ?>">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()">
+                                        <i class="fas fa-times"></i>
+                                    </button>
                                 </div>
                             </div>
-                            
-                            <div class="row g-3 mt-2">
-                                <div class="col-md-2">
-                                    <label class="form-label">Difficulty</label>
-                                    <select name="difficulty" class="form-select select2">
-                                        <option value="">All Levels</option>
-                                        <option value="beginner" <?php echo ($_GET['difficulty'] ?? '') === 'beginner' ? 'selected' : ''; ?>>Beginner</option>
-                                        <option value="intermediate" <?php echo ($_GET['difficulty'] ?? '') === 'intermediate' ? 'selected' : ''; ?>>Intermediate</option>
-                                        <option value="advanced" <?php echo ($_GET['difficulty'] ?? '') === 'advanced' ? 'selected' : ''; ?>>Advanced</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label">Sort By</label>
-                                    <select name="sort" class="form-select select2">
-                                        <option value="created_at">Date Created</option>
-                                        <option value="title">Title</option>
-                                        <option value="price">Price</option>
-                                        <option value="enrollment_count">Popularity</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-2">
-                                    <label class="form-label">Order</label>
-                                    <select name="order" class="form-select select2">
-                                        <option value="DESC">Descending</option>
-                                        <option value="ASC">Ascending</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">&nbsp;</label>
-                                    <div class="d-flex gap-2">
-                                        <button type="submit" class="btn btn-primary">
-                                            <i class="fas fa-search me-2"></i>Filter
-                                        </button>
-                                        <a href="courses.php" class="btn btn-outline-secondary">
-                                            <i class="fas fa-undo me-2"></i>Clear
-                                        </a>
-                                        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createCourseModal">
-                                            <i class="fas fa-plus me-2"></i>Add Course
-                                        </button>
-                                        <button type="button" class="btn btn-info" onclick="refreshCourses()">
-                                            <i class="fas fa-sync-alt me-2"></i>Refresh
-                                        </button>
-                                    </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Category</label>
+                                <select name="category" class="form-select select2">
+                                    <option value="">All Categories</option>
+                                    <?php foreach ($categories as $cat): ?>
+                                        <option value="<?php echo $cat['id']; ?>" <?php echo ((string)$cat['id'] === (string)$category) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($cat['name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Status</label>
+                                <select name="status" class="form-select">
+                                    <option value="">All Status</option>
+                                    <option value="published" <?php echo $status === 'published' ? 'selected' : ''; ?>>Published</option>
+                                    <option value="draft" <?php echo $status === 'draft' ? 'selected' : ''; ?>>Draft</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Instructor</label>
+                                <select name="instructor" class="form-select select2">
+                                    <option value="">All Instructors</option>
+                                    <?php foreach ($instructors as $inst): ?>
+                                        <option value="<?php echo $inst['id']; ?>" <?php echo ((string)$inst['id'] === (string)$instructor) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($inst['full_name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn-modern btn-primary-modern">
+                                        <i class="fas fa-search me-2"></i>Filter
+                                    </button>
+                                    <a href="courses.php" class="btn-modern btn-secondary-modern">
+                                        <i class="fas fa-undo me-2"></i>Clear
+                                    </a>
+                                    <button type="button" class="btn-modern btn-success-modern" data-bs-toggle="modal" data-bs-target="#createCourseModal">
+                                        <i class="fas fa-plus me-2"></i>Add
+                                    </button>
                                 </div>
                             </div>
-                        </form>
-                    </div>
+                        </div>
+                    </form>
                 </div>
+            </div>
 
-                <!-- Course Statistics Overview -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="stat-card primary">
-                            <h3><?php echo $courseStats['total']; ?></h3>
-                            <p>Total Courses</p>
-                            <small><i class="fas fa-book"></i></small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card success">
-                            <h3><?php echo $courseStats['published']; ?></h3>
-                            <p>Published</p>
-                            <small><i class="fas fa-check-circle"></i></small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card info">
-                            <h3><?php echo $courseStats['enrollments']; ?></h3>
-                            <p>Total Enrollments</p>
-                            <small><i class="fas fa-users"></i></small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card warning">
-                            <h3><?php echo $courseStats['total_attempts']; ?></h3>
-                            <p>Quiz Attempts</p>
-                            <small><i class="fas fa-question-circle"></i></small>
-                        </div>
+            <!-- Statistics Overview -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="admin-stat-card primary">
+                        <div class="admin-stat-icon"><i class="fas fa-book"></i></div>
+                        <div class="admin-stat-value"><?php echo $courseStats['total']; ?></div>
+                        <div class="admin-stat-label">Total Courses</div>
                     </div>
                 </div>
+                <div class="col-md-3">
+                    <div class="admin-stat-card success">
+                        <div class="admin-stat-icon"><i class="fas fa-check-circle"></i></div>
+                        <div class="admin-stat-value"><?php echo $courseStats['published']; ?></div>
+                        <div class="admin-stat-label">Published</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="admin-stat-card info">
+                        <div class="admin-stat-icon"><i class="fas fa-users"></i></div>
+                        <div class="admin-stat-value"><?php echo $courseStats['enrollments']; ?></div>
+                        <div class="admin-stat-label">Total Enrollments</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="admin-stat-card warning">
+                        <div class="admin-stat-icon"><i class="fas fa-question-circle"></i></div>
+                        <div class="admin-stat-value"><?php echo $courseStats['total_attempts']; ?></div>
+                        <div class="admin-stat-label">Quiz Attempts</div>
+                    </div>
+                </div>
+            </div>
 
                 <!-- Bulk Actions Bar -->
                 <div class="bulk-actions-bar" id="bulkActionsBar">
@@ -641,43 +527,66 @@ $courseStats = $course->getCourseStats();
                     <p class="mt-2">Loading courses...</p>
                 </div>
 
-                <!-- Courses Grid View -->
-                <div class="course-grid" id="gridView">
-                    <?php if (empty($courses)): ?>
-                        <div class="col-12 text-center py-5">
-                            <i class="fas fa-book fa-4x text-muted mb-3"></i>
-                            <h4>No courses found</h4>
-                            <p class="text-muted">Try adjusting your filters or create a new course.</p>
-                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createCourseModal">
-                                <i class="fas fa-plus me-2"></i>Create First Course
-                            </button>
+            <!-- Course Content Card -->
+            <div class="admin-content-card mb-4">
+                <div class="admin-card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-graduation-cap me-2"></i>
+                            All Courses (<?php echo $totalCourses; ?>)
                         </div>
+                        <div class="dropdown">
+                            <button class="btn-modern btn-secondary-modern dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-download me-2"></i>Export
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" onclick="exportCourses('csv')">Export as CSV</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportCourses('excel')">Export as Excel</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportCourses('pdf')">Export as PDF</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <!-- Courses Grid View -->
+                    <div class="p-4">
+                        <div class="course-grid" id="gridView">
+                            <?php if (empty($courses)): ?>
+                                <div class="col-12 text-center py-5">
+                                    <div class="admin-empty-state">
+                                        <i class="fas fa-book fa-3x text-muted mb-3"></i>
+                                        <h5>No courses found</h5>
+                                        <p class="text-muted">Try adjusting your filters or create a new course.</p>
+                                        <button type="button" class="btn-modern btn-primary-modern" data-bs-toggle="modal" data-bs-target="#createCourseModal">
+                                            <i class="fas fa-plus me-2"></i>Create First Course
+                                        </button>
+                                    </div>
+                                </div>
                     <?php else: ?>
                         <?php foreach ($courses as $courseRow): ?>
                             <div class="course-card" data-course-id="<?php echo $courseRow['id']; ?>">
-                                <?php if ($courseRow['thumbnail']): ?>
-                                    <div class="course-thumbnail">
-                                        <img src="<?php echo htmlspecialchars(resolveUploadUrl($courseRow['thumbnail'])); ?>" class="w-100 h-100 object-fit-cover" alt="<?php echo htmlspecialchars($courseRow['title']); ?>">
-                                        <div class="overlay"></div>
+                                <div class="course-thumbnail">
+                                    <?php if ($courseRow['thumbnail']): ?>
+                                        <img src="<?php echo htmlspecialchars(resolveUploadUrl($courseRow['thumbnail'])); ?>" alt="<?php echo htmlspecialchars($courseRow['title']); ?>">
+                                    <?php else: ?>
+                                        <div class="d-flex align-items-center justify-content-center h-100">
+                                            <i class="fas fa-book fa-3x text-white"></i>
+                                        </div>
+                                    <?php endif; ?>
+                                    
+                                    <div class="course-badge">
+                                        <span class="badge bg-<?php echo $courseRow['status'] === 'published' ? 'success' : 'warning'; ?>">
+                                            <?php echo ucfirst($courseRow['status']); ?>
+                                        </span>
                                     </div>
-                                <?php else: ?>
-                                    <div class="course-thumbnail d-flex align-items-center justify-content-center">
-                                        <i class="fas fa-book fa-3x text-white"></i>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <div class="course-badge">
-                                    <span class="badge bg-<?php echo $courseRow['status'] === 'published' ? 'success' : 'warning'; ?>">
-                                        <?php echo ucfirst($courseRow['status']); ?>
-                                    </span>
                                 </div>
                                 
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <h5 class="card-title mb-0"><?php echo htmlspecialchars($courseRow['title']); ?></h5>
+                                        <h5 class="card-title"><?php echo htmlspecialchars($courseRow['title']); ?></h5>
                                         <input type="checkbox" class="form-check-input course-checkbox" value="<?php echo $courseRow['id']; ?>" onchange="updateBulkSelection()">
                                     </div>
-                                    <p class="text-muted mb-3"><?php echo substr(strip_tags($courseRow['description']), 0, 120); ?>...</p>
+                                    <p class="text-muted small mb-0"><?php echo substr(strip_tags($courseRow['description']), 0, 100); ?>...</p>
                                     
                                     <div class="course-meta">
                                         <span class="course-price">Rs<?php echo number_format($courseRow['price'], 2); ?></span>
@@ -686,48 +595,38 @@ $courseStats = $course->getCourseStats();
                                         </span>
                                     </div>
                                     
-                                    <div class="course-stats">
+                                    <div class="course-stats-bar">
                                         <div class="stat-item">
-                                            <div class="number"><?php echo $courseRow['enrollment_count'] ?? 0; ?></div>
-                                            <div class="label">Students</div>
+                                            <span class="number"><?php echo $courseRow['enrollment_count'] ?? 0; ?></span>
+                                            <span class="label">Students</span>
                                         </div>
                                         <div class="stat-item">
-                                            <div class="number"><?php echo round($courseRow['avg_progress'] ?? 0); ?>%</div>
-                                            <div class="label">Progress</div>
+                                            <span class="number"><?php echo round($courseRow['avg_progress'] ?? 0); ?>%</span>
+                                            <span class="label">Progress</span>
                                         </div>
                                         <div class="stat-item">
-                                            <div class="course-progress-ring">
-                                                <svg width="60" height="60">
-                                                    <circle class="background" cx="30" cy="30" r="25"></circle>
-                                                    <circle class="progress" cx="30" cy="30" r="25" 
-                                                        stroke-dasharray="157" 
-                                                        stroke-dashoffset="<?php echo 157 - (157 * ($courseRow['avg_progress'] ?? 0) / 100); ?>">
-                                                    </circle>
-                                                </svg>
-                                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; font-weight: bold;">
-                                                    <?php echo round($courseRow['avg_progress'] ?? 0); ?>%
-                                                </div>
-                                            </div>
+                                            <span class="number"><?php echo $courseRow['lesson_count'] ?? 0; ?></span>
+                                            <span class="label">Lessons</span>
                                         </div>
                                     </div>
                                     
                                     <div class="action-buttons">
-                                        <button class="btn btn-sm btn-outline-dark" onclick="editCourse(<?php echo $courseRow['id']; ?>)" title="Edit Course">
+                                        <button class="btn btn-outline-primary" onclick="editCourse(<?php echo $courseRow['id']; ?>)" title="Edit">
                                             <i class="fas fa-edit"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-outline-primary" onclick="viewCourse(<?php echo $courseRow['id']; ?>)" title="View Course">
+                                        <button class="btn btn-outline-info" onclick="viewCourse(<?php echo $courseRow['id']; ?>)" title="View">
                                             <i class="fas fa-eye"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-outline-info" onclick="courseBuilder(<?php echo $courseRow['id']; ?>)" title="Course Builder">
-                                            <i class="fas fa-screwdriver-wrench"></i>
+                                        <button class="btn btn-outline-secondary" onclick="courseBuilder(<?php echo $courseRow['id']; ?>)" title="Builder">
+                                            <i class="fas fa-tools"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-outline-success" onclick="duplicateCourse(<?php echo $courseRow['id']; ?>)" title="Duplicate Course">
+                                        <button class="btn btn-outline-success" onclick="duplicateCourse(<?php echo $courseRow['id']; ?>)" title="Duplicate">
                                             <i class="fas fa-copy"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-outline-warning" onclick="toggleStatus(<?php echo $courseRow['id']; ?>, '<?php echo $courseRow['status']; ?>')" title="Toggle Status">
+                                        <button class="btn btn-outline-warning" onclick="toggleStatus(<?php echo $courseRow['id']; ?>, '<?php echo $courseRow['status']; ?>')" title="Toggle">
                                             <i class="fas fa-power-off"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCourse(<?php echo $courseRow['id']; ?>)" title="Delete Course">
+                                        <button class="btn btn-outline-danger" onclick="deleteCourse(<?php echo $courseRow['id']; ?>)" title="Delete">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
@@ -737,102 +636,109 @@ $courseStats = $course->getCourseStats();
                     <?php endif; ?>
                 </div>
 
-                <!-- Courses Table View -->
-                <div class="table-responsive" id="tableView" style="display: none;">
-                    <table class="table table-hover" id="coursesTable">
-                        <thead class="table-light">
-                            <tr>
-                                <th><input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleSelectAll()"></th>
-                                <th>Course</th>
-                                <th>Category</th>
-                                <th>Instructor</th>
-                                <th>Price</th>
-                                <th>Students</th>
-                                <th>Progress</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($courses as $courseRow): ?>
-                                <tr data-course-id="<?php echo $courseRow['id']; ?>">
-                                    <td><input type="checkbox" class="form-check-input course-checkbox" value="<?php echo $courseRow['id']; ?>" onchange="updateBulkSelection()"></td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <?php if ($courseRow['thumbnail']): ?>
-                                                <img src="<?php echo htmlspecialchars(resolveUploadUrl($courseRow['thumbnail'])); ?>" class="rounded me-3" style="width: 50px; height: 50px; object-fit: cover;" alt="">
-                                            <?php else: ?>
-                                                <div class="rounded me-3 bg-primary d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                                                    <i class="fas fa-book text-white"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Table View -->
+                    <div id="tableView" style="display: none;">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="coursesTable">
+                                <thead>
+                                    <tr>
+                                        <th width="30"><input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleSelectAll()"></th>
+                                        <th>Course</th>
+                                        <th>Category</th>
+                                        <th>Instructor</th>
+                                        <th>Price</th>
+                                        <th>Students</th>
+                                        <th>Progress</th>
+                                        <th>Status</th>
+                                        <th width="150">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($courses as $courseRow): ?>
+                                        <tr data-course-id="<?php echo $courseRow['id']; ?>">
+                                            <td><input type="checkbox" class="form-check-input course-checkbox" value="<?php echo $courseRow['id']; ?>" onchange="updateBulkSelection()"></td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <?php if ($courseRow['thumbnail']): ?>
+                                                        <img src="<?php echo htmlspecialchars(resolveUploadUrl($courseRow['thumbnail'])); ?>" class="rounded me-3" style="width: 50px; height: 50px; object-fit: cover;" alt="">
+                                                    <?php else: ?>
+                                                        <div class="rounded me-3 bg-primary d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                                            <i class="fas fa-book text-white"></i>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                    <div>
+                                                        <div class="fw-bold"><?php echo htmlspecialchars($courseRow['title']); ?></div>
+                                                        <small class="text-muted"><?php echo substr(strip_tags($courseRow['description']), 0, 50); ?>...</small>
+                                                    </div>
                                                 </div>
-                                            <?php endif; ?>
-                                            <div>
-                                                <div class="fw-bold"><?php echo htmlspecialchars($courseRow['title']); ?></div>
-                                                <small class="text-muted"><?php echo substr(strip_tags($courseRow['description']), 0, 50); ?>...</small>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td><?php echo htmlspecialchars($courseRow['category_name'] ?? 'N/A'); ?></td>
-                                    <td><?php echo htmlspecialchars($courseRow['instructor_name'] ?? 'N/A'); ?></td>
-                                    <td>Rs<?php echo number_format($courseRow['price'], 2); ?></td>
-                                    <td><?php echo $courseRow['enrollment_count'] ?? 0; ?></td>
-                                    <td>
-                                        <div class="progress" style="height: 6px;">
-                                            <div class="progress-bar" role="progressbar" style="width: <?php echo $courseRow['avg_progress'] ?? 0; ?>%; background: linear-gradient(90deg, #28a745, #20c997);" aria-valuenow="<?php echo $courseRow['avg_progress'] ?? 0; ?>" aria-valuemin="0" aria-valuemax="100"></div>
-                                        </div>
-                                        <small><?php echo round($courseRow['avg_progress'] ?? 0); ?>%</small>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-<?php echo $courseRow['status'] === 'published' ? 'success' : 'warning'; ?>">
-                                            <?php echo ucfirst($courseRow['status']); ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group" role="group">
-                                            <button class="btn btn-sm btn-outline-primary" onclick="editCourse(<?php echo $courseRow['id']; ?>)" title="Edit">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-info" onclick="viewCourse(<?php echo $courseRow['id']; ?>)" title="View">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-danger" onclick="deleteCourse(<?php echo $courseRow['id']; ?>)" title="Delete">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($courseRow['category_name'] ?? 'N/A'); ?></td>
+                                            <td><?php echo htmlspecialchars($courseRow['instructor_name'] ?? 'N/A'); ?></td>
+                                            <td>Rs<?php echo number_format($courseRow['price'], 2); ?></td>
+                                            <td><?php echo $courseRow['enrollment_count'] ?? 0; ?></td>
+                                            <td>
+                                                <div class="progress" style="height: 6px;">
+                                                    <div class="progress-bar" role="progressbar" style="width: <?php echo $courseRow['avg_progress'] ?? 0; ?>%" aria-valuenow="<?php echo $courseRow['avg_progress'] ?? 0; ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                                                </div>
+                                                <small class="text-muted"><?php echo round($courseRow['avg_progress'] ?? 0); ?>%</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-<?php echo $courseRow['status'] === 'published' ? 'success' : 'warning'; ?>">
+                                                    <?php echo ucfirst($courseRow['status']); ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary" onclick="editCourse(<?php echo $courseRow['id']; ?>)" title="Edit">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-info" onclick="viewCourse(<?php echo $courseRow['id']; ?>)" title="View">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-danger" onclick="deleteCourse(<?php echo $courseRow['id']; ?>)" title="Delete">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    <?php if ($totalPages > 1): ?>
+                        <nav class="p-4 pt-0">
+                            <ul class="pagination justify-content-center">
+                                <?php if ($page > 1): ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=<?php echo $page - 1; ?>&search=<?php echo urlencode($search); ?>&category=<?php echo $category; ?>&status=<?php echo $status; ?>&instructor=<?php echo $instructor; ?>">Previous</a>
+                                    </li>
+                                <?php endif; ?>
+                                
+                                <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                                    <li class="page-item <?php echo $i == $page ? 'active' : ''; ?>">
+                                        <a class="page-link" href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&category=<?php echo $category; ?>&status=<?php echo $status; ?>&instructor=<?php echo $instructor; ?>"><?php echo $i; ?></a>
+                                    </li>
+                                <?php endfor; ?>
+                                
+                                <?php if ($page < $totalPages): ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=<?php echo $page + 1; ?>&search=<?php echo urlencode($search); ?>&category=<?php echo $category; ?>&status=<?php echo $status; ?>&instructor=<?php echo $instructor; ?>">Next</a>
+                                    </li>
+                                <?php endif; ?>
+                            </ul>
+                        </nav>
+                    <?php endif; ?>
                 </div>
-                
-                <!-- Pagination -->
-                <?php if ($totalPages > 1): ?>
-                    <nav class="mt-4">
-                        <ul class="pagination justify-content-center">
-                            <?php if ($page > 1): ?>
-                                <li class="page-item">
-                                    <a class="page-link" href="?page=<?php echo $page - 1; ?>&search=<?php echo urlencode($search); ?>&category=<?php echo $category; ?>&status=<?php echo $status; ?>&instructor=<?php echo $instructor; ?>">Previous</a>
-                                </li>
-                            <?php endif; ?>
-                            
-                            <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                                <li class="page-item <?php echo $i == $page ? 'active' : ''; ?>">
-                                    <a class="page-link" href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&category=<?php echo $category; ?>&status=<?php echo $status; ?>&instructor=<?php echo $instructor; ?>"><?php echo $i; ?></a>
-                                </li>
-                            <?php endfor; ?>
-                            
-                            <?php if ($page < $totalPages): ?>
-                                <li class="page-item">
-                                    <a class="page-link" href="?page=<?php echo $page + 1; ?>&search=<?php echo urlencode($search); ?>&category=<?php echo $category; ?>&status=<?php echo $status; ?>&instructor=<?php echo $instructor; ?>">Next</a>
-                                </li>
-                            <?php endif; ?>
-                        </ul>
-                    </nav>
-                <?php endif; ?>
             </div>
         </div>
     </div>
+</div>
 
     <!-- Create Course Modal -->
     <div class="modal fade" id="createCourseModal" tabindex="-1">
@@ -922,7 +828,7 @@ $courseStats = $course->getCourseStats();
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn-modern btn-primary-modern">
                             <i class="fas fa-plus me-2"></i>Create Course
                         </button>
                     </div>
@@ -1020,7 +926,7 @@ $courseStats = $course->getCourseStats();
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn-modern btn-primary-modern">
                             <i class="fas fa-save me-2"></i>Save Changes
                         </button>
                     </div>
@@ -1054,7 +960,7 @@ $courseStats = $course->getCourseStats();
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn-modern btn-primary-modern">
                             <i class="fas fa-copy me-2"></i>Duplicate Course
                         </button>
                     </div>
@@ -1228,7 +1134,7 @@ $courseStats = $course->getCourseStats();
                 text: `This will permanently delete ${selectedIds.length} course(s). This action cannot be undone!`,
                 icon: 'error',
                 showCancelButton: true,
-                confirmButtonColor: '#dc3545',
+                confirmButtonColor: '#4169E1',
                 confirmButtonText: 'Delete'
             }).then((result) => {
                 if (result.isConfirmed) {
@@ -1398,7 +1304,7 @@ $courseStats = $course->getCourseStats();
                 text: 'This will permanently delete the course. This action cannot be undone!',
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonColor: '#dc3545',
+                confirmButtonColor: '#4169E1',
                 confirmButtonText: 'Delete'
             }).then((result) => {
                 if (result.isConfirmed) {
@@ -1501,5 +1407,5 @@ $courseStats = $course->getCourseStats();
             });
         }, 30000);
     </script>
-</body>
-</html>
+
+<?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>
