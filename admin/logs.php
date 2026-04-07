@@ -23,7 +23,7 @@ $date_to = $_GET['date_to'] ?? '';
 $sql = "
     SELECT al.*, u.full_name, u.email, u.role as user_role
     FROM admin_logs al
-    JOIN users u ON al.user_id = u.id
+    JOIN users_new u ON al.user_id = u.id
     WHERE 1=1
 ";
 $params = [];

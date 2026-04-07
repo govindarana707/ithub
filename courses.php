@@ -144,7 +144,6 @@ $queryString = http_build_query(array_filter($_GET, function($k) {
 <body>
     <?php require_once 'includes/header.php'; ?>
 
-    <!-- Search Section -->
     <div class="container">
         <div class="search-container">
             <div class="row">

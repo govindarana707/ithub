@@ -198,6 +198,12 @@ class Discussion {
         $conn = $this->db->getConnection();
         $offset = ($page - 1) * $limit;
         
+        // Check if discussions table exists
+        $tableCheck = $conn->query("SHOW TABLES LIKE 'discussions'");
+        if ($tableCheck->num_rows == 0) {
+            return []; // Table doesn't exist, return empty array
+        }
+        
         $stmt = $conn->prepare("
             SELECT d.*, c.title as course_title, u.full_name as student_name, u.profile_image
             FROM discussions d
@@ -207,6 +213,12 @@ class Discussion {
             ORDER BY d.pinned DESC, d.created_at DESC
             LIMIT ? OFFSET ?
         ");
+        
+        if ($stmt === false) {
+            error_log("SQL prepare failed in getInstructorDiscussions: " . $conn->error);
+            return [];
+        }
+        
         $stmt->bind_param("iii", $instructorId, $limit, $offset);
         $stmt->execute();
         

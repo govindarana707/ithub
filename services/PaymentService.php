@@ -96,8 +96,8 @@ class PaymentService {
                 'product_code' => 'EPAYTEST',
                 'product_service_charge' => $productServiceCharge,
                 'product_delivery_charge' => $productDeliveryCharge,
-                'success_url' => BASE_URL . '/payments/esewa_success_fixed.php',
-                'failure_url' => BASE_URL . '/payments/esewa_failure.php',
+                'success_url' => BASE_URL . 'payments/esewa_success.php',
+                'failure_url' => BASE_URL . 'payments/esewa_failure.php',
                 'signed_field_names' => 'total_amount,transaction_uuid,product_code',
                 'signature' => $signature
             ];

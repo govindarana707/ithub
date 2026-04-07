@@ -23,20 +23,30 @@ try {
     
     // Get courses count
     $stmt = $conn->prepare("SELECT COUNT(*) as count FROM courses_new WHERE instructor_id = ?");
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-    $stats['courses'] = $stmt->get_result()->fetch_assoc()['count'];
+    if ($stmt === false) {
+        $stats['courses'] = 0;
+    } else {
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $stats['courses'] = $stmt->get_result()->fetch_assoc()['count'];
+        $stmt->close();
+    }
     
     // Get students count (unique students across all courses)
     $stmt = $conn->prepare("
-        SELECT COUNT(DISTINCT e.student_id) as count 
-        FROM enrollments e 
+        SELECT COUNT(DISTINCT e.user_id) as count 
+        FROM enrollments_new e 
         JOIN courses_new c ON e.course_id = c.id 
         WHERE c.instructor_id = ?
     ");
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-    $stats['students'] = $stmt->get_result()->fetch_assoc()['count'];
+    if ($stmt === false) {
+        $stats['students'] = 0;
+    } else {
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $stats['students'] = $stmt->get_result()->fetch_assoc()['count'];
+        $stmt->close();
+    }
     
     // Get quizzes count
     $stmt = $conn->prepare("
@@ -45,9 +55,14 @@ try {
         JOIN courses_new c ON q.course_id = c.id 
         WHERE c.instructor_id = ?
     ");
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-    $stats['quizzes'] = $stmt->get_result()->fetch_assoc()['count'];
+    if ($stmt === false) {
+        $stats['quizzes'] = 0;
+    } else {
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $stats['quizzes'] = $stmt->get_result()->fetch_assoc()['count'];
+        $stmt->close();
+    }
     
     // Get discussions count
     $stmt = $conn->prepare("
@@ -56,20 +71,30 @@ try {
         JOIN courses_new c ON d.course_id = c.id 
         WHERE c.instructor_id = ? AND d.parent_id IS NULL
     ");
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-    $stats['discussions'] = $stmt->get_result()->fetch_assoc()['count'];
+    if ($stmt === false) {
+        $stats['discussions'] = 0;
+    } else {
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $stats['discussions'] = $stmt->get_result()->fetch_assoc()['count'];
+        $stmt->close();
+    }
     
     // Get earnings
     $stmt = $conn->prepare("
         SELECT COALESCE(SUM(c.price), 0) as total 
-        FROM enrollments e 
+        FROM enrollments_new e 
         JOIN courses_new c ON e.course_id = c.id 
         WHERE c.instructor_id = ? AND e.status = 'active'
     ");
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-    $stats['earnings'] = number_format($stmt->get_result()->fetch_assoc()['total'], 2);
+    if ($stmt === false) {
+        $stats['earnings'] = 0;
+    } else {
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $stats['earnings'] = number_format($stmt->get_result()->fetch_assoc()['total'], 2);
+        $stmt->close();
+    }
     
     echo json_encode([
         'success' => true,

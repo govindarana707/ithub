@@ -20,6 +20,10 @@ class Instructor {
             FROM users_new 
             WHERE id = ? AND role = 'instructor'
         ");
+        if (!$stmt) {
+            error_log("Failed to prepare getInstructorProfile query: " . $conn->error);
+            return null;
+        }
         $stmt->bind_param("i", $instructorId);
         $stmt->execute();
         
@@ -28,9 +32,14 @@ class Instructor {
         if ($profile) {
             // Get course statistics
             $stmt = $conn->prepare("SELECT COUNT(*) as total FROM courses_new WHERE instructor_id = ?");
-            $stmt->bind_param("i", $instructorId);
-            $stmt->execute();
-            $profile['total_courses'] = $stmt->get_result()->fetch_assoc()['total'];
+            if (!$stmt) {
+                error_log("Failed to prepare course count query: " . $conn->error);
+                $profile['total_courses'] = 0;
+            } else {
+                $stmt->bind_param("i", $instructorId);
+                $stmt->execute();
+                $profile['total_courses'] = $stmt->get_result()->fetch_assoc()['total'];
+            }
             
             $stmt = $conn->prepare("
                 SELECT COUNT(DISTINCT e.user_id) as total 
@@ -38,9 +47,14 @@ class Instructor {
                 JOIN courses_new c ON e.course_id = c.id 
                 WHERE c.instructor_id = ?
             ");
-            $stmt->bind_param("i", $instructorId);
-            $stmt->execute();
-            $profile['total_students'] = $stmt->get_result()->fetch_assoc()['total'];
+            if (!$stmt) {
+                error_log("Failed to prepare student count query: " . $conn->error);
+                $profile['total_students'] = 0;
+            } else {
+                $stmt->bind_param("i", $instructorId);
+                $stmt->execute();
+                $profile['total_students'] = $stmt->get_result()->fetch_assoc()['total'];
+            }
             
             $stmt = $conn->prepare("
                 SELECT AVG(e.progress_percentage) as avg_progress 
@@ -48,10 +62,15 @@ class Instructor {
                 JOIN courses_new c ON e.course_id = c.id 
                 WHERE c.instructor_id = ?
             ");
-            $stmt->bind_param("i", $instructorId);
-            $stmt->execute();
-            $avgProgress = $stmt->get_result()->fetch_assoc()['avg_progress'];
-            $profile['avg_student_progress'] = $avgProgress ? round($avgProgress, 2) : 0;
+            if (!$stmt) {
+                error_log("Failed to prepare progress query: " . $conn->error);
+                $profile['avg_student_progress'] = 0;
+            } else {
+                $stmt->bind_param("i", $instructorId);
+                $stmt->execute();
+                $avgProgress = $stmt->get_result()->fetch_assoc()['avg_progress'];
+                $profile['avg_student_progress'] = $avgProgress ? round($avgProgress, 2) : 0;
+            }
             
             // Calculate total revenue
             $stmt = $conn->prepare("
@@ -60,10 +79,15 @@ class Instructor {
                 JOIN courses_new c ON e.course_id = c.id 
                 WHERE c.instructor_id = ?
             ");
-            $stmt->bind_param("i", $instructorId);
-            $stmt->execute();
-            $revenue = $stmt->get_result()->fetch_assoc()['total_revenue'];
-            $profile['total_revenue'] = $revenue ? number_format($revenue, 2) : 0;
+            if (!$stmt) {
+                error_log("Failed to prepare revenue query: " . $conn->error);
+                $profile['total_revenue'] = 0;
+            } else {
+                $stmt->bind_param("i", $instructorId);
+                $stmt->execute();
+                $revenue = $stmt->get_result()->fetch_assoc()['total_revenue'];
+                $profile['total_revenue'] = $revenue ? number_format($revenue, 2) : 0;
+            }
             
             // Get instructor specialties and qualifications
             $profile['specialties'] = $this->getInstructorSpecialties($instructorId);
@@ -162,6 +186,10 @@ class Instructor {
         $types .= "ii";
         
         $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log("Failed to prepare getInstructorCourses query: " . $conn->error);
+            return [];
+        }
         $stmt->bind_param($types, ...$params);
         $stmt->execute();
         
@@ -263,6 +291,10 @@ class Instructor {
         $types .= "ii";
         
         $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log("Failed to prepare getInstructorStudents query: " . $conn->error);
+            return [];
+        }
         $stmt->bind_param($types, ...$params);
         $stmt->execute();
         
@@ -364,9 +396,14 @@ class Instructor {
             ");
         }
         
-        $stmt->bind_param("i", $instructorId);
-        $stmt->execute();
-        $analytics['course_performance'] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        if (!$stmt) {
+            error_log("Failed to prepare course performance query: " . $conn->error);
+            $analytics['course_performance'] = [];
+        } else {
+            $stmt->bind_param("i", $instructorId);
+            $stmt->execute();
+            $analytics['course_performance'] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        }
         
         // Student engagement
         $stmt = $conn->prepare("
@@ -405,6 +442,10 @@ class Instructor {
         
         // Validate instructor exists and is active
         $stmt = $conn->prepare("SELECT id FROM users_new WHERE id = ? AND role = 'instructor' AND status = 'active'");
+        if (!$stmt) {
+            error_log("Failed to prepare validate instructor query: " . $conn->error);
+            return ['success' => false, 'error' => 'Database error: ' . $conn->error];
+        }
         $stmt->bind_param("i", $instructorId);
         $stmt->execute();
         
@@ -422,7 +463,10 @@ class Instructor {
                                duration_hours, difficulty_level, status, thumbnail, created_at, updated_at) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ");
-        
+        if (!$stmt) {
+            error_log("Failed to prepare create course query: " . $conn->error);
+            return ['success' => false, 'error' => 'Database error: ' . $conn->error];
+        }
         $stmt->bind_param("ssiidisss", 
             $courseData['title'], 
             $courseData['description'], 
@@ -455,6 +499,10 @@ class Instructor {
         
         // Verify ownership
         $stmt = $conn->prepare("SELECT id FROM courses_new WHERE id = ? AND instructor_id = ?");
+        if (!$stmt) {
+            error_log("Failed to prepare verify ownership query: " . $conn->error);
+            return ['success' => false, 'error' => 'Database error: ' . $conn->error];
+        }
         $stmt->bind_param("ii", $courseId, $instructorId);
         $stmt->execute();
         
@@ -485,6 +533,10 @@ class Instructor {
         $types .= "ii";
         
         $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log("Failed to prepare update course query: " . $conn->error);
+            return ['success' => false, 'error' => 'Database error: ' . $conn->error];
+        }
         $stmt->bind_param($types, ...$params);
         
         if ($stmt->execute()) {
@@ -509,6 +561,10 @@ class Instructor {
             WHERE c.id = ? AND c.instructor_id = ?
             GROUP BY c.id
         ");
+        if (!$stmt) {
+            error_log("Failed to prepare verify course query: " . $conn->error);
+            return ['success' => false, 'error' => 'Database error: ' . $conn->error];
+        }
         $stmt->bind_param("ii", $courseId, $instructorId);
         $stmt->execute();
         
@@ -524,6 +580,10 @@ class Instructor {
         
         // Delete course
         $stmt = $conn->prepare("DELETE FROM courses_new WHERE id = ? AND instructor_id = ?");
+        if (!$stmt) {
+            error_log("Failed to prepare delete course query: " . $conn->error);
+            return ['success' => false, 'error' => 'Database error: ' . $conn->error];
+        }
         $stmt->bind_param("ii", $courseId, $instructorId);
         
         if ($stmt->execute()) {
@@ -554,9 +614,14 @@ class Instructor {
             JOIN courses_new c ON e.course_id = c.id
             WHERE c.instructor_id = ? AND $dateCondition
         ");
-        $stmt->bind_param("i", $instructorId);
-        $stmt->execute();
-        $earnings['summary'] = $stmt->get_result()->fetch_assoc();
+        if (!$stmt) {
+            error_log("Failed to prepare earnings summary query: " . $conn->error);
+            $earnings['summary'] = ['total_revenue' => 0, 'total_enrollments' => 0, 'avg_course_price' => 0];
+        } else {
+            $stmt->bind_param("i", $instructorId);
+            $stmt->execute();
+            $earnings['summary'] = $stmt->get_result()->fetch_assoc();
+        }
         
         // Revenue by course
         $stmt = $conn->prepare("
@@ -571,9 +636,14 @@ class Instructor {
             ORDER BY revenue DESC
             LIMIT 10
         ");
-        $stmt->bind_param("i", $instructorId);
-        $stmt->execute();
-        $earnings['by_course'] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        if (!$stmt) {
+            error_log("Failed to prepare earnings by course query: " . $conn->error);
+            $earnings['by_course'] = [];
+        } else {
+            $stmt->bind_param("i", $instructorId);
+            $stmt->execute();
+            $earnings['by_course'] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        }
         
         // Monthly revenue trend
         $stmt = $conn->prepare("
@@ -588,9 +658,14 @@ class Instructor {
             ORDER BY month DESC
             LIMIT 12
         ");
-        $stmt->bind_param("i", $instructorId);
-        $stmt->execute();
-        $earnings['monthly_trend'] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        if (!$stmt) {
+            error_log("Failed to prepare monthly trend query: " . $conn->error);
+            $earnings['monthly_trend'] = [];
+        } else {
+            $stmt->bind_param("i", $instructorId);
+            $stmt->execute();
+            $earnings['monthly_trend'] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        }
         
         return $earnings;
     }
@@ -604,6 +679,10 @@ class Instructor {
         $this->ensureInstructorMetaTable();
         
         $stmt = $conn->prepare("SELECT meta_value FROM instructor_meta WHERE instructor_id = ? AND meta_key = 'specialties'");
+        if (!$stmt) {
+            error_log("Failed to prepare specialties query: " . $conn->error);
+            return [];
+        }
         $stmt->bind_param("i", $instructorId);
         $stmt->execute();
         
@@ -625,6 +704,11 @@ class Instructor {
             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = NOW()
         ");
         
+        if (!$stmt) {
+            error_log("Failed to prepare update specialties query: " . $conn->error);
+            return false;
+        }
+        
         $specialtiesJson = json_encode($specialties);
         $stmt->bind_param("is", $instructorId, $specialtiesJson);
         
@@ -640,6 +724,10 @@ class Instructor {
         $this->ensureInstructorMetaTable();
         
         $stmt = $conn->prepare("SELECT meta_value FROM instructor_meta WHERE instructor_id = ? AND meta_key = 'qualifications'");
+        if (!$stmt) {
+            error_log("Failed to prepare qualifications query: " . $conn->error);
+            return [];
+        }
         $stmt->bind_param("i", $instructorId);
         $stmt->execute();
         
@@ -661,6 +749,11 @@ class Instructor {
             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = NOW()
         ");
         
+        if (!$stmt) {
+            error_log("Failed to prepare update qualifications query: " . $conn->error);
+            return false;
+        }
+        
         $qualificationsJson = json_encode($qualifications);
         $stmt->bind_param("is", $instructorId, $qualificationsJson);
         
@@ -676,6 +769,10 @@ class Instructor {
         $this->ensureInstructorMetaTable();
         
         $stmt = $conn->prepare("SELECT meta_value FROM instructor_meta WHERE instructor_id = ? AND meta_key = 'social_links'");
+        if (!$stmt) {
+            error_log("Failed to prepare social links query: " . $conn->error);
+            return [];
+        }
         $stmt->bind_param("i", $instructorId);
         $stmt->execute();
         
@@ -697,6 +794,11 @@ class Instructor {
             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = NOW()
         ");
         
+        if (!$stmt) {
+            error_log("Failed to prepare update social links query: " . $conn->error);
+            return false;
+        }
+        
         $socialLinksJson = json_encode($socialLinks);
         $stmt->bind_param("is", $instructorId, $socialLinksJson);
         
@@ -715,7 +817,7 @@ class Instructor {
             meta_value LONGTEXT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (instructor_id, meta_key),
-            CONSTRAINT fk_instructor_meta_user FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE CASCADE
+            CONSTRAINT fk_instructor_meta_user FOREIGN KEY (instructor_id) REFERENCES users_new(id) ON DELETE CASCADE
         )";
         
         return (bool)$conn->query($sql);
@@ -822,6 +924,10 @@ class Instructor {
         $types .= "ii";
         
         $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log("Failed to prepare getAllInstructors query: " . $conn->error);
+            return [];
+        }
         $stmt->bind_param($types, ...$params);
         $stmt->execute();
         

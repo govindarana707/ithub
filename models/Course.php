@@ -147,14 +147,13 @@ class Course {
         $sql = "
             SELECT c.*, cat.name as category_name, u.full_name as instructor_name,
                    COUNT(e.id) as enrollment_count,
-                   COALESCE(AVG(cr.rating), 0) as avg_rating,
-                   COUNT(cr.id) as review_count,
+                   0 as avg_rating,
+                   0 as review_count,
                    COUNT(l.id) as lesson_count
             FROM courses_new c
             LEFT JOIN categories_new cat ON c.category_id = cat.id
             LEFT JOIN users_new u ON c.instructor_id = u.id
             LEFT JOIN enrollments_new e ON c.id = e.course_id
-            LEFT JOIN course_reviews cr ON c.id = cr.course_id
             LEFT JOIN lessons l ON c.id = l.course_id
             WHERE c.status = 'published'
         ";
@@ -229,8 +228,8 @@ class Course {
         // Get total count for pagination
         $countSql = str_replace("c.*, cat.name as category_name, u.full_name as instructor_name,
                    COUNT(e.id) as enrollment_count,
-                   COALESCE(AVG(cr.rating), 0) as avg_rating,
-                   COUNT(cr.id) as review_count,
+                   0 as avg_rating,
+                   0 as review_count,
                    COUNT(l.id) as lesson_count", "COUNT(DISTINCT c.id) as total", $sql);
         $countSql = preg_replace('/GROUP BY c\.id.*$/s', '', $countSql);
         

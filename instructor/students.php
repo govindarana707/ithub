@@ -33,7 +33,7 @@ $conn = connectDB();
 $countSql = "
     SELECT COUNT(DISTINCT u.id) as total
     FROM users_new u
-    JOIN enrollments_new e ON u.id = e.student_id
+    JOIN enrollments_new e ON u.id = e.user_id
     JOIN courses_new c ON e.course_id = c.id
     WHERE c.instructor_id = ? AND u.role = 'student'
 ";
@@ -89,7 +89,7 @@ if ($export) {
                c.title as course_title,
                e.progress_percentage, e.status as enrollment_status, e.enrolled_at
         FROM enrollments_new e
-        JOIN users_new u ON u.id = e.student_id
+        JOIN users_new u ON u.id = e.user_id
         JOIN courses_new c ON c.id = e.course_id
         WHERE c.instructor_id = ?
     ";

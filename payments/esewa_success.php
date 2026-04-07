@@ -1,71 +1,79 @@
 <?php
 require_once '../config/config.php';
 require_once '../includes/EsewaGateway.php';
+require_once '../services/PaymentService.php';
 
-// Get response from eSewa
-$transactionId = $_GET['oid'] ?? '';
-$amount = $_GET['amt'] ?? '';
-$productId = $_GET['refId'] ?? '';
+// eSewa API v2 sends data as base64 encoded JSON in 'data' parameter
+$dataParam = $_GET['data'] ?? '';
+
+// If no data param, fall back to old format (oid, amt, refId)
+if (empty($dataParam)) {
+    $transactionId = $_GET['oid'] ?? '';
+    $amount = $_GET['amt'] ?? '';
+    $productId = $_GET['refId'] ?? '';
+} else {
+    // Decode base64 data from eSewa v2
+    $decodedData = base64_decode($dataParam);
+    $responseData = json_decode($decodedData, true);
+    
+    if (!$responseData) {
+        header('Location: ../courses.php?error=payment_failed&reason=invalid_data');
+        exit();
+    }
+    
+    $transactionId = $responseData['transaction_uuid'] ?? '';
+    $amount = $responseData['total_amount'] ?? '';
+    $productId = $responseData['product_code'] ?? '';
+}
 
 if (empty($transactionId) || empty($amount)) {
     header('Location: ../courses.php?error=payment_failed&reason=missing_params');
     exit();
 }
 
-// Initialize eSewa gateway
-$esewa = new EsewaGateway();
-
-// Verify payment
-$verification = $esewa->verifyPayment($transactionId, $amount, $productId);
-
-if ($verification['success']) {
-    // Update payment status
-    $esewa->updatePaymentStatus($transactionId, 'completed', $verification);
+// Use PaymentService to verify and process
+try {
+    $paymentService = new PaymentService();
     
-    // Get payment details
-    $payment = $esewa->getPaymentByTransactionId($transactionId);
+    // Get payment from database
+    $payment = $paymentService->getPaymentByTransactionUuid($transactionId);
     
-    if ($payment) {
+    if (!$payment) {
+        header('Location: ../courses.php?error=payment_not_found');
+        exit();
+    }
+    
+    // Verify with eSewa API
+    $verification = $paymentService->verifyEsewaPayment([
+        'transaction_uuid' => $transactionId,
+        'total_amount' => $amount
+    ]);
+    
+    if ($verification['success']) {
         // Enroll student
         require_once '../models/Course.php';
         $course = new Course();
         
-        $enrollmentResult = $course->enrollStudent($payment['student_id'], $payment['course_id']);
+        $enrollmentResult = $course->enrollStudent($payment['user_id'], $payment['course_id']);
         
         if ($enrollmentResult['success']) {
             // Log activity
-            logActivity($payment['student_id'], 'payment_completed', "eSewa payment completed for course ID: {$payment['course_id']}");
+            logActivity($payment['user_id'], 'payment_completed', "eSewa payment completed for course ID: {$payment['course_id']}");
             
-            // Create notification
-            $conn = connectDB();
-            $stmt = $conn->prepare("INSERT INTO notifications (user_id, title, message, notification_type, related_id, related_type) VALUES (?, ?, ?, 'success', ?, 'course')");
-            $title = "🎉 Payment Successful!";
-            $message = "Your payment for '{$payment['course_title']}' has been successfully processed via eSewa. You are now enrolled!";
-            $stmt->bind_param("issii", $payment['student_id'], $title, $message, $payment['course_id']);
-            $stmt->execute();
-            $stmt->close();
-            $conn->close();
-            
-            // Clear session
-            unset($_SESSION['esewa_payment']);
-            
-            header('Location: ../student/courses.php?success=payment_completed&course_id=' . $payment['course_id']);
+            header('Location: ../student/my-courses.php?success=payment_completed&course_id=' . $payment['course_id']);
             exit();
         } else {
-            // Payment successful but enrollment failed
-            logActivity($payment['student_id'], 'enrollment_failed_after_payment', "Payment successful but enrollment failed for course ID: {$payment['course_id']}");
-            header('Location: ../student/courses.php?error=enrollment_failed&payment_success=true');
+            header('Location: ../student/my-courses.php?error=enrollment_failed&payment_success=true');
             exit();
         }
     } else {
-        header('Location: ../student/courses.php?error=payment_verification_failed');
+        header('Location: ../courses.php?error=payment_verification_failed&reason=' . urlencode($verification['error']));
         exit();
     }
-} else {
-    // Payment verification failed
-    $esewa->updatePaymentStatus($transactionId, 'failed', $verification);
     
-    header('Location: ../student/courses.php?error=payment_verification_failed&reason=' . urlencode($verification['error']));
+} catch (Exception $e) {
+    error_log("eSewa success handling error: " . $e->getMessage());
+    header('Location: ../courses.php?error=payment_processing_failed');
     exit();
 }
 ?>

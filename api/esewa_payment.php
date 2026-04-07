@@ -1,9 +1,42 @@
 <?php
-require_once '../includes/session_helper.php';
-require_once '../config/config.php';
-require_once '../models/User.php';
-require_once '../includes/AuthEnhancements.php';
-require_once __DIR__ . '/../services/EnrollmentServiceNew.php';
+// Disable error display to ensure clean JSON output
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+
+// Log start of request
+error_log("esewa_payment.php - Starting request");
+
+// Register shutdown handler to catch fatal errors
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error && ($error['type'] === E_ERROR || $error['type'] === E_PARSE || $error['type'] === E_CORE_ERROR)) {
+        error_log("esewa_payment.php - Fatal error: " . $error['message'] . " in " . $error['file'] . ":" . $error['line']);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Fatal error', 'error' => $error['message'], 'file' => $error['file'], 'line' => $error['line']]);
+    }
+});
+
+try {
+    require_once '../includes/session_helper.php';
+    require_once '../config/config.php';
+    require_once '../models/User.php';
+    require_once '../includes/AuthEnhancements.php';
+    
+    error_log("esewa_payment.php - Config loaded");
+    
+    require_once __DIR__ . '/../services/PaymentService.php';
+    
+    error_log("esewa_payment.php - PaymentService loaded");
+    
+    require_once __DIR__ . '/../services/EnrollmentServiceNew.php';
+    
+    error_log("esewa_payment.php - EnrollmentService loaded");
+} catch (Throwable $e) {
+    error_log("esewa_payment.php - Load error: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'message' => 'Load error', 'error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
+    exit();
+}
 
 header('Content-Type: application/json');
 
@@ -73,8 +106,8 @@ try {
         'transaction_uuid' => $paymentResult['transaction_uuid']
     ]);
     
-} catch (Exception $e) {
-    error_log("eSewa payment API error: " . $e->getMessage());
-    sendJSON(['success' => false, 'message' => 'Payment service error', 'error' => $e->getMessage()]);
+} catch (Throwable $e) {
+    error_log("eSewa payment API error: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+    sendJSON(['success' => false, 'message' => 'Payment service error', 'error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
 }
 ?>

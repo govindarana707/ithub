@@ -51,7 +51,6 @@ $conn->close();
 <div class="list-group sidebar-modern">
     <a href="dashboard.php" class="list-group-item list-group-item-action <?php echo $current_page == 'dashboard.php' ? 'active' : ''; ?>">
         <i class="fas fa-tachometer-alt me-2"></i> Dashboard
-        <span class="badge bg-primary float-end">New</span>
     </a>
     <a href="courses.php" class="list-group-item list-group-item-action <?php echo $current_page == 'courses.php' ? 'active' : ''; ?>">
         <i class="fas fa-graduation-cap me-2"></i> My Courses
@@ -100,6 +99,9 @@ $conn->close();
     transition: all 0.3s ease;
     position: relative;
     background: white;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .sidebar-modern .list-group-item:hover {
@@ -117,12 +119,23 @@ $conn->close();
     transform: translateX(0);
 }
 
+.sidebar-modern .list-group-item i {
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.sidebar-modern .list-group-item span:not(.badge) {
+    flex-grow: 1;
+}
+
 .sidebar-modern .badge {
     border-radius: 20px;
-    padding: 4px 8px;
+    padding: 4px 10px;
     font-size: 11px;
     font-weight: 600;
-    animation: pulse 2s infinite;
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
 @keyframes pulse {
@@ -133,14 +146,24 @@ $conn->close();
 
 <script>
 $(document).ready(function() {
-    // Load dynamic counts
+    console.log('Loading sidebar stats...');
     $.ajax({
-        url: 'api/instructor_stats.php',
+        url: '../api/instructor_stats.php',
         type: 'GET',
+        dataType: 'json',
         success: function(data) {
-            if (data.courses) $('#courseCount').text(data.courses);
-            if (data.students) $('#studentCount').text(data.students);
-            if (data.quizzes) $('#quizCount').text(data.quizzes);
+            console.log('API Response:', data);
+            if (data.success) {
+                $('#courseCount').text(data.courses || 0);
+                $('#studentCount').text(data.students || 0);
+                $('#quizCount').text(data.quizzes || 0);
+            } else {
+                console.error('API returned error:', data.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('AJAX Error:', status, error);
+            console.error('Response:', xhr.responseText);
         }
     });
 });

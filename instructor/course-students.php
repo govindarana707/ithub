@@ -40,7 +40,7 @@ $export = ($_GET['export'] ?? '') === 'csv';
 
 // Base query
 $baseSql = "
-    FROM enrollments e
+    FROM enrollments_new e
     JOIN users u ON u.id = e.student_id
     WHERE e.course_id = ?
 ";

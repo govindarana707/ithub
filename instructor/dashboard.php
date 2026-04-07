@@ -210,12 +210,66 @@ function calculateAverage($trend) {
 <!-- Enhanced Dashboard Styles -->
 <style>
 /* Import enhanced dashboard layout styles */
-@import url('../assets/css/dashboard-enhanced-layout.css');
+@import url('../assets/css/dashboard-enhanced-layout.css?v=2');
 
 /* Additional custom styles for instructor dashboard */
 .instructor-dashboard {
     background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
     min-height: 100vh;
+}
+
+.dashboard-card {
+    background: white !important;
+    border: 1px solid #e5e7eb !important;
+}
+
+.overview-stat-card {
+    background: white !important;
+    border: 1px solid #e5e7eb !important;
+}
+
+.quick-stat {
+    background: white !important;
+    border: 1px solid #e5e7eb !important;
+}
+
+/* Force white background on all cards */
+.dashboard-card,
+.overview-stat-card,
+.quick-stat,
+.course-card-modern,
+.card,
+.card-body,
+.stat-card,
+.visual-container,
+.sidebar,
+.main-content,
+.activity-item,
+.engagement-item,
+.trend-item,
+.achievement-badge,
+.quick-action-btn,
+.empty-state,
+.empty-state-table,
+.empty-state-chart,
+.empty-icon {
+    background: white !important;
+    background-color: white !important;
+}
+
+/* Fix card text colors */
+.card-title,
+.stat-value,
+.stat-label,
+.quick-stat-value,
+.quick-stat-label,
+.metric-value,
+.metric-label {
+    color: #1e293b !important;
+}
+
+.text-muted {
+    color: #64748b !important;
 }
 
 .dashboard-header {
@@ -1018,6 +1072,18 @@ function calculateAverage($trend) {
         
         // Advanced Dashboard Functionality
         $(document).ready(function() {
+            // Force white background on all cards (override dark mode)
+            function forceWhiteBackgrounds() {
+                const cards = document.querySelectorAll('.dashboard-card, .overview-stat-card, .quick-stat, .course-card-modern, .card, .stat-card, .activity-item, .engagement-item');
+                cards.forEach(card => {
+                    card.style.background = 'white';
+                    card.style.backgroundColor = 'white';
+                });
+            }
+            forceWhiteBackgrounds();
+            setTimeout(forceWhiteBackgrounds, 100);
+            setTimeout(forceWhiteBackgrounds, 500);
+            
             // Initialize Charts
             initializeCharts();
             
